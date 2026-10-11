@@ -193,7 +193,13 @@ def test_sigterm_during_bootstrap_is_not_lost_and_signals_restored(tmp_path, mon
             closed.append(True)
 
     settings = type(
-        "Settings", (), {"persistence_backend": "postgres", "database_url": "synthetic"}
+        "Settings",
+        (),
+        {
+            "persistence_backend": "postgres",
+            "database_url": "synthetic",
+            "is_production_like": False,
+        },
     )()
     monkeypatch.setattr(module.RuntimeSettings, "from_environ", lambda: settings)
     monkeypatch.setattr(module, "PostgresFiscalDatabase", BootstrapDatabase)
@@ -252,7 +258,13 @@ def test_database_failure_closes_pool_and_restores_signals(tmp_path, monkeypatch
                 raise RuntimeError("synthetic DB failure")
 
     settings = type(
-        "Settings", (), {"persistence_backend": "postgres", "database_url": "synthetic"}
+        "Settings",
+        (),
+        {
+            "persistence_backend": "postgres",
+            "database_url": "synthetic",
+            "is_production_like": False,
+        },
     )()
     monkeypatch.setattr(module.RuntimeSettings, "from_environ", lambda: settings)
     monkeypatch.setattr(module, "PostgresFiscalDatabase", BrokenDatabase)
@@ -279,6 +291,8 @@ def process_env():
     )
     env.pop("NFCORE_WORKER_ONESHOT", None)
     subprocess.run([sys.executable, str(FIXTURE), "reset"], env=env, check=True, timeout=20)
+    # Governed CI fixture applies schema before the worker process is started.
+    subprocess.run([sys.executable, str(FIXTURE), "prepare"], env=env, check=True, timeout=30)
     return env
 
 

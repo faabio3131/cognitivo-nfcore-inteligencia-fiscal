@@ -11,6 +11,7 @@ from kordena_fiscal.persistence.cakto import (
     CAKTO_SCHEMA_NAME,
     CAKTO_SCHEMA_STATEMENTS,
     CAKTO_SCHEMA_VERSION,
+    postgres_cakto_commercial_database,
 )
 from kordena_fiscal.persistence.command_commercial_schema import (
     COMMAND_COMMERCIAL_NAME,
@@ -185,6 +186,12 @@ def apply() -> None:
     environment = os.getenv("NFCORE_ENVIRONMENT", "").strip().casefold()
     if environment not in {"staging", "production"}:
         raise RuntimeError("schema migration apply is restricted to staging/production profiles")
+    # Railway service preDeployCommand must not be a second migration authority.
+    # Only the external governed orchestrator, after a proven backup, may apply.
+    if os.getenv("RAILWAY_SERVICE_ID", "").strip():
+        raise RuntimeError(
+            "schema migration blocked: Railway service preDeploy is not an authorized executor"
+        )
     _require_apply_approval(environment)
     dsn = os.getenv("DATABASE_URL", "").strip()
     if not dsn:
@@ -194,12 +201,16 @@ def apply() -> None:
     try:
         before = database.applied_migrations()
         applied = database.initialize()
-        after = database.applied_migrations()
+        after = database.require_current_schema()
+        cakto = postgres_cakto_commercial_database(database)
+        cakto_changed = cakto.initialize()
+        cakto_versions = cakto.require_current_schema()
     finally:
         database.close()
     print(
         "schema migration: PASS "
-        f"environment={environment} before={before} applied={applied} after={after}"
+        f"environment={environment} before={before} applied={applied} after={after} "
+        f"cakto_changed={cakto_changed} cakto_versions={cakto_versions}"
     )
 
 
