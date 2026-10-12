@@ -25,13 +25,18 @@ with Path(os.environ["FAKE_COMMANDS"]).open("a") as handle:
     handle.write(" ".join(args) + "\n")
 up = Path(os.environ["FAKE_UP"])
 up_services = up.read_text().splitlines() if up.exists() else []
-service = args[args.index("--service") + 1] if "--service" in args else "api"
+rollback_file = Path(os.environ.get("FAKE_ROLLBACKS", "/nonexistent-rollback-file"))
+rolled_back = rollback_file.read_text().splitlines() if rollback_file.exists() else []
+service = (
+    args[args.index("--service") + 1]
+    if "--service" in args else os.environ["NFCORE_RAILWAY_API_SERVICE"]
+)
 
 
 def snap(name):
-    is_new = name in up_services
+    is_new = name in up_services and name not in rolled_back
     return {
-        "id": name + "-new" if is_new else name + "-old",
+        "id": name + ("-rollback" if name in rolled_back else "-new" if is_new else "-old"),
         "status": "SUCCESS",
         "meta": {"commitHash": os.environ["FAKE_NEW_SHA"] if is_new else "b" * 40},
     }
@@ -41,24 +46,35 @@ if args[:2] == ["deployment", "list"]:
     print(json.dumps([snap(service)]))
 elif args[0] == "status":
     rows = []
-    for name in ["api", "worker", "portal"]:
+    for name in [
+        os.environ["NFCORE_RAILWAY_API_SERVICE"],
+        os.environ["NFCORE_RAILWAY_WORKER_SERVICE"],
+        os.environ["NFCORE_RAILWAY_PORTAL_SERVICE"],
+    ]:
         d = snap(name)
-        instances = (
-            []
-            if name == "worker" and os.environ.get("FAKE_STOPPED") == "true"
-            else [{"status": "RUNNING"}]
+        stopped = (
+            name == os.environ["NFCORE_RAILWAY_WORKER_SERVICE"]
+            and (
+                name in rolled_back
+                or os.environ.get("FAKE_ALWAYS_STOPPED") == "true"
+                or (
+                    os.environ.get("FAKE_STOPPED") == "true"
+                    and name not in up_services
+                )
+            )
         )
+        instances = [] if stopped else [{"status": "RUNNING"}]
         rows.append({"node": {
             "serviceId": name, "serviceName": name,
             "latestDeployment": {"id": d["id"], "status": "SUCCESS"},
             "activeDeployments": [{
-                "id": d["id"], "status": "SUCCESS", "deploymentStopped": False,
+                "id": d["id"], "status": "SUCCESS", "deploymentStopped": stopped,
                 "instances": instances,
             }],
         }})
     print(json.dumps({
-        "id": "project", "environments": {"edges": [{"node": {
-            "id": "env", "serviceInstances": {"edges": rows},
+        "id": os.environ["NFCORE_RAILWAY_PROJECT_ID"], "environments": {"edges": [{"node": {
+            "id": os.environ["NFCORE_RAILWAY_ENVIRONMENT_ID"], "serviceInstances": {"edges": rows},
         }}]},
     }))
 elif args[0] == "up":
@@ -87,6 +103,7 @@ elif args[:4] == ["postgres", "pitr", "backup", "list"]:
         FAKE_COMMANDS=str(tmp_path / "cmds.log"),
         FAKE_UP=str(tmp_path / "up.log"),
         FAKE_BACKUP_NAME=str(tmp_path / "backup_name"),
+        FAKE_ROLLBACKS=str(tmp_path / "rollbacks.log"),
         FAKE_NEW_SHA=sha,
         FAKE_STOPPED="true" if stopped_worker else "false",
         NFCORE_RAILWAY_PROJECT_ID="project",
@@ -167,3 +184,113 @@ def test_driver_rejects_corrupted_rollback_baselines_before_any_rollout(
         after = (tmp_path / "cmds.log").read_text()
         assert "up --ci" not in after[len(before):]
     baseline.write_text(valid)
+
+
+STAGING_PROJECT = "b84b290d-f3b4-46a1-9023-0b761cb96b0d"
+STAGING_ENVIRONMENT = "c9878b9b-62b2-4a97-b8ba-743c8a3e99ec"
+
+
+def _staging_degraded(env: dict[str, str]) -> dict[str, str]:
+    env.update(
+        NFCORE_RAILWAY_ALLOW_STOPPED_WORKER_BASELINE="true",
+        NFCORE_ENVIRONMENT="staging",
+        NFCORE_RAILWAY_PROJECT_ID=STAGING_PROJECT,
+        NFCORE_RAILWAY_ENVIRONMENT_ID=STAGING_ENVIRONMENT,
+        NFCORE_RAILWAY_WORKER_SERVICE="nfcore-worker",
+    )
+    return env
+
+
+def test_explicit_staging_exception_captures_stopped_worker_and_requires_new_running_one(
+    tmp_path: Path,
+) -> None:
+    env = _staging_degraded(_fake(tmp_path, stopped_worker=True))
+    captured = _run(env, "prepare-rollback")
+    assert captured.returncode == 0, captured.stdout + captured.stderr
+    baseline = (tmp_path / "baseline.tsv").read_text()
+    assert f"nfcore-worker\tnfcore-worker-old\t{'b' * 40}\tstopped" in baseline
+    assert f"api\tapi-old\t{'b' * 40}\trunning" in baseline
+    assert f"portal\tportal-old\t{'b' * 40}\trunning" in baseline
+    assert _run(env, "backup").returncode == 0
+    deployed = _run(env, "deploy")
+    assert deployed.returncode == 0, deployed.stdout + deployed.stderr
+    assert _run(env, "verify-worker").returncode == 0
+    assert (tmp_path / "cmds.log").read_text().count("up --ci") == 3
+
+
+def test_explicit_staging_exception_never_accepts_a_new_stopped_worker(
+    tmp_path: Path,
+) -> None:
+    env = _staging_degraded(_fake(tmp_path, stopped_worker=True))
+    env["FAKE_ALWAYS_STOPPED"] = "true"
+    assert _run(env, "prepare-rollback").returncode == 0
+    assert _run(env, "backup").returncode == 0
+    result = _run(env, "deploy")
+    assert result.returncode != 0
+    assert "DEPLOY_READY" not in result.stdout
+    assert (tmp_path / "cmds.log").read_text().count("up --ci") == 2
+
+
+def test_degraded_staging_baseline_is_invalid_without_exact_scope_and_opt_in(
+    tmp_path: Path,
+) -> None:
+    env = _staging_degraded(_fake(tmp_path, stopped_worker=True))
+    for key, value in [
+        ("NFCORE_RAILWAY_ALLOW_STOPPED_WORKER_BASELINE", "false"),
+        ("NFCORE_ENVIRONMENT", "production"),
+        ("NFCORE_ENVIRONMENT", "development"),
+        ("NFCORE_RAILWAY_PROJECT_ID", "another-project"),
+        ("NFCORE_RAILWAY_ENVIRONMENT_ID", "another-environment"),
+        ("NFCORE_RAILWAY_WORKER_SERVICE", "other-worker"),
+    ]:
+        invalid = {**env, key: value}
+        result = _run(invalid, "prepare-rollback")
+        assert result.returncode != 0, (key, result.stdout, result.stderr)
+        assert "ROLLBACK_BASELINE_CAPTURED" not in result.stdout
+        assert "postgres pitr backup" not in (tmp_path / "cmds.log").read_text()
+    assert not (tmp_path / "baseline.tsv").exists()
+
+
+def test_revoking_opt_in_blocks_deploy_of_previously_captured_degraded_baseline(
+    tmp_path: Path,
+) -> None:
+    env = _staging_degraded(_fake(tmp_path, stopped_worker=True))
+    assert _run(env, "prepare-rollback").returncode == 0
+    invalid = {**env, "NFCORE_RAILWAY_ALLOW_STOPPED_WORKER_BASELINE": "false"}
+    result = _run(invalid, "deploy")
+    assert result.returncode != 0
+    assert "DEPLOY_READY" not in result.stdout
+    assert "up --ci" not in (tmp_path / "cmds.log").read_text()
+
+
+def test_tampered_stopped_api_baseline_is_rejected_without_deploy(
+    tmp_path: Path,
+) -> None:
+    env = _staging_degraded(_fake(tmp_path, stopped_worker=True))
+    assert _run(env, "prepare-rollback").returncode == 0
+    baseline = tmp_path / "baseline.tsv"
+    baseline.write_text(baseline.read_text().replace("\trunning", "\tstopped", 1))
+    result = _run(env, "deploy")
+    assert result.returncode != 0
+    assert "up --ci" not in (tmp_path / "cmds.log").read_text()
+
+
+def test_stopped_worker_rollback_reports_degraded_state_not_healthy(
+    tmp_path: Path,
+) -> None:
+    env = _staging_degraded(_fake(tmp_path, stopped_worker=True))
+    assert _run(env, "prepare-rollback").returncode == 0
+    assert _run(env, "backup").returncode == 0
+    assert _run(env, "deploy").returncode == 0
+    helper = tmp_path / "rollback_helper.py"
+    helper.write_text(
+        "import os,sys\nfrom pathlib import Path\n"
+        "name=sys.argv[2].removesuffix('-old')\n"
+        "with Path(os.environ['FAKE_ROLLBACKS']).open('a') as f:f.write(name+'\\n')\n"
+    )
+    env["NFCORE_RAILWAY_GRAPHQL_HELPER"] = str(helper)
+    reverted = _run(env, "rollback")
+    assert reverted.returncode == 0, reverted.stdout + reverted.stderr
+    assert "ROLLBACK_RESTORED_DEGRADED_WORKER" in reverted.stdout
+    assert "ROLLBACK_READY" not in reverted.stdout
+    assert "WORKER_PRIOR_STOPPED_STATE_RESTORED" in reverted.stdout
