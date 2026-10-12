@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -45,8 +46,16 @@ from .cakto import build_cakto_webhook_router
 from .composition import RuntimeComposition, build_postgres_runtime_composition
 from .config import RuntimeSettings
 from .fiscal_runtime import FiscalOperationHandler
-from .observability import MetricsRegistry, RequestTimer, StructuredLogger
+from .observability import (
+    MetricsRegistry,
+    RequestTimer,
+    SafeTracer,
+    StructuredLogger,
+    TraceContext,
+)
 from .security import configure_edge_security
+
+_TRACE_REFERENCE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}\Z")
 
 
 class RuntimeApi:
@@ -119,6 +128,7 @@ def create_runtime_app(
     *,
     metrics: MetricsRegistry | None = None,
     logger: StructuredLogger | None = None,
+    tracer: SafeTracer | None = None,
     cakto_receiver: CaktoWebhookReceiver | None = None,
     command_secret_resolver: SecretResolver | None = None,
     command_product_id: str = "nfcore",
@@ -145,6 +155,7 @@ def create_runtime_app(
         fiscal_operation_handlers=fiscal_operation_handlers,
     )
     runtime_metrics = metrics or MetricsRegistry()
+    runtime_tracer = tracer or SafeTracer()
     runtime_logger = logger or StructuredLogger(
         service="nfcore-api",
         environment=resolved.environment.value,
@@ -284,14 +295,32 @@ def create_runtime_app(
     )
     app.state.nfcore_metrics = runtime_metrics
     app.state.nfcore_logger = runtime_logger
+    app.state.nfcore_tracer = runtime_tracer
     app.state.nfcore_production_authority = production_authority
     configure_edge_security(app, resolved)
 
     @app.middleware("http")
     async def observe_request(request: Request, call_next):  # type: ignore[no-untyped-def]
         timer = RequestTimer()
+        started_at = datetime.now(UTC)
         correlation_id = request.headers.get("X-Correlation-Id", "").strip() or uuid4().hex
         causation_id = request.headers.get("X-Causation-Id", "").strip() or None
+        # Untrusted HTTP headers may contain secrets; only bounded safe references
+        # become trace metadata. Existing request/header contracts are unchanged.
+        trace_correlation = (
+            correlation_id if _TRACE_REFERENCE.fullmatch(correlation_id) else uuid4().hex
+        )
+        trace_causation = (
+            causation_id
+            if causation_id is not None and _TRACE_REFERENCE.fullmatch(causation_id)
+            else None
+        )
+        context = TraceContext(
+            trace_id=uuid4().hex,
+            correlation_id=trace_correlation,
+            causation_id=trace_causation,
+        )
+        request.state.nfcore_trace_context = context
         try:
             response = await call_next(request)
             status_code = response.status_code
@@ -320,6 +349,14 @@ def create_runtime_app(
                 duration_seconds=elapsed,
                 error_type=type(exc).__name__,
             )
+            runtime_tracer.record(
+                operation="http.request",
+                context=context,
+                started_at=started_at,
+                elapsed_seconds=elapsed,
+                outcome="error",
+                attributes={"method": request.method, "status_class": "5xx"},
+            )
             raise
         elapsed = timer.elapsed()
         status_class = f"{status_code // 100}xx"
@@ -346,6 +383,14 @@ def create_runtime_app(
             result=outcome,
             duration_seconds=elapsed,
         )
+        runtime_tracer.record(
+            operation="http.request",
+            context=context,
+            started_at=started_at,
+            elapsed_seconds=elapsed,
+            outcome=outcome,
+            attributes={"method": request.method, "status_class": status_class},
+        )
         response.headers["X-Correlation-Id"] = correlation_id
         return response
 
@@ -354,8 +399,19 @@ def create_runtime_app(
         return {"status": "live", "product": "FM NFCORE"}
 
     @app.get("/health/ready", tags=["health"])
-    async def ready() -> JSONResponse:
+    async def ready(request: Request) -> JSONResponse:
+        db_timer = RequestTimer()
+        db_started = datetime.now(UTC)
         healthy, reason = runtime.ready()
+        if resolved.persistence_backend == "postgres":
+            runtime_tracer.record(
+                operation="db.readiness",
+                context=request.state.nfcore_trace_context,
+                started_at=db_started,
+                elapsed_seconds=db_timer.elapsed(),
+                outcome="ok" if healthy else "error",
+                attributes={"backend": "postgres"},
+            )
         runtime_metrics.increment(
             "nfcore_dependency_checks_total",
             service="postgres" if resolved.persistence_backend == "postgres" else "sqlite",

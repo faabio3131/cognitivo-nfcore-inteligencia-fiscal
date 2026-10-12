@@ -3,9 +3,15 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
+import pytest
 from fastapi.testclient import TestClient
 
 from kordena_fiscal.application import BackgroundCycleResult
+from kordena_fiscal.application.webhook_delivery import (
+    WebhookDeliveryRequest,
+    WebhookDeliveryResponse,
+    WebhookDestination,
+)
 from kordena_fiscal.runtime.api import create_runtime_app
 from kordena_fiscal.runtime.config import RuntimeSettings
 from kordena_fiscal.runtime.observability import (
@@ -17,6 +23,7 @@ from kordena_fiscal.runtime.observability import (
     WorkerObservability,
     redact,
 )
+from kordena_fiscal.runtime.worker_composition import _TracedWebhookTransport
 
 SECRET = "never-expose-this-secret"
 NOW = datetime(2026, 9, 14, 23, 30, tzinfo=UTC)
@@ -172,3 +179,151 @@ def test_health_payload_never_contains_database_url_or_secret_profile_material()
     payload = live.text + ready.text
     assert "DATABASE_URL" not in payload
     assert SECRET not in payload
+
+
+def test_p09_http_tracing_uses_existing_runtime_sink_and_correlation() -> None:
+    records: list[TraceRecord] = []
+
+    class Sink:
+        def record(self, trace: TraceRecord) -> None:
+            records.append(trace)
+
+    app = create_runtime_app(_settings(), tracer=SafeTracer(Sink()))
+    with TestClient(app) as client:
+        response = client.get(
+            "/health/live",
+            headers={"X-Correlation-Id": "p09-api-correlation",
+                     "Authorization": f"Bearer {SECRET}"},
+        )
+    assert response.status_code == 200
+    assert response.headers["X-Correlation-Id"] == "p09-api-correlation"
+    assert len(records) == 1
+    trace = records[0]
+    assert trace.operation == "http.request"
+    assert trace.context.correlation_id == "p09-api-correlation"
+    assert len(trace.context.trace_id) == 32
+    assert trace.outcome == "success"
+    assert trace.attributes == {"method": "GET", "status_class": "2xx"}
+    assert SECRET not in repr(records)
+    assert "health/live" not in repr(records)
+
+
+def test_p09_http_tracing_sink_failure_never_breaks_health() -> None:
+    class FailingSink:
+        def record(self, trace: TraceRecord) -> None:
+            del trace
+            raise RuntimeError(SECRET)
+
+    app = create_runtime_app(_settings(), tracer=SafeTracer(FailingSink()))
+    with TestClient(app) as client:
+        assert client.get("/health/live").status_code == 200
+
+
+@pytest.mark.parametrize("status_code", [302, 503])
+def test_p09_canonical_webhook_transport_emits_safe_outcomes(status_code: int) -> None:
+    records: list[TraceRecord] = []
+
+    class Sink:
+        def record(self, trace: TraceRecord) -> None:
+            records.append(trace)
+
+    class FakeTransport:
+        def deliver(self, request: WebhookDeliveryRequest) -> WebhookDeliveryResponse:
+            assert request.body == SECRET.encode()
+            return WebhookDeliveryResponse(status_code=status_code, error_detail=SECRET)
+
+    request = WebhookDeliveryRequest(
+        destination=WebhookDestination("synthetic-destination", "https://example.org/hook"),
+        body=SECRET.encode(),
+        headers=(("Content-Type", "application/json"),),
+        outbox_entry_id="outbox-synthetic-1",
+        attempt_count=1,
+    )
+    traced = _TracedWebhookTransport(FakeTransport(), SafeTracer(Sink()))
+    response = traced.deliver(request)
+    assert response.status_code == status_code and response.error_detail == SECRET
+    assert len(records) == 1
+    assert records[0].operation == "external.webhook"
+    assert records[0].outcome == "error"
+    assert records[0].attributes == {"status_class": f"{status_code // 100}xx"}
+    assert records[0].context.causation_id == "outbox-synthetic-1"
+    assert SECRET not in repr(records)
+    assert "example.org" not in repr(records)
+
+
+def test_p09_webhook_transport_preserves_exception_and_observes_failure() -> None:
+    records: list[TraceRecord] = []
+
+    class Sink:
+        def record(self, trace: TraceRecord) -> None:
+            records.append(trace)
+
+    class FailingTransport:
+        def deliver(self, request: WebhookDeliveryRequest) -> WebhookDeliveryResponse:
+            del request
+            raise RuntimeError(SECRET)
+
+    request = WebhookDeliveryRequest(
+        destination=WebhookDestination("synthetic-destination", "https://example.org/hook"),
+        body=b"synthetic",
+        headers=(("Content-Type", "application/json"),),
+        outbox_entry_id="outbox-synthetic-2",
+        attempt_count=1,
+    )
+    with pytest.raises(RuntimeError, match=SECRET):
+        _TracedWebhookTransport(FailingTransport(), SafeTracer(Sink())).deliver(request)
+    assert len(records) == 1 and records[0].outcome == "error"
+    assert SECRET not in repr(records)
+
+
+def test_p09_untrusted_correlation_header_does_not_escape_into_trace() -> None:
+    records: list[TraceRecord] = []
+
+    class Sink:
+        def record(self, trace: TraceRecord) -> None:
+            records.append(trace)
+
+    app = create_runtime_app(
+        _settings(),
+        tracer=SafeTracer(Sink()),
+        logger=StructuredLogger(service="nfcore-api", environment="test", sink=lambda _: None),
+    )
+    with TestClient(app) as client:
+        response = client.get(
+            "/health/live",
+            headers={"X-Correlation-Id": f"Bearer {SECRET}",
+                     "X-Causation-Id": f"Bearer {SECRET}"},
+        )
+    assert response.status_code == 200
+    assert len(records) == 1
+    assert records[0].context.causation_id is None
+    assert len(records[0].context.correlation_id) == 32
+    assert SECRET not in repr(records)
+
+
+def test_p09_webhook_trace_does_not_replace_canonical_response_validation() -> None:
+    records: list[TraceRecord] = []
+    malformed = object()
+
+    class Sink:
+        def record(self, trace: TraceRecord) -> None:
+            records.append(trace)
+
+    class MalformedTransport:
+        def deliver(self, request: WebhookDeliveryRequest) -> object:
+            del request
+            return malformed
+
+    request = WebhookDeliveryRequest(
+        destination=WebhookDestination("synthetic-destination", "https://example.org/hook"),
+        body=b"synthetic",
+        headers=(("Content-Type", "application/json"),),
+        outbox_entry_id="outbox-synthetic-malformed",
+        attempt_count=1,
+    )
+    response = _TracedWebhookTransport(MalformedTransport(), SafeTracer(Sink())).deliver(
+        request
+    )
+    assert response is malformed
+    assert len(records) == 1 and records[0].outcome == "error"
+    assert records[0].attributes == {}
