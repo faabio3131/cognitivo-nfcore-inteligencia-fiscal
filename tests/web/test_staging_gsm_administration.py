@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import SimpleNamespace
 from typing import Any
 
@@ -53,13 +53,20 @@ class _BindingAdmin:
     def __init__(self) -> None:
         self.bound: list[Any] = []
 
+    def current_binding(self, reference_id: str) -> Any | None:
+        return next((b for b in reversed(self.bound) if b.reference_id == reference_id), None)
+
     def put(
         self, *, actor: _Actor, binding: Any, expected_revision: int, correlation_id: str
     ) -> None:
         assert actor.account.is_platform_admin
-        assert expected_revision == 0
+        previous = self.current_binding(binding.reference_id)
+        if previous == binding:
+            return
+        assert expected_revision == (previous.revision if previous is not None else 0)
         assert correlation_id
-        self.bound.append(binding)
+        if previous != binding:
+            self.bound.append(binding)
 
 
 def _client(router: object) -> TestClient:
@@ -77,10 +84,31 @@ def test_binding_requires_session_and_platform_admin() -> None:
     response = client.post("/internal/staging/gsm-binding", headers=HEADERS)
     assert response.status_code == 200
     assert {b.workload_id for b in administration.bound} == {"nfcore-worker", "nfcore-api"}
+    assert {b.workload_id: b.cloud_version for b in administration.bound} == {
+        "nfcore-worker": "1", "nfcore-api": "2"
+    }
     assert all(
         b.resource.endswith("nfcore-stg-pilot-webhook-signing")
         for b in administration.bound
     )
+
+
+
+def test_binding_upgrades_existing_api_version_with_revision_and_replay() -> None:
+    administration = _BindingAdmin()
+    client = _client(create_staging_gsm_binding_router(_Identity(_Actor()), administration))
+    client.cookies.update(COOKIES)
+    assert client.post("/internal/staging/gsm-binding", headers=HEADERS).status_code == 200
+    verifier = administration.current_binding("sec_nfcore_staging_pilot_gsm_verify_01")
+    assert verifier.cloud_version == "2"
+    administration.bound[-1] = replace(verifier, cloud_version="1")
+    assert client.post("/internal/staging/gsm-binding", headers=HEADERS).status_code == 200
+    upgraded = administration.current_binding(verifier.reference_id)
+    assert upgraded.cloud_version == "2"
+    assert upgraded.revision == 2
+    count = len(administration.bound)
+    assert client.post("/internal/staging/gsm-binding", headers=HEADERS).status_code == 200
+    assert len(administration.bound) == count
 
 
 def test_binding_rejects_non_platform_admin() -> None:
