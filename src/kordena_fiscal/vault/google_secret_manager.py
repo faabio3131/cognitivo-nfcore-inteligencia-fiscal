@@ -9,7 +9,8 @@ from __future__ import annotations
 import base64
 import json
 import math
-from collections.abc import Callable
+import re
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
@@ -42,6 +43,36 @@ from .external import (
 
 MAX_ENVELOPE_BYTES = 65536
 GSM_ENDPOINT = "secretmanager.googleapis.com"
+
+_VERSION_NAME = re.compile(
+    r"projects/([A-Za-z0-9_.:-]{1,64})/secrets/([A-Za-z0-9_-]{1,255})/versions/([1-9][0-9]{0,18})\Z"
+)
+
+
+def same_secret_version(
+    returned: object,
+    requested: str,
+    project_numbers: Mapping[str, str] | None = None,
+) -> bool:
+    """Fail-closed identity check for the version Google returned.
+
+    AccessSecretVersion may echo the project NUMBER (``projects/123/...``) even when the
+    request used the project ID (``projects/my-project/...``). Secret ID and version must
+    match exactly. The project segment must match exactly, or be the one number explicitly
+    pinned for the requested project ID in ``project_numbers`` (default: none, strict).
+    No other number, and no unpinned project ID, is ever treated as equivalent.
+    """
+    if not isinstance(returned, str):
+        return False
+    got = _VERSION_NAME.fullmatch(returned)
+    want = _VERSION_NAME.fullmatch(requested)
+    if got is None or want is None or got.group(2, 3) != want.group(2, 3):
+        return False
+    returned_project, requested_project = got.group(1), want.group(1)
+    if returned_project == requested_project:
+        return True
+    pinned = (project_numbers or {}).get(requested_project)
+    return pinned is not None and pinned.isdigit() and returned_project == pinned
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -173,6 +204,7 @@ class DurableGsmReader:
         environment: str,
         workload_id: str,
         allowed_resources: frozenset[str],
+        project_numbers: Mapping[str, str] | None = None,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         if environment not in {"test", "development", "staging", "production"}:
@@ -184,6 +216,7 @@ class DurableGsmReader:
         self.environment = environment
         self._workload = workload_id
         self._resources = frozenset(allowed_resources)
+        self._project_numbers = dict(project_numbers or {})
         self._clock = clock or (lambda: datetime.now(UTC))
 
     def _binding(self, reference_id: str) -> SecretBinding:
@@ -242,7 +275,9 @@ class DurableGsmReader:
             raise SecretBackendUnavailable("GSM version unavailable") from None
         try:
             if (
-                payload.name != binding.version_name
+                not same_secret_version(
+                    payload.name, binding.version_name, self._project_numbers
+                )
                 or type(payload.data) is not bytes
                 or not 0 < len(payload.data) <= MAX_ENVELOPE_BYTES
                 or type(payload.crc32c) is not int
