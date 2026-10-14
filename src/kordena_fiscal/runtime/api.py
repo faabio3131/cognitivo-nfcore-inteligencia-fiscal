@@ -40,8 +40,12 @@ from kordena_fiscal.web.commercial_acquisition import (
 )
 from kordena_fiscal.web.commercial_trial import create_commercial_trial_router
 from kordena_fiscal.web.human_recovery import PasswordResetDelivery
+from kordena_fiscal.web.staging_gsm_binding_admin import create_staging_gsm_binding_router
+from kordena_fiscal.web.staging_webhook_approval import create_staging_webhook_egress_router
+from kordena_fiscal.web.staging_webhook_probe import create_staging_webhook_probe_router
 
 from .activation_email import build_activation_delivery_from_environ
+from .api_staging_gsm_probe import staging_probe_verifier
 from .cakto import build_cakto_webhook_router
 from .composition import RuntimeComposition, build_postgres_runtime_composition
 from .config import RuntimeSettings
@@ -53,6 +57,7 @@ from .observability import (
     StructuredLogger,
     TraceContext,
 )
+from .secret_manager import SecretBindingAdministration
 from .security import configure_edge_security
 
 _TRACE_REFERENCE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}\Z")
@@ -140,6 +145,7 @@ def create_runtime_app(
     commercial_acquisition_rate_limiter: FixedWindowRateLimiter | None = None,
     commercial_readiness_rate_limiter: FixedWindowRateLimiter | None = None,
     commercial_trial_security: WebhookSecurity | None = None,
+    staging_probe_security: WebhookSecurity | None = None,
     commercial_trial_rate_limiter: FixedWindowRateLimiter | None = None,
     password_reset_delivery: PasswordResetDelivery | None = None,
     production_authority: ProductionExecutionAuthority | None = None,
@@ -161,6 +167,12 @@ def create_runtime_app(
         environment=resolved.environment.value,
     )
     composition = runtime.composition
+    if (
+        staging_probe_security is None
+        and resolved.environment.value == "staging"
+        and runtime.database is not None
+    ):
+        staging_probe_security = staging_probe_verifier(runtime.database)
     selected_checkout = commercial_checkout_projector
     selected_checkout_starter = commercial_checkout_starter
     selected_checkout_processing = commercial_checkout_processing_configured
@@ -531,6 +543,25 @@ def create_runtime_app(
             "command_webhook_configured": command_receiver is not None,
             "cakto_webhook_configured": cakto_receiver is not None,
         }
+
+    if (
+        resolved.environment.value == "staging"
+        and composition is not None
+        and runtime.database is not None
+    ):
+        app.include_router(create_staging_gsm_binding_router(
+            composition.human_identity,
+            SecretBindingAdministration(runtime.database),
+        ))
+        app.include_router(create_staging_webhook_egress_router(
+            composition.human_identity,
+            runtime.database,
+        ))
+
+    if staging_probe_security is not None:
+        if resolved.environment.value != "staging":
+            raise ValueError("staging webhook probe prohibited outside staging")
+        app.include_router(create_staging_webhook_probe_router(staging_probe_security))
 
     if command_receiver is not None:
         app.include_router(create_command_commercial_router(
