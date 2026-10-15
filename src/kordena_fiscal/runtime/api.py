@@ -660,6 +660,7 @@ def create_runtime_app(
             commercial_delivery_readiness=commercial_delivery_readiness,
             commercial_operational_readiness=commercial_operational_readiness,
             cakto_checkout_administration=cakto_checkout_administration,
+            runtime_metrics=runtime_metrics,
         ),
     )
     return app
