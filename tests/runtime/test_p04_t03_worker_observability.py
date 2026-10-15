@@ -490,3 +490,31 @@ def test_p09_trace_wrapper_preserves_invalid_handler_result_for_canonical_reject
     assert len(records) == 1
     assert records[0].operation == "worker.dispatch"
     assert records[0].outcome == "invalid"
+
+
+def test_p09_worker_dispatch_metrics_are_bounded_and_optional(database) -> None:
+    from kordena_fiscal.runtime.observability import MetricsRegistry
+
+    class InvalidHandler:
+        def dispatch(self, entry):
+            del entry
+            return object()
+
+    entry = put(database, "p09-metric-invalid-handler")
+    metrics = MetricsRegistry()
+    wrapper = _TracedOutboxHandler(InvalidHandler(), SafeTracer(), metrics)
+    assert not isinstance(wrapper.dispatch(entry), FiscalDispatchResult)
+    snapshot = metrics.as_dicts()
+    assert any(
+        row["name"] == "nfcore_dispatch_total"
+        and row["labels"] == {"outcome": "other"}
+        and row["value"] == 1.0
+        for row in snapshot
+    )
+    assert all(set(row["labels"]) <= {"outcome"} for row in snapshot)
+
+    class FailingMetrics:
+        def increment(self, *args, **kwargs):
+            raise RuntimeError("metrics offline")
+
+    assert _TracedOutboxHandler(InvalidHandler(), SafeTracer(), FailingMetrics()).dispatch(entry)
