@@ -1,7 +1,7 @@
 """P09-T01: trace export must be bounded, scrubbed and non-authoritative."""
 
-from datetime import UTC, datetime
 import json
+from datetime import UTC, datetime
 
 from kordena_fiscal.runtime.observability import (
     SafeTracer,
@@ -69,6 +69,7 @@ def test_exporter_failure_never_breaks_fiscal_execution() -> None:
 
 def test_canonical_http_entrypoint_emits_scrubbed_trace(capsys: object) -> None:
     from fastapi.testclient import TestClient
+
     from kordena_fiscal.web.app import create_app
 
     with TestClient(create_app()) as client:
