@@ -65,3 +65,17 @@ def test_exporter_failure_never_breaks_fiscal_execution() -> None:
         elapsed_seconds=0.1,
         outcome="ok",
     )
+
+
+def test_canonical_http_entrypoint_emits_scrubbed_trace(capsys: object) -> None:
+    from fastapi.testclient import TestClient
+    from kordena_fiscal.web.app import create_app
+
+    with TestClient(create_app()) as client:
+        response = client.get("/health/live", headers={"Authorization": "Bearer never-log"})
+    assert response.status_code == 200
+    output = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert '"event":"runtime.trace"' in output
+    assert '"operation":"http.request"' in output
+    assert "never-log" not in output
+    assert "/health/live" not in output
