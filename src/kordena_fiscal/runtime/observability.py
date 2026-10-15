@@ -157,6 +157,54 @@ class NullTraceSink:
         del trace
 
 
+class StructuredLogTraceSink:
+    """Export bounded, non-sensitive runtime spans through the existing logger.
+
+    Context identifiers and free-form attributes are intentionally excluded: the
+    runtime logger is not a destination for client data or credential material.
+    """
+
+    # Fixed low-cardinality vocabulary: syntactically safe identifiers can still be PII.
+    _ALLOWED_OPERATIONS = frozenset({
+        "http.request",
+        "worker.dispatch",
+        "worker.cycle",
+        "worker.poll",
+        "db.outbox_counts",
+        "external.webhook",
+    })
+    _ALLOWED_OUTCOMES = frozenset({
+        "ok",
+        "error",
+        "invalid",
+        "succeeded",
+        "retry_wait",
+        "dead_letter",
+        "failed",
+    })
+
+    def __init__(self, logger: StructuredLogger) -> None:
+        self._logger = logger
+
+    def record(self, trace: TraceRecord) -> None:
+        operation = trace.operation
+        outcome = trace.outcome
+        if operation not in self._ALLOWED_OPERATIONS:
+            operation = "other"
+        if outcome not in self._ALLOWED_OUTCOMES:
+            outcome = "other"
+        duration = trace.elapsed_seconds
+        if not math.isfinite(duration):
+            duration = 0.0
+        self._logger.emit(
+            "info" if outcome == "ok" else "warning",
+            "runtime.trace",
+            operation=operation,
+            outcome=outcome,
+            elapsed_seconds=round(max(0.0, duration), 6),
+        )
+
+
 class SafeTracer:
     """Tracing adapter that redacts attributes and never breaks fiscal execution."""
 
