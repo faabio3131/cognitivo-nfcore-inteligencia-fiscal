@@ -49,7 +49,6 @@ from kordena_fiscal.security.s2s import (
 from kordena_fiscal.web.portal_runtime import DurableHumanPortalExecutor
 
 from .commercial_provisioning import CommercialCustomerProvisioningService
-from .internal_archive_handler import build_archive_reference_handler
 from .fiscal_runtime import (
     CanonicalBridgeRequestExecutor,
     CanonicalBridgeSecurityBoundary,
@@ -57,6 +56,7 @@ from .fiscal_runtime import (
     CanonicalPortalOperationExecutor,
     FiscalOperationHandler,
 )
+from .internal_archive_handler import build_archive_reference_handler
 
 
 @dataclass(frozen=True, slots=True)
