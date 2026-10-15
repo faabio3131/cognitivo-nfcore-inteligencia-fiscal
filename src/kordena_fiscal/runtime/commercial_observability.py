@@ -52,12 +52,6 @@ class CommercialTelemetry:
         if not isinstance(count, int) or isinstance(count, bool) or count < 0:
             raise ValueError("count must be a non-negative integer")
 
-        self.metrics.increment(
-            "nfcore_commercial_events_total",
-            count,
-            operation=event.value,
-            outcome=outcome.value,
-        )
         fields: dict[str, object] = {
             "operation": event.value,
             "outcome": outcome.value,
@@ -73,6 +67,12 @@ class CommercialTelemetry:
             ):
                 raise ValueError("reason_code must be a bounded safe token")
             fields["reason_code"] = normalized
+        self.metrics.increment(
+            "nfcore_commercial_events_total",
+            count,
+            operation=event.value,
+            outcome=outcome.value,
+        )
         self.logger.emit("INFO", "commercial_chain_event", **fields)
 
 
