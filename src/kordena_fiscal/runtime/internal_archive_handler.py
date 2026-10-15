@@ -11,10 +11,12 @@ from typing import Any
 from kordena_fiscal.domain import ExecutionScope, FiscalValidationError
 from kordena_fiscal.persistence.ports import FiscalUnitOfWorkFactory
 
+from .fiscal_runtime import FiscalOperationHandler
+
 
 def build_archive_reference_handler(
     unit_of_work_factory: FiscalUnitOfWorkFactory,
-):
+) -> FiscalOperationHandler:
     """Adapt the existing archive store to queryArchiveReference without a new API."""
 
     def query_archive_reference(
