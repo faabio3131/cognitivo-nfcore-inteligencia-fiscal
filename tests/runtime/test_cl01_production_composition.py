@@ -294,6 +294,25 @@ def test_postgres_runtime_composes_human_identity_recovery_and_durable_portal(
         assert portal_operation.status_code == 503
         assert portal_operation.json()["detail"]["code"] == "FISCAL_RUNTIME_NOT_READY"
 
+        # A read-only archive handler never activates fiscal write commands.
+        # Keep the real authenticated session and CSRF/idempotency requirements.
+        for operation, payload in (
+            ("issueFiscalDocument", {"unit_id": "unit-a", "document": {"model": "55"}}),
+            ("cancelFiscalDocument", {"unit_id": "unit-a", "document_id": "DOC-1"}),
+            ("inutilizeFiscalRange", {
+                "unit_id": "unit-a", "model": 55, "series": 1,
+                "first_number": 1, "last_number": 1,
+                "justification": "Falha tecnica na numeracao de documento fiscal",
+            }),
+        ):
+            blocked = client.post(
+                f"/v1/portal/operations/{operation}",
+                headers={CSRF_HEADER: csrf, "Idempotency-Key": f"blocked-{operation}"},
+                json=payload,
+            )
+            assert blocked.status_code == 503
+            assert blocked.json()["detail"]["code"] == "FISCAL_RUNTIME_NOT_READY"
+
     database = _RuntimeDatabase.last
     assert database is not None
     assert database.closed is True

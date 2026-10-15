@@ -381,3 +381,57 @@ def test_concurrent_scoped_issuance_reservation_has_one_fresh_intent(database):
     with database() as uow:
         assert len(uow.idempotency.attempts(IdempotencyKey(fixture.digest("concurrent")))) == 1
         uow.lifecycle.assert_scope("CONCURRENT-DOC", fixture.scope())
+
+
+def test_authenticated_archive_query_through_postgres_portal_is_scoped(database):
+    """Exercise login -> canonical portal -> PostgreSQL archive without a provider."""
+    if not isinstance(database, PostgresFiscalDatabase):
+        pytest.skip("runtime production composition requires PostgreSQL")
+
+    from kordena_fiscal.runtime.composition import build_postgres_runtime_composition
+    from kordena_fiscal.web import create_app
+
+    fixture.identity(database.human_accounts())
+    composition = build_postgres_runtime_composition(database)
+    http = TestClient(
+        create_app(
+            human_identity=composition.human_identity,
+            portal_executor=composition.portal_executor,
+        ),
+        base_url="https://nfcore.test",
+    )
+    assert http.post(
+        "/v1/auth/login",
+        json={"email": "operator@example.com", "password": fixture.PASSWORD},
+    ).status_code == 200
+    csrf = http.cookies.get(CSRF_COOKIE)
+    assert csrf
+
+    own = http.post(
+        "/v1/portal/operations/queryArchiveReference",
+        headers={CSRF_HEADER: csrf},
+        json={"unit_id": "unit-a", "document_reference": "ARCHIVE-a"},
+    )
+    assert own.status_code == 200, own.text
+    assert own.json()["found"] is True
+    assert len(own.json()["entries"]) == 1
+    assert fixture.PROTECTED not in own.text
+    assert "content" not in own.json()["entries"][0]
+
+    cross_unit = http.post(
+        "/v1/portal/operations/queryArchiveReference",
+        headers={CSRF_HEADER: csrf},
+        json={"unit_id": "unit-b", "document_reference": "ARCHIVE-b"},
+    )
+    assert cross_unit.status_code == 403
+    anonymous = TestClient(
+        create_app(
+            human_identity=composition.human_identity,
+            portal_executor=composition.portal_executor,
+        ),
+        base_url="https://nfcore.test",
+    )
+    assert anonymous.post(
+        "/v1/portal/operations/queryArchiveReference",
+        json={"unit_id": "unit-a", "document_reference": "ARCHIVE-a"},
+    ).status_code in {401, 403}
