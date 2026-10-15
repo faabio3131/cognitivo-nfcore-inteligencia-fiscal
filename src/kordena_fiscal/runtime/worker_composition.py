@@ -46,6 +46,7 @@ from .observability import (
     RequestTimer,
     SafeTracer,
     StructuredLogger,
+    StructuredLogTraceSink,
     TraceContext,
     WorkerHealth,
     WorkerObservability,
@@ -271,7 +272,9 @@ def build_production_worker_runtime(
         or claim_selection.operations != frozenset(handlers)
     ):
         raise RuntimeConfigurationError("worker handlers and claim selection disagree")
-    runtime_tracer = tracer or SafeTracer()
+    runtime_tracer = tracer if tracer is not None else SafeTracer(
+        StructuredLogTraceSink(StructuredLogger(service="nfcore-worker", environment=environment))
+    )
     traced_handlers = {
         operation: _TracedOutboxHandler(handler, runtime_tracer)
         for operation, handler in handlers.items()
