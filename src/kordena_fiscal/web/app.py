@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any, Protocol, runtime_checkable
+from uuid import uuid4
 
 from fastapi import Body, FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -19,6 +20,13 @@ from kordena_fiscal.control_plane.commercial_release import (
 from kordena_fiscal.control_plane.pricing_admin import CommercialPricingAdministrationService
 from kordena_fiscal.product.checkout import CommercialCheckoutProjector
 from kordena_fiscal.product.commercial_readiness import CommercialDeliveryPathReadiness
+from kordena_fiscal.runtime.observability import (
+    RequestTimer,
+    SafeTracer,
+    StructuredLogger,
+    StructuredLogTraceSink,
+    TraceContext,
+)
 from kordena_fiscal.security.human_identity import HumanIdentityService
 from kordena_fiscal.security.human_recovery import PasswordRecoveryService
 from kordena_fiscal.web.cakto_checkout import create_cakto_checkout_router
@@ -263,6 +271,34 @@ def create_app(
         version="1.0.0",
         description="Web-first HTTP adapter for FM NFCORE fiscal infrastructure.",
     )
+
+    http_tracer = SafeTracer(
+        StructuredLogTraceSink(
+            StructuredLogger(service="nfcore-api", environment="unspecified")
+        )
+    )
+
+    @app.middleware("http")
+    async def trace_http_request(
+        request: Request, call_next: Callable[[Request], Awaitable[Any]]
+    ) -> Any:
+        timer = RequestTimer()
+        started = datetime.now(UTC)
+        context = TraceContext(trace_id=uuid4().hex, correlation_id=uuid4().hex)
+        try:
+            response = await call_next(request)
+        except Exception:
+            http_tracer.record(
+                operation="http.request", context=context, started_at=started,
+                elapsed_seconds=timer.elapsed(), outcome="error",
+            )
+            raise
+        http_tracer.record(
+            operation="http.request", context=context, started_at=started,
+            elapsed_seconds=timer.elapsed(),
+            outcome="error" if response.status_code >= 500 else "ok",
+        )
+        return response
 
     if human_identity is not None:
         app.include_router(
