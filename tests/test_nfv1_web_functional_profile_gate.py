@@ -8,7 +8,9 @@ from pathlib import Path
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/ci/check_nfv1_web_functional_profile.py"
 
 
-def _run(tmp_path: Path, profile: dict[str, object], strict: bool = False) -> subprocess.CompletedProcess[str]:
+def _run(
+    tmp_path: Path, profile: dict[str, object], strict: bool = False
+) -> subprocess.CompletedProcess[str]:
     path = tmp_path / "runtime-profile.json"
     path.write_text(json.dumps(profile), encoding="utf-8")
     cmd = [sys.executable, str(SCRIPT), str(path)]
