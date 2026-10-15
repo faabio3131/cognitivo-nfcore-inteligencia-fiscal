@@ -14,6 +14,7 @@ from kordena_fiscal.control_plane.commercial_release import (
 from kordena_fiscal.control_plane.pricing_admin import (
     CommercialPricingAdministrationService,
 )
+from kordena_fiscal.runtime.observability import MetricsRegistry
 from kordena_fiscal.product.checkout import (
     CommercialCheckoutProjector,
     unconfigured_checkout_projection,
@@ -40,6 +41,7 @@ def create_commercial_release_router(
     checkout_processing_configured: bool = False,
     delivery_readiness: CommercialDeliveryPathReadiness | None = None,
     operational_readiness: Callable[[], bool] | None = None,
+    runtime_metrics: MetricsRegistry | None = None,
 ) -> APIRouter:
     router = APIRouter(tags=["commercial-release"])
     resolved_delivery_readiness = delivery_readiness or CommercialDeliveryPathReadiness()
@@ -102,6 +104,14 @@ def create_commercial_release_router(
             processing_configured=processing_configured,
             expose_urls=purchase_enabled,
         )
+        if runtime_metrics is not None:
+            try:
+                runtime_metrics.increment(
+                    "nfcore_commercial_offer_observed_total",
+                    outcome="available" if purchase_enabled else "blocked",
+                )
+            except Exception:
+                pass  # Metrics are not commercial approval authority.
 
         return {
             "product_id": "nfcore",
