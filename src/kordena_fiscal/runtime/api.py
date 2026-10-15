@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
@@ -128,6 +128,24 @@ class RuntimeApi:
     def close(self) -> None:
         if self.database is not None:
             self.database.close()
+
+
+def _record_commercial_activation_attempt(
+    operation: Callable[[], None], metrics: MetricsRegistry
+) -> None:
+    """Observe activation attempts, never promote telemetry to commercial authority."""
+    try:
+        operation()
+    except Exception:
+        try:
+            metrics.increment("nfcore_commercial_activation_attempts_total", outcome="failed")
+        except Exception:
+            pass
+        raise
+    try:
+        metrics.increment("nfcore_commercial_activation_attempts_total", outcome="succeeded")
+    except Exception:
+        pass
 
 
 def create_runtime_app(
@@ -631,7 +649,12 @@ def create_runtime_app(
     def mark_commercial_active(account_id: str, now: datetime) -> None:
         if composition is None:
             return
-        composition.commercial_activation.mark_active(account_id=account_id, now=now)
+        _record_commercial_activation_attempt(
+            lambda: composition.commercial_activation.mark_active(
+                account_id=account_id, now=now
+            ),
+            runtime_metrics,
+        )
 
     commercial_activation_completed = (
         None if composition is None else mark_commercial_active
