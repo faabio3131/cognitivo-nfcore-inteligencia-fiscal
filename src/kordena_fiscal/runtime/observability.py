@@ -164,7 +164,24 @@ class StructuredLogTraceSink:
     runtime logger is not a destination for client data or credential material.
     """
 
-    _SAFE_TOKEN = re.compile(r"^[a-z][a-z0-9._-]{0,79}$")
+    # Fixed low-cardinality vocabulary: syntactically safe identifiers can still be PII.
+    _ALLOWED_OPERATIONS = frozenset({
+        "http.request",
+        "worker.dispatch",
+        "worker.cycle",
+        "worker.poll",
+        "db.outbox_counts",
+        "external.webhook",
+    })
+    _ALLOWED_OUTCOMES = frozenset({
+        "ok",
+        "error",
+        "invalid",
+        "succeeded",
+        "retry_wait",
+        "dead_letter",
+        "failed",
+    })
 
     def __init__(self, logger: StructuredLogger) -> None:
         self._logger = logger
@@ -172,9 +189,9 @@ class StructuredLogTraceSink:
     def record(self, trace: TraceRecord) -> None:
         operation = trace.operation
         outcome = trace.outcome
-        if not self._SAFE_TOKEN.fullmatch(operation):
+        if operation not in self._ALLOWED_OPERATIONS:
             operation = "other"
-        if not self._SAFE_TOKEN.fullmatch(outcome):
+        if outcome not in self._ALLOWED_OUTCOMES:
             outcome = "other"
         duration = trace.elapsed_seconds
         if not math.isfinite(duration):
