@@ -670,5 +670,8 @@ _development_ingress = development_commercial_ingress(_entrypoint_settings, os.e
 app = create_runtime_app(
     _entrypoint_settings,
     password_reset_delivery=build_activation_delivery_from_environ(),
-    **_development_ingress,
+    commercial_acquisition_security=_development_ingress.get(
+        "commercial_acquisition_security"
+    ),
+    commercial_trial_security=_development_ingress.get("commercial_trial_security"),
 )
