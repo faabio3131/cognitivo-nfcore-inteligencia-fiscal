@@ -51,6 +51,44 @@ def test_structured_trace_export_denies_freeform_operation_and_outcome() -> None
     assert "secret" not in lines[0]
 
 
+
+def test_syntactically_safe_unknown_tokens_are_rejected() -> None:
+    lines: list[str] = []
+    tracer = SafeTracer(StructuredLogTraceSink(
+        StructuredLogger(service="nfcore-worker", environment="staging", sink=lines.append)
+    ))
+    tracer.record(
+        operation="tenant-private",
+        context=TraceContext(trace_id="d" * 32, correlation_id="private"),
+        started_at=datetime.now(UTC),
+        elapsed_seconds=0.1,
+        outcome="customer123",
+    )
+    event = json.loads(lines[0])
+    assert event["operation"] == "other"
+    assert event["outcome"] == "other"
+    assert "tenant-private" not in lines[0]
+    assert "customer123" not in lines[0]
+
+
+def test_known_worker_outcomes_remain_visible_without_identifiers() -> None:
+    for outcome in ("ok", "error", "invalid", "succeeded", "retry_wait", "dead_letter"):
+        lines: list[str] = []
+        tracer = SafeTracer(StructuredLogTraceSink(
+            StructuredLogger(service="nfcore-worker", environment="staging", sink=lines.append)
+        ))
+        tracer.record(
+            operation="worker.dispatch",
+            context=TraceContext(trace_id="e" * 32, correlation_id="private"),
+            started_at=datetime.now(UTC),
+            elapsed_seconds=0.1,
+            outcome=outcome,
+        )
+        event = json.loads(lines[0])
+        assert event["operation"] == "worker.dispatch"
+        assert event["outcome"] == outcome
+        assert "private" not in lines[0]
+
 def test_exporter_failure_never_breaks_fiscal_execution() -> None:
     def broken_sink(_line: str) -> None:
         raise RuntimeError("telemetry offline")
