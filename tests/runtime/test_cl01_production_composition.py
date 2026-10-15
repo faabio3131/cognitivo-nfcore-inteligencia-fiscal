@@ -299,7 +299,11 @@ def test_postgres_runtime_composes_human_identity_recovery_and_durable_portal(
         for operation, payload in (
             ("issueFiscalDocument", {"unit_id": "unit-a", "document": {"model": "55"}}),
             ("cancelFiscalDocument", {"unit_id": "unit-a", "document_id": "DOC-1"}),
-            ("inutilizeFiscalRange", {"unit_id": "unit-a", "start": 1, "end": 1}),
+            ("inutilizeFiscalRange", {
+                "unit_id": "unit-a", "model": 55, "series": "1",
+                "first_number": 1, "last_number": 1,
+                "justification": "Falha tecnica na numeracao de documento fiscal",
+            }),
         ):
             blocked = client.post(
                 f"/v1/portal/operations/{operation}",
