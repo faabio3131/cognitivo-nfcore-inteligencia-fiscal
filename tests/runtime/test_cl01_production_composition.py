@@ -252,8 +252,13 @@ def test_postgres_runtime_composes_human_identity_recovery_and_durable_portal(
         assert projection["legal_name"] == "Empresa Piloto Ltda"
         assert projection["unit_count"] == 1
         assert projection["fiscal_operation_executor_configured"] is True
-        assert projection["fiscal_operations_configured"] is False
-        assert projection["configured_fiscal_operations"] == []
+        assert projection["fiscal_operations_configured"] is True
+        assert projection["configured_fiscal_operations"] == ["queryArchiveReference"]
+        assert not set(projection["configured_fiscal_operations"]) & {
+            "issueFiscalDocument",
+            "cancelFiscalDocument",
+            "inutilizeFiscalRange",
+        }
 
         units = client.get("/v1/portal/surfaces/units")
         assert units.status_code == 200
