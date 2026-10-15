@@ -54,3 +54,31 @@ def test_runtime_profile_does_not_echo_unknown_sensitive_fields(tmp_path: Path) 
     result = _run(tmp_path, {"private_token": "private-secret"})
     assert result.returncode == 1
     assert "private-secret" not in result.stdout
+
+
+def test_optional_competing_provider_receivers_do_not_block_internal_parity(
+    tmp_path: Path,
+) -> None:
+    profile: dict[str, object] = {
+        key: True
+        for key in (
+            "human_identity_configured",
+            "portal_executor_configured",
+            "bridge_security_configured",
+            "bridge_executor_configured",
+            "portal_fiscal_operation_executor_configured",
+            "password_recovery_configured",
+            "password_reset_delivery_configured",
+            "commercial_fulfillment_configured",
+            "commercial_provisioning_configured",
+            "commercial_activation_configured",
+            "commercial_checkout_processing_configured",
+            "commercial_first_party_acquisition_configured",
+        )
+    }
+    profile["fiscal_operation_handlers_configured"] = ["queryFiscalDocument"]
+    profile["cakto_webhook_configured"] = False
+    profile["command_webhook_configured"] = False
+    result = _run(tmp_path, profile, strict=True)
+    assert result.returncode == 0
+    assert json.loads(result.stdout)["all_development_paths_ready"] is True
