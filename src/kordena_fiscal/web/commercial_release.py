@@ -14,7 +14,6 @@ from kordena_fiscal.control_plane.commercial_release import (
 from kordena_fiscal.control_plane.pricing_admin import (
     CommercialPricingAdministrationService,
 )
-from kordena_fiscal.runtime.observability import MetricsRegistry
 from kordena_fiscal.product.checkout import (
     CommercialCheckoutProjector,
     unconfigured_checkout_projection,
@@ -27,6 +26,7 @@ from kordena_fiscal.product.commercial_release import (
     CommercialReleaseDecision,
     CommercialReleaseError,
 )
+from kordena_fiscal.runtime.observability import MetricsRegistry
 from kordena_fiscal.security.human_identity import HumanIdentityService
 from kordena_fiscal.web.portal_api import _csrf
 from kordena_fiscal.web.pricing_admin import _platform_actor, _public_catalog
