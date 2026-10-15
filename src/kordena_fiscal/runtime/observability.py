@@ -157,6 +157,37 @@ class NullTraceSink:
         del trace
 
 
+class StructuredLogTraceSink:
+    """Export bounded, non-sensitive runtime spans through the existing logger.
+
+    Context identifiers and free-form attributes are intentionally excluded: the
+    runtime logger is not a destination for client data or credential material.
+    """
+
+    _SAFE_TOKEN = re.compile(r"^[a-z][a-z0-9._-]{0,79}$")
+
+    def __init__(self, logger: StructuredLogger) -> None:
+        self._logger = logger
+
+    def record(self, trace: TraceRecord) -> None:
+        operation = trace.operation
+        outcome = trace.outcome
+        if not self._SAFE_TOKEN.fullmatch(operation):
+            operation = "other"
+        if not self._SAFE_TOKEN.fullmatch(outcome):
+            outcome = "other"
+        duration = trace.elapsed_seconds
+        if not math.isfinite(duration):
+            duration = 0.0
+        self._logger.emit(
+            "info" if outcome == "ok" else "warning",
+            "runtime.trace",
+            operation=operation,
+            outcome=outcome,
+            elapsed_seconds=round(max(0.0, duration), 6),
+        )
+
+
 class SafeTracer:
     """Tracing adapter that redacts attributes and never breaks fiscal execution."""
 
