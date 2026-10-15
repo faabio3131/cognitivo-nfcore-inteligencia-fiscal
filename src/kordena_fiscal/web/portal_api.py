@@ -89,6 +89,7 @@ _OPERATION_PERMISSIONS: dict[str, PortalPermission] = {
     "updateUser": PortalPermission.USER_MANAGE,
     "issueFiscalDocument": PortalPermission.DOCUMENT_ISSUE,
     "queryFiscalDocument": PortalPermission.DOCUMENT_QUERY,
+    "queryArchiveReference": PortalPermission.DOCUMENT_QUERY,
     "cancelFiscalDocument": PortalPermission.DOCUMENT_CANCEL,
     "inutilizeFiscalRange": PortalPermission.DOCUMENT_INUTILIZE,
     "reconcileFiscalOperation": PortalPermission.RECONCILIATION_EXECUTE,
