@@ -235,3 +235,26 @@ def test_unknown_surface_and_operation_are_not_routable_authority() -> None:
         headers={CSRF_HEADER: csrf},
     )
     assert unknown.status_code == 404
+
+
+def test_archive_reference_query_uses_existing_portal_role_and_scope() -> None:
+    executor = RecordingPortalExecutor()
+    web = logged_client(executor, role=PortalRole.AUDITOR)
+    csrf = web.cookies.get(CSRF_COOKIE)
+    assert csrf
+
+    allowed = web.post(
+        "/v1/portal/operations/queryArchiveReference",
+        json={"unit_id": "unit-a", "document_reference": "document-1"},
+        headers={CSRF_HEADER: csrf},
+    )
+    other_unit = web.post(
+        "/v1/portal/operations/queryArchiveReference",
+        json={"unit_id": "unit-b", "document_reference": "document-1"},
+        headers={CSRF_HEADER: csrf},
+    )
+    assert allowed.status_code == 200
+    assert executor.operation_key is None
+    assert executor.operation_authority is not None
+    assert executor.operation_authority.account.tenant_id == "tenant-authoritative"
+    assert other_unit.status_code == 403

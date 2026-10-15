@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
@@ -49,6 +50,7 @@ from .api_staging_gsm_probe import staging_probe_verifier
 from .cakto import build_cakto_webhook_router
 from .composition import RuntimeComposition, build_postgres_runtime_composition
 from .config import RuntimeSettings
+from .development_commercial_ingress import development_commercial_ingress
 from .fiscal_runtime import FiscalOperationHandler
 from .observability import (
     MetricsRegistry,
@@ -663,6 +665,13 @@ def create_runtime_app(
     return app
 
 
+_entrypoint_settings = RuntimeSettings.from_environ()
+_development_ingress = development_commercial_ingress(_entrypoint_settings, os.environ)
 app = create_runtime_app(
+    _entrypoint_settings,
     password_reset_delivery=build_activation_delivery_from_environ(),
+    commercial_acquisition_security=_development_ingress.get(
+        "commercial_acquisition_security"
+    ),
+    commercial_trial_security=_development_ingress.get("commercial_trial_security"),
 )

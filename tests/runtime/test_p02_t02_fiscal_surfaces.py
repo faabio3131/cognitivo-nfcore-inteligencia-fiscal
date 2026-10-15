@@ -278,7 +278,9 @@ def test_governed_capability_authority_is_reused_without_promoting_readiness(dat
     if isinstance(database, PostgresFiscalDatabase):
         fixture.identity(database.human_accounts())
         composition = build_postgres_runtime_composition(database, capability_readiness=readiness)
-        assert not composition.fiscal_operation_path.configured_operations
+        assert composition.fiscal_operation_path.configured_operations == (
+            "queryArchiveReference",
+        )
         application = create_app(
             human_identity=composition.human_identity, portal_executor=composition.portal_executor
         )

@@ -216,7 +216,7 @@ def test_postgres_runtime_composes_human_identity_recovery_and_durable_portal(
         assert profile["bridge_executor_configured"] is True
         assert profile["bridge_workload_identity_configured"] is False
         assert profile["portal_fiscal_operation_executor_configured"] is True
-        assert profile["fiscal_operation_handlers_configured"] == []
+        assert profile["fiscal_operation_handlers_configured"] == ["queryArchiveReference"]
         assert profile["fiscal_provider_transport_real_configured"] is False
         assert profile["fiscal_external_secret_client_configured"] is False
         assert profile["fiscal_signer_configured"] is False
@@ -252,8 +252,13 @@ def test_postgres_runtime_composes_human_identity_recovery_and_durable_portal(
         assert projection["legal_name"] == "Empresa Piloto Ltda"
         assert projection["unit_count"] == 1
         assert projection["fiscal_operation_executor_configured"] is True
-        assert projection["fiscal_operations_configured"] is False
-        assert projection["configured_fiscal_operations"] == []
+        assert projection["fiscal_operations_configured"] is True
+        assert projection["configured_fiscal_operations"] == ["queryArchiveReference"]
+        assert not set(projection["configured_fiscal_operations"]) & {
+            "issueFiscalDocument",
+            "cancelFiscalDocument",
+            "inutilizeFiscalRange",
+        }
 
         units = client.get("/v1/portal/surfaces/units")
         assert units.status_code == 200
