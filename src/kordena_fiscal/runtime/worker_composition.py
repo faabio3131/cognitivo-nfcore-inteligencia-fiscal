@@ -101,7 +101,9 @@ class _TracedOutboxHandler:
         # Do not validate the domain result in the tracing adapter; the canonical
         # outbox worker remains the only authority for invalid handler responses.
         outcome = result.status.value if isinstance(result, FiscalDispatchResult) else "invalid"
-        metric_outcome = outcome if outcome in {"succeeded", "retry_wait", "dead_letter"} else "other"
+        metric_outcome = (
+            outcome if outcome in {"succeeded", "retry_wait", "dead_letter"} else "other"
+        )
         self._metric(timer.elapsed(), metric_outcome)
         self._tracer.record(
             operation="worker.dispatch", context=context, started_at=started,
@@ -291,12 +293,12 @@ def build_production_worker_runtime(
     runtime_tracer = tracer if tracer is not None else SafeTracer(
         StructuredLogTraceSink(StructuredLogger(service="nfcore-worker", environment=environment))
     )
+    metrics = MetricsRegistry()
     traced_handlers = {
         operation: _TracedOutboxHandler(handler, runtime_tracer, metrics)
         for operation, handler in handlers.items()
     }
     routed = RoutedOutboxHandler(traced_handlers)
-    metrics = MetricsRegistry()
 
     def queue_counts() -> Mapping[FiscalOutboxStatus, int]:
         timer = RequestTimer()
