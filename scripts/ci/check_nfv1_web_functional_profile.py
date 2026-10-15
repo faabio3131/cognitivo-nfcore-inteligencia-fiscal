@@ -49,7 +49,9 @@ def assess(profile: Mapping[str, Any]) -> dict[str, object]:
         "core_ready": not missing_core,
         "core_missing": missing_core,
         "paths_configured": paths,
-        "commercial_catalog_published": profile.get("pricing_catalog_published") is True,
+        "commercial_catalog_published": (
+            profile.get("pricing_catalog_published") is True
+        ),
         "commercial_release_available": (
             profile.get("commercial_release_status") not in (None, "unavailable")
         ),
@@ -60,7 +62,10 @@ def assess(profile: Mapping[str, Any]) -> dict[str, object]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("profile", type=Path, help="JSON snapshot from canonical /runtime/profile")
+    parser.add_argument(
+        "profile", type=Path,
+        help="JSON snapshot from canonical /runtime/profile",
+    )
     parser.add_argument("--require-all-paths", action="store_true")
     args = parser.parse_args()
     payload = json.loads(args.profile.read_text(encoding="utf-8"))
