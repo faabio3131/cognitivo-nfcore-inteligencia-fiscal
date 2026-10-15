@@ -351,5 +351,5 @@ def build_customer_webhook_handler(
         security=security,
         policy=policy,
         destination_resolver=DurableWebhookDestinationResolver(uow_factory, destination_id),
-        transport=_TracedWebhookTransport(\n            PinnedWebhookTransport(policy),\n            tracer if tracer is not None else SafeTracer(\n                StructuredLogTraceSink(\n                    StructuredLogger(service="nfcore-worker", environment="staging")\n                )\n            ),\n        ),
+        transport=_TracedWebhookTransport(\n            PinnedWebhookTransport(policy),\n            tracer if tracer is not None else SafeTracer(\n                StructuredLogTraceSink(\n                    StructuredLogger(service="nfcore-worker", environment="unspecified")\n                )\n            ),\n        ),
     )
