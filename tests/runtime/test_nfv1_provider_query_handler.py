@@ -3,16 +3,28 @@ from datetime import UTC, datetime
 
 import pytest
 
-from kordena_fiscal.domain import Cnpj, ElectronicInvoiceModel, ExecutionScope, FiscalEnvironment, FiscalValidationError
-from kordena_fiscal.operations import FakeFiscalOperationsGateway, FiscalOperationsClient, FiscalQueryStatus
+from kordena_fiscal.domain import (
+    Cnpj,
+    ElectronicInvoiceModel,
+    ExecutionScope,
+    FiscalEnvironment,
+    FiscalValidationError,
+)
+from kordena_fiscal.operations import (
+    FakeFiscalOperationsGateway,
+    FiscalOperationsClient,
+    FiscalQueryStatus,
+)
 from kordena_fiscal.runtime.provider_query_handler import build_provider_query_handler
 from kordena_fiscal.xml import AccessKeyInput, build_access_key
 
 
 def _scope(unit: str = "unit-a") -> ExecutionScope:
     return ExecutionScope(
-        tenant_id="tenant-a", unit_id=unit,
-        environment=FiscalEnvironment.HOMOLOGATION, correlation_id="query-test",
+        tenant_id="tenant-a",
+        unit_id=unit,
+        environment=FiscalEnvironment.HOMOLOGATION,
+        correlation_id="query-test",
     )
 
 
@@ -23,7 +35,10 @@ def _key() -> str:
             issued_at=datetime(2026, 9, 11, tzinfo=UTC),
             issuer_cnpj=Cnpj("12.345.678/0001-95"),
             model=ElectronicInvoiceModel.NFCE,
-            series=3, invoice_number=10, emission_type=1, numeric_code=12345678,
+            series=3,
+            invoice_number=10,
+            emission_type=1,
+            numeric_code=12345678,
         )
     ).value
 
