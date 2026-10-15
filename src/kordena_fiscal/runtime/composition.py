@@ -49,6 +49,7 @@ from kordena_fiscal.security.s2s import (
 from kordena_fiscal.web.portal_runtime import DurableHumanPortalExecutor
 
 from .commercial_provisioning import CommercialCustomerProvisioningService
+from .internal_archive_handler import build_archive_reference_handler
 from .fiscal_runtime import (
     CanonicalBridgeRequestExecutor,
     CanonicalBridgeSecurityBoundary,
@@ -166,9 +167,13 @@ def build_postgres_runtime_composition(
             cakto_commercial_database
         )
     fiscal_application = FiscalApplicationService(database)
+    canonical_handlers = dict(fiscal_operation_handlers or {})
+    canonical_handlers.setdefault(
+        "queryArchiveReference", build_archive_reference_handler(database)
+    )
     fiscal_operation_path = CanonicalFiscalOperationPath(
         fiscal_application,
-        handlers=fiscal_operation_handlers,
+        handlers=canonical_handlers,
     )
     audit_sink = security_audit_sink
     if audit_sink is None:
