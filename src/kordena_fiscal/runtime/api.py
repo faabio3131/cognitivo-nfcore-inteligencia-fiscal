@@ -131,7 +131,7 @@ class RuntimeApi:
 
 
 def _record_commercial_activation_attempt(
-    operation: Callable[[], None], metrics: MetricsRegistry
+    operation: Callable[[], object], metrics: MetricsRegistry
 ) -> None:
     """Observe activation attempts, never promote telemetry to commercial authority."""
     try:
