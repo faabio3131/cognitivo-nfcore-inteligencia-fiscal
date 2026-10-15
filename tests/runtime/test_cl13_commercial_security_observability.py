@@ -70,8 +70,9 @@ def test_commercial_telemetry_uses_bounded_low_cardinality_dimensions() -> None:
 
 
 def test_commercial_telemetry_rejects_free_form_reason_and_invalid_count() -> None:
+    metrics = MetricsRegistry()
     telemetry = CommercialTelemetry(
-        metrics=MetricsRegistry(),
+        metrics=metrics,
         logger=StructuredLogger(
             service="nfcore-commercial",
             environment="test",
@@ -92,3 +93,6 @@ def test_commercial_telemetry_rejects_free_form_reason_and_invalid_count() -> No
             CommercialTelemetryOutcome.PENDING,
             count=-1,
         )
+
+    # Rejected events must not generate a success-looking operational metric.
+    assert metrics.snapshot() == ()
