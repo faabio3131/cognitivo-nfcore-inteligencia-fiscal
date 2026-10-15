@@ -45,6 +45,8 @@ def assess(profile: Mapping[str, Any]) -> dict[str, object]:
         )
         for name, key in OPTIONAL_PATHS.items()
     }
+    # Optional sales channels are never universal launch prerequisites.
+    # Report their actual status without requiring multiple competing providers.
     return {
         "core_ready": not missing_core,
         "core_missing": missing_core,
@@ -55,8 +57,15 @@ def assess(profile: Mapping[str, Any]) -> dict[str, object]:
         "commercial_release_available": (
             profile.get("commercial_release_status") not in (None, "unavailable")
         ),
+        "internal_fiscal_wiring_ready": not missing_core
+        and paths["fiscal_handlers"],
+        "internal_commercial_wiring_ready": not missing_core
+        and (paths["commercial_acquisition"] or paths["trial"])
+        and paths["commercial_checkout"],
         "all_development_paths_ready": not missing_core
-        and all(paths.values()),
+        and paths["fiscal_handlers"]
+        and (paths["commercial_acquisition"] or paths["trial"])
+        and paths["commercial_checkout"],
     }
 
 
