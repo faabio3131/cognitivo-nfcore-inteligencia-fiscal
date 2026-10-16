@@ -39,3 +39,9 @@ Zero alerts/warnings ativos e zero deploys com falhas na janela verificada. A di
 4. Antes de P05, consultar o cronograma/ledger e reconciliar T01/T02 com o drift atual (sem repetir GSM/migrations já resolvidos, nem inferir autorização de deploy).
 
 **Autorizações:** o dono autorizou integrar PR #208 e #209 após gates; não autorizou implicitamente deploy, migração produtiva, DNS, novas credenciais ou ativação fiscal real.
+
+## Complemento — Emissão real na autoridade de alertas do Worker
+
+No escopo pré-claim certificado (`OutboxClaimSelection.scope`), o `build_production_worker_runtime` conecta o `InternalAlertMonitor` à `AlertRegistry` V2-13 existente por `StructuredLogAlertSink`. O sink registra apenas código e severidade, sem tenant/unidade/segredo nos logs. O observer usa as métricas reais do ciclo, publica o candidato, mantém deduplicação enquanto incidente persiste e resolve a chave quando o sinal desaparece; recorrência gera novo alerta. Workers sem escopo canônico **não** fabricam tenant para publicar alertas. O caminho fiscal/outbox permanece determinístico, sem mutação pela telemetria. Evidência: `tests/runtime/test_nfv1_p09_t03_worker_canonical_alert_delivery.py`, 2 PASS, integrado à matriz de 6 PASS, Ruff e Mypy direcionados PASS.
+
+**Limite:** API com métricas agregadas e deploy Railway exigem destino/autoridade operacional externa para notificações ativas; o conjunto interno de regras e a interface de projeção não constituem monitoramento externo contínuo. Etapas P05/P09-T04/T05 continuam donas dessa ativação. Nenhum deploy, certificado real ou migração ocorreu.

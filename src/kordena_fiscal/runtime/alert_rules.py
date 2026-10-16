@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from kordena_fiscal.domain import ExecutionScope
-from kordena_fiscal.observability.alerts import AlertRegistry
+from kordena_fiscal.observability.alerts import AlertRegistry, ComplianceOperationalAlert
 from kordena_fiscal.observability.events import ObservabilityContext
-from kordena_fiscal.runtime.observability import MetricSample, MetricsRegistry
+from kordena_fiscal.runtime.observability import MetricSample, MetricsRegistry, StructuredLogger
 from kordena_fiscal.security.secrets import SecretAuditEvent
 from kordena_fiscal.security.signing import CertificateReference
 
@@ -206,11 +206,25 @@ _ALERT_KIND = {
 }
 
 
+class StructuredLogAlertSink:
+    """Canonical registry sink; logs only bounded code/severity, no tenant/secret."""
+
+    def __init__(self, logger: StructuredLogger) -> None:
+        self._logger = logger
+
+    def publish(self, alert: ComplianceOperationalAlert) -> None:
+        self._logger.emit(
+            "WARNING", "worker_operational_alert",
+            code=alert.message_code, severity=alert.severity.value,
+        )
+
+
 def publish_alert_candidates(
     candidates: tuple[AlertCandidate, ...],
     *,
     registry: AlertRegistry,
     context: ObservabilityContext,
+    active_keys: dict[str, str] | None = None,
 ) -> int:
     """Delegate all alert persistence/deduplication to canonical AlertRegistry.
 
@@ -220,6 +234,12 @@ def publish_alert_candidates(
     from kordena_fiscal.observability.alerts import AlertKind, AlertSeverity
 
     published = 0
+    if active_keys is not None:
+        present = {candidate.code for candidate in candidates if candidate.code in _ALERT_KIND}
+        for code, key in tuple(active_keys.items()):
+            if code not in present:
+                registry.resolve(key)
+                del active_keys[code]
     for candidate in candidates:
         kind = _ALERT_KIND.get(candidate.code)
         if kind is None:
@@ -235,6 +255,8 @@ def publish_alert_candidates(
         )
         if alert is not None:
             published += 1
+            if active_keys is not None:
+                active_keys[candidate.code] = alert.deduplication_key
     return published
 
 
