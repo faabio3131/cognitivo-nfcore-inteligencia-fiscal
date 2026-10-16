@@ -28,6 +28,7 @@ from kordena_fiscal.lifecycle import (
     IssuanceAttemptStatus,
 )
 from kordena_fiscal.numbering import FiscalNumberReservation, FiscalSequenceManager
+from kordena_fiscal.runtime.observability import MetricsRegistry
 from kordena_fiscal.security import (
     CertificateReference,
     FiscalSigningService,
@@ -188,7 +189,9 @@ class NfceIssuanceOrchestrator:
         signed_xml_assembler: NfceSignedXmlAssembler,
         gateway: FiscalGatewayClient,
         state_machine: FiscalStateMachine | None = None,
+        metrics: MetricsRegistry | None = None,
     ) -> None:
+        self._metrics = metrics
         self._idempotency = idempotency
         self._numbering = numbering
         self._numeric_code_provider = numeric_code_provider
@@ -198,6 +201,15 @@ class NfceIssuanceOrchestrator:
         self._signed_xml_assembler = signed_xml_assembler
         self._gateway = gateway
         self._state_machine = state_machine or FiscalStateMachine()
+
+    def _observe(self, metric: str, *, outcome: str) -> None:
+        if self._metrics is None:
+            return
+        try:
+            self._metrics.increment(metric, outcome=outcome)
+        except Exception:
+            # A telemetry failure cannot alter fiscal authorization authority.
+            return
 
     def issue(self, command: NfceIssuanceCommand) -> NfceIssuanceResult:
         if not isinstance(command, NfceIssuanceCommand):
@@ -298,15 +310,19 @@ class NfceIssuanceOrchestrator:
             document,
             "NFC-e authorization requested",
         )
-        authorization = self._gateway.authorize(
-            AuthorizationRequest(
-                scope=document.scope,
-                access_key=access_key,
-                signed_xml=signed_xml,
-                idempotency_key=attempt.key,
-                request_fingerprint=attempt.request_fingerprint,
+        try:
+            authorization = self._gateway.authorize(
+                AuthorizationRequest(
+                    scope=document.scope,
+                    access_key=access_key,
+                    signed_xml=signed_xml,
+                    idempotency_key=attempt.key,
+                    request_fingerprint=attempt.request_fingerprint,
+                )
             )
-        )
+        except Exception:
+            self._observe("nfcore_provider_errors_total", outcome="error")
+            raise
 
         if authorization.status is AuthorizationStatus.AUTHORIZED:
             protocol_reference = authorization.protocol_reference
@@ -340,6 +356,7 @@ class NfceIssuanceOrchestrator:
                 attempt.generation,
                 rejection_reason,
             )
+            self._observe("nfcore_fiscal_rejections_total", outcome="rejected")
 
         return NfceIssuanceResult(
             attempt=attempt,

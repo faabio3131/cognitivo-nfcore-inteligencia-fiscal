@@ -40,6 +40,7 @@ from kordena_fiscal.lifecycle import (
     IssuanceAttemptStatus,
 )
 from kordena_fiscal.numbering import FiscalSequenceManager, InMemoryFiscalSequenceStore
+from kordena_fiscal.runtime.observability import MetricsRegistry
 from kordena_fiscal.security import (
     CertificateReference,
     FiscalSignerKind,
@@ -260,6 +261,7 @@ def _system(
     mode: FakeGatewayMode,
     *,
     assembler=None,  # type: ignore[no-untyped-def]
+    metrics: MetricsRegistry | None = None,
 ):
     idempotency_store = InMemoryIdempotencyStore()
     numbering_store = InMemoryFiscalSequenceStore()
@@ -275,6 +277,7 @@ def _system(
         signing=FiscalSigningService(_FakeSigner()),
         signed_xml_assembler=assembler or _SyntheticSignedXmlAssembler(),
         gateway=FiscalGatewayClient(gateway_adapter),
+        metrics=metrics,
     )
     return orchestrator, gateway_adapter, numbering, numeric_code_provider
 
@@ -425,3 +428,33 @@ def test_command_blocks_non_nfce_and_cross_scope_certificate_before_execution() 
             certificate=_certificate(_scope(unit="unit-b")),
             signing_algorithm="synthetic",
         )
+
+
+def test_nfce_rejection_metric_is_safe_and_not_counted_on_replay() -> None:
+    metrics = MetricsRegistry()
+    orchestrator, _, _, _ = _system(FakeGatewayMode.REJECT, metrics=metrics)
+    command = _command()
+    result = orchestrator.issue(command)
+    assert result.attempt.status is IssuanceAttemptStatus.REJECTED
+    assert metrics.as_dicts() == [
+        {"name": "nfcore_fiscal_rejections_total", "value": 1.0,
+         "labels": {"outcome": "rejected"}}
+    ]
+
+
+def test_nfce_gateway_exception_records_provider_error_without_changing_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    metrics = MetricsRegistry()
+    orchestrator, _, _, _ = _system(FakeGatewayMode.AUTHORIZE, metrics=metrics)
+
+    def outage(_request: object) -> None:
+        raise ConnectionError("private gateway detail")
+
+    monkeypatch.setattr(orchestrator._gateway, "authorize", outage)
+    with pytest.raises(ConnectionError, match="private gateway detail"):
+        orchestrator.issue(_command())
+    assert metrics.as_dicts() == [
+        {"name": "nfcore_provider_errors_total", "value": 1.0,
+         "labels": {"outcome": "error"}}
+    ]
