@@ -127,3 +127,17 @@ Ao retomar o projeto, nunca continue apenas do chat. Reabra o cronograma, o ledg
 - `build_postgres_runtime_composition` registra o handler read-only no mesmo `CanonicalFiscalOperationPath` existente, preservando handlers explícitos e fail-closed dos demais comandos. `web/portal_api.py` habilita a operação com `DOCUMENT_QUERY`; `CanonicalPortalOperationExecutor` continua validando tenant/unidade/ambiente antes do lookup.
 - Testes: SQLite durável com isolamento por unidade e entrada inválida `tests/runtime/test_nfv1_internal_archive_handler.py`; API de Portal com sessão AUDITOR e 403 para outra unidade `tests/web/test_portal_api.py`.
 - Isto é integração interna real e parcial: emissão/cancelamento/inutilização e fluxo comercial final ainda dependem dos handlers/adapters de execução e checkout aprovados. CI do HEAD exige verificação; PR #190 Draft sem merge ou deploy.
+
+
+## Protocolo de reconciliação antirretrabalho — obrigatório (2026-10-16)
+
+**LER ANTES DE QUALQUER EXECUÇÃO:** `docs/checkpoints/NFV1_CURRENT_RECONCILIATION_ANTI_REWORK_2026-10-16.md`. É uma fotografia datada; GitHub e runtime atuais prevalecem. Este protocolo aplica-se a TODOS os agentes `.md`, revisores e executores do FM NFCORE V1.
+
+1. Consultar ao vivo `main`/HEAD, PRs, CI+Governança do SHA exato, cronograma, ledger, checkpoints e ambiente de destino; se não for possível, declarar `CURRENT_NAO_VERIFICADO` e não alterar código nem checkbox.
+2. Reconstruir a matriz por tarefa `ID → requisito de aceite → código/diff → testes → PR/merge SHA → CI pós-merge → runtime (quando aplicável)`. Sem elo obrigatório, resultado `EVIDENCIA_INSUFICIENTE`, não `DONE`.
+3. Fazer busca antirretrabalho em `main` e PRs já mergeadas **antes** de programar; apenas delta faltante é elegível. Não repetir T07/P02 nem as métricas já incorporadas.
+4. Distinguir `IMPLEMENTED_NOT_CERTIFIED`, `DONE_CERTIFIED_INTERNAL`, `DONE_CERTIFIED_OPERATIONAL`, `PENDING`, `BLOCKED_EXTERNAL` e `SUPERSEDED`. Não promover checkbox do ledger com CI verde isoladamente.
+5. Quando ledger e código divergem, reconciliar uma única vez no checkpoint e registrar evidências; a próxima implementação fica condicionada à resolução da divergência. Nunca tratar nota histórica do AGENTS.md como CURRENT.
+6. P09-T01/T02 e P05 são gates separados: tracing/métricas em código não homologam staging; deployment SUCCESS não comprova jornada do cliente. A prioridade comercial Web não autoriza deploy, migration, segredo real ou fiscal real.
+7. Fechar cada PR com HEAD, gates PR e pós-merge, alterações, blockers e **próxima tarefa permitida** no repositório. A análise apenas no chat não vale como continuidade.
+8. Executar `python3 scripts/check_nfcore_plan.py` e CI. **O validador verifica estrutura; não autentica GitHub ou Railway**. Os dois níveis de prova são obrigatórios.
