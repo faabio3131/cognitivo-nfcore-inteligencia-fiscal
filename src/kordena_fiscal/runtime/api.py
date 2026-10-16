@@ -57,9 +57,9 @@ from .observability import (
     RequestTimer,
     SafeTracer,
     StructuredLogger,
-    StructuredLogTraceSink,
     TraceContext,
 )
+from .otel_trace_sink import build_trace_sink
 from .secret_manager import SecretBindingAdministration
 from .security import configure_edge_security
 
@@ -187,7 +187,7 @@ def create_runtime_app(
         environment=resolved.environment.value,
     )
     runtime_tracer = tracer if tracer is not None else SafeTracer(
-        StructuredLogTraceSink(runtime_logger)
+        build_trace_sink(runtime_logger, service="nfcore-api")
     )
     composition = runtime.composition
     if (

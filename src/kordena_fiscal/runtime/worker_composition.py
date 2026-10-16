@@ -46,11 +46,11 @@ from .observability import (
     RequestTimer,
     SafeTracer,
     StructuredLogger,
-    StructuredLogTraceSink,
     TraceContext,
     WorkerHealth,
     WorkerObservability,
 )
+from .otel_trace_sink import build_trace_sink
 
 
 def _new_trace_context(
@@ -307,7 +307,10 @@ def build_production_worker_runtime(
     ):
         raise RuntimeConfigurationError("worker handlers and claim selection disagree")
     runtime_tracer = tracer if tracer is not None else SafeTracer(
-        StructuredLogTraceSink(StructuredLogger(service="nfcore-worker", environment=environment))
+        build_trace_sink(
+            StructuredLogger(service="nfcore-worker", environment=environment),
+            service="nfcore-worker",
+        )
     )
     metrics = MetricsRegistry()
     traced_handlers = {
@@ -389,8 +392,9 @@ def build_customer_webhook_handler(
         transport=_TracedWebhookTransport(
             PinnedWebhookTransport(policy),
             tracer if tracer is not None else SafeTracer(
-                StructuredLogTraceSink(
-                    StructuredLogger(service="nfcore-worker", environment="unspecified")
+                build_trace_sink(
+                    StructuredLogger(service="nfcore-worker", environment="unspecified"),
+                    service="nfcore-worker",
                 )
             ),
             metrics=metrics,
