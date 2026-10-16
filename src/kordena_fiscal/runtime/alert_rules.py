@@ -109,8 +109,10 @@ def evaluate_operational_signals(signals: OperationalSignals) -> tuple[AlertCand
         if not math.isfinite(days):
             raise ValueError("certificate expiry observation must be finite")
         if days <= 30:
-            alerts.append(AlertCandidate("certificate_expiry", "warning",
-                                         "certificate_days_remaining", days, 30))
+            severity = "critical" if days <= 7 else "warning"
+            alerts.append(AlertCandidate(
+                "certificate_expiry", severity, "certificate_days_remaining", days, 30
+            ))
     for code, ok in (
         ("secret_failure", signals.secret_resolution_ok),
         ("db_unavailable", signals.database_ready),
