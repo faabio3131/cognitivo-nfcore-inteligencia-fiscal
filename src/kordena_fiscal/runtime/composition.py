@@ -57,6 +57,7 @@ from .fiscal_runtime import (
     FiscalOperationHandler,
 )
 from .internal_archive_handler import build_archive_reference_handler
+from .observability import MetricsRegistry
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +93,7 @@ def build_postgres_runtime_composition(
     fiscal_operation_handlers: Mapping[str, FiscalOperationHandler] | None = None,
     capability_readiness: CapabilityReadinessService | None = None,
     enable_cakto_checkout: bool = False,
+    metrics: MetricsRegistry | None = None,
     password_reset_ttl: timedelta = timedelta(minutes=10),
 ) -> RuntimeComposition:
     """Compose commercial, human and fiscal ingress over the same PostgreSQL lifecycle."""
@@ -144,6 +146,7 @@ def build_postgres_runtime_composition(
     commercial_fulfillment = CommercialFulfillmentService(
         canonical_commercial_database,
         contract_factory=commercial_activation.contract_for,
+        metrics=metrics,
     )
     commercial_claim = CommercialClaimService(
         unit_of_work_factory=canonical_commercial_database,
@@ -166,7 +169,7 @@ def build_postgres_runtime_composition(
         cakto_checkout_administration = CaktoCheckoutAdministrationService(
             cakto_commercial_database
         )
-    fiscal_application = FiscalApplicationService(database)
+    fiscal_application = FiscalApplicationService(database, metrics=metrics)
     canonical_handlers = dict(fiscal_operation_handlers or {})
     canonical_handlers.setdefault(
         "queryArchiveReference", build_archive_reference_handler(database)
