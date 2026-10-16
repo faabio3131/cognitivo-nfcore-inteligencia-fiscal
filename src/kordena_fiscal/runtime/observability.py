@@ -111,8 +111,16 @@ class MetricsRegistry:
         # Validate the labels before either update; never create half an observation.
         if set(labels) - self._ALLOWED_LABELS:
             raise ValueError("high-cardinality/unsupported metric labels")
-        self.increment(f"{name}_count", 1.0, **labels)
-        self.increment(f"{name}_seconds_total", seconds, **labels)
+        dimensions = tuple(sorted((k, str(v)) for k, v in labels.items()))
+        count_key = (f"{name}_count", dimensions)
+        duration_key = (f"{name}_seconds_total", dimensions)
+        with self._lock:
+            count = self._values[count_key] + 1.0
+            duration = self._values[duration_key] + seconds
+            if not math.isfinite(count) or not math.isfinite(duration):
+                raise ValueError("metric accumulation must remain finite")
+            self._values[count_key] = count
+            self._values[duration_key] = duration
 
     def snapshot(self) -> tuple[MetricSample, ...]:
         with self._lock:
