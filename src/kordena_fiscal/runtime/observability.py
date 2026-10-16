@@ -184,6 +184,7 @@ class StructuredLogTraceSink:
         "worker.cycle",
         "worker.poll",
         "db.outbox_counts",
+        "db.readiness",
         "external.webhook",
     })
     _ALLOWED_OUTCOMES = frozenset({

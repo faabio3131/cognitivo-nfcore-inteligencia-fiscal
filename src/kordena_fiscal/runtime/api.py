@@ -59,6 +59,7 @@ from .observability import (
     StructuredLogger,
     TraceContext,
 )
+from .otel_trace_sink import build_trace_sink
 from .secret_manager import SecretBindingAdministration
 from .security import configure_edge_security
 
@@ -181,10 +182,12 @@ def create_runtime_app(
         fiscal_operation_handlers=fiscal_operation_handlers,
     )
     runtime_metrics = metrics or MetricsRegistry()
-    runtime_tracer = tracer or SafeTracer()
     runtime_logger = logger or StructuredLogger(
         service="nfcore-api",
         environment=resolved.environment.value,
+    )
+    runtime_tracer = tracer if tracer is not None else SafeTracer(
+        build_trace_sink(runtime_logger, service="nfcore-api")
     )
     composition = runtime.composition
     if (

@@ -23,6 +23,7 @@ from kordena_fiscal.product.cakto import (
     CaktoWebhookReceiver,
     CaktoWebhookVerifier,
 )
+from kordena_fiscal.runtime.observability import MetricsRegistry
 
 NOW = datetime(2026, 9, 15, 20, 10, tzinfo=UTC)
 SECRET = b"test-only-cakto-webhook-secret"
@@ -318,6 +319,7 @@ def test_informational_event_never_calls_canonical_bridge(tmp_path) -> None:
 def test_reconciliation_delegates_to_canonical_bridge_and_reports_drift(tmp_path) -> None:
     database = _database(tmp_path)
     bridge = RecordingCanonicalBridge()
+    metrics = MetricsRegistry()
     with database() as uow:
         uow.commercial.put_cakto_plan_binding(_binding())
         uow.commit()
@@ -325,6 +327,7 @@ def test_reconciliation_delegates_to_canonical_bridge_and_reports_drift(tmp_path
     result = CaktoCommercialProcessor(
         unit_of_work_factory=database,
         canonical_bridge=bridge,
+        metrics=metrics,
     ).reconcile(
         CaktoReconciliationSnapshot(
             external_customer_id="481920",
@@ -340,6 +343,12 @@ def test_reconciliation_delegates_to_canonical_bridge_and_reports_drift(tmp_path
     assert result.canonical_status == "active"
     assert result.drift is True
     assert len(bridge.reconciled) == 1
+    assert any(
+        sample.name == "nfcore_cakto_reconciliation_total"
+        and sample.value == 1
+        and dict(sample.labels) == {"outcome": "drift"}
+        for sample in metrics.snapshot()
+    )
 
 
 def test_legacy_commercial_models_have_no_fiscal_activation_surface() -> None:

@@ -691,7 +691,12 @@ class CaktoCommercialProcessor:
             )
         if binding is None or not binding.enabled:
             raise CaktoTransientProcessingError("Cakto plan mapping is not configured")
-        return self._canonical_bridge.reconcile(snapshot, binding)
+        result = self._canonical_bridge.reconcile(snapshot, binding)
+        self._metrics.increment(
+            "nfcore_cakto_reconciliation_total",
+            outcome="drift" if result.drift else "aligned",
+        )
+        return result
 
     def _process_one(self, entry: CaktoWebhookInboxEntry) -> str:
         with self._unit_of_work_factory() as uow:
