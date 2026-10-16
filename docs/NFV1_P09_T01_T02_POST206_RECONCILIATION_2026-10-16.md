@@ -30,3 +30,11 @@ Manter `MetricsRegistry` como autoridade canônica, baixa cardinalidade, sem ten
 ## Gates restantes
 
 Confirmar CI/Governança pós-merge de `9045873`; obter prova de spans internos no staging apenas quando o deploy for autorizado; P09-T01 ainda não certificada. P09-T02 preparada por matriz, sem promoção de status. Não reiniciar P05, nem pedir contabilidade externa para fechar desenvolvimento interno. Próxima alteração em branch isolada com testes e AGENTS.md atualizados.
+
+## Auditoria dirigida de produtores — 2026-10-16
+
+- **Fulfillment comercial:** `application/commercial_fulfillment.py` implementa `CommercialFulfillmentService.process`, com caminhos de sucesso, replay e exceções, mas não injeta `MetricsRegistry` e não registra contador próprio. `runtime/commercial_observability.py` disponibiliza `CommercialTelemetryEvent.PROVISIONING`, porém a busca em `src/` não encontrou uso explícito `CommercialTelemetryEvent.PROVISIONING`; **nome de enum não comprova emissão real**.
+- **Provider errors:** `CommercialTelemetryEvent.PROVIDER_DRIFT` e `FAILURE` são contratos existentes; busca de produção em `src/` não encontrou chamadas diretas desses membros. Um nome `nfcore_provider_errors_total` aparece em `tests/test_nfv1_p09_t02_metric_sample_integrity.py` como amostra sintética do `MetricsRegistry`, não como produtor. Classificação: lacuna ainda não resolvida.
+- **Fiscal rejection:** busca de produtores `nfcore_*reject*` em `src/` não encontrou registro dedicado; validar o ponto determinístico de normalização de rejeições e evitar emitir métricas em um serviço paralelo.
+- **Fiscal reconciliation:** `nfcore_cakto_reconciliation_total` é reconciliação *comercial*, não fiscal; nenhum `nfcore_*reconcil*` fiscal localizado em `src/` nesta auditoria dirigida.
+- **Decisão:** instrumentar somente após localizar o contrato determinístico e o ponto autoritativo para cada resultado. Status T02 `IMPLEMENTED_NOT_CERTIFIED`, com quatro grupos ainda abertos; P09-T01 ainda precisa prova de spans no staging.
