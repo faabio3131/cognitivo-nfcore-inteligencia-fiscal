@@ -82,8 +82,8 @@ class MetricsRegistry:
         self._collectors: list[Callable[[], None]] = []
 
     def increment(self, name: str, value: float = 1.0, **labels: str) -> None:
-        if value < 0:
-            raise ValueError("metric increment must be non-negative")
+        if not math.isfinite(value) or value < 0:
+            raise ValueError("metric increment must be finite and non-negative")
         unknown = set(labels) - self._ALLOWED_LABELS
         if unknown:
             raise ValueError(f"high-cardinality/unsupported metric labels: {sorted(unknown)}")
@@ -106,8 +106,13 @@ class MetricsRegistry:
             self._collectors.append(collector)
 
     def observe_seconds(self, name: str, seconds: float, **labels: str) -> None:
+        if not math.isfinite(seconds) or seconds < 0:
+            raise ValueError("metric duration must be finite and non-negative")
+        # Validate the labels before either update; never create half an observation.
+        if set(labels) - self._ALLOWED_LABELS:
+            raise ValueError("high-cardinality/unsupported metric labels")
         self.increment(f"{name}_count", 1.0, **labels)
-        self.increment(f"{name}_seconds_total", max(0.0, seconds), **labels)
+        self.increment(f"{name}_seconds_total", seconds, **labels)
 
     def snapshot(self) -> tuple[MetricSample, ...]:
         with self._lock:
