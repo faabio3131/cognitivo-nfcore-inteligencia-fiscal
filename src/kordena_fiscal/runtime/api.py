@@ -447,7 +447,9 @@ def create_runtime_app(
         healthy, reason = runtime.ready()
         # Health checks drive real internal evaluation without external I/O or paging.
         app.state.nfcore_alert_candidates = alert_monitor.poll(
-            signals=OperationalSignals(database_ready=healthy)
+            signals=OperationalSignals(
+                database_ready=None if reason == "composition_unavailable" else healthy
+            )
         )
         if resolved.persistence_backend == "postgres":
             runtime_tracer.record(
