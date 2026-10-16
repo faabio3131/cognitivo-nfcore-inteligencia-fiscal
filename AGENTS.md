@@ -155,3 +155,9 @@ Ao retomar o projeto, nunca continue apenas do chat. Reabra o cronograma, o ledg
 - Nao declarar T02 DONE sem testes/CI e evidencia para cada item do cronograma; sem merge em main, deploy ou operacoes externas sem aprovacao especifica.
 
 - **Causa raiz adicional do template no Windows:** Git rastreia simultaneamente `.github/PULL_REQUEST_TEMPLATE.md` e `.github/pull_request_template.md`. NTFS case-insensitive faz colisao; restaurar um pode deixar outro como modificado. Diff inicial preservado em `C:\Users\faabi\Documents\nfcore-p09-template-unexpected-20261016.patch` (4385 bytes). Nao usar `git add -A`, nao renomear/excluir arquivos do repositorio neste gate; saneamento de conflito case-only exige PR propria e revisao de impacto.
+
+### P09-T02 delta real de reconciliacao comercial — 2026-10-16
+
+- Em `product/cakto.py`, `CaktoCommercialProcessor.reconcile()` passa a emitir `nfcore_cakto_reconciliation_total{outcome=drift|aligned}` somente apos retorno do bridge canonico, sem tenant/customer ID como label. Nao cria segunda autoridade comercial ou fiscal. Teste atualizado em `tests/product/test_web11_cakto.py` valida a amostra drift no caminho real SQLite/bridge.
+- Reexecucao dirigida com `PYTHONPATH` do worktree correto: `tests/product/test_web11_cakto.py` mais tres suites P09-T02 = 25 PASS; Ruff dos dois arquivos PASS. Provas apenas locais, CI remoto e demais gates ainda necessarios. Nao confundir reconciliacao comercial Cakto com reconciliacao FISCAL, que segue aberta no cronograma.
+- Aviso no Windows: `git diff --check` global inclui modificacao espuria do template case-only; fazer `git diff --check -- AGENTS.md src/kordena_fiscal/product/cakto.py tests/product/test_web11_cakto.py` e stage somente os tres caminhos. Conflito dos templates permanece pendente de saneamento separado.
