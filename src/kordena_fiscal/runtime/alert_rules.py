@@ -1,8 +1,4 @@
-"""Deterministic internal alert candidates over the existing metrics authority.
-
-No notifications, credentials, tenant identifiers or external side effects. Missing
-series are unknown, never interpreted as healthy. Thresholds are reviewable policy.
-"""
+"""Bounded alert candidates over canonical in-process metrics; no external delivery."""
 
 from __future__ import annotations
 
@@ -27,17 +23,18 @@ class AlertRule:
     severity: str
     threshold: float
     labels: tuple[tuple[str, str], ...] = ()
+    kind: str = "counter"
 
 
-# Candidate operational policy; delivery/routing and final thresholds are separate gates.
+# Threshold zero is a conservative *candidate*, not a production paging policy.
 DEFAULT_RULES: tuple[AlertRule, ...] = (
-    AlertRule("http_5xx", "nfcore_http_requests_total", "critical", 0, (("status_class", "5xx"),)),
+    AlertRule("http_5xx", "nfcore_http_requests_total", "critical", 0,
+              (("status_class", "5xx"),)),
     AlertRule("provider_errors", "nfcore_provider_errors_total", "warning", 0),
-    AlertRule("worker_backlog", "nfcore_worker_backlog_jobs", "warning", 0),
-    AlertRule(
-        "worker_dead_letter", "nfcore_worker_jobs_total", "critical", 0,
-        (("outcome", "dead_letter"),),
-    ),
+    AlertRule("worker_backlog", "nfcore_worker_backlog_jobs", "warning", 0,
+              kind="gauge"),
+    AlertRule("worker_dead_letter", "nfcore_worker_jobs_total", "critical", 0,
+              (("outcome", "dead_letter"),)),
     AlertRule("fiscal_rejection", "nfcore_fiscal_rejections_total", "warning", 0),
     AlertRule("worker_cycle_failure", "nfcore_worker_cycle_failures_total", "warning", 0),
 )
@@ -46,21 +43,41 @@ DEFAULT_RULES: tuple[AlertRule, ...] = (
 def evaluate_alert_candidates(
     samples: tuple[MetricSample, ...],
     rules: tuple[AlertRule, ...] = DEFAULT_RULES,
+    *,
+    previous: tuple[MetricSample, ...] | None = None,
 ) -> tuple[AlertCandidate, ...]:
-    """Evaluate bounded facts without assuming absent instrumentation means zero."""
+    """Counter alerts require two snapshots; missing series is unknown, not healthy.
+
+    Counter resets are not counted as incidents; gauge rules use present value.
+    The evaluator never emits notifications or changes fiscal authority.
+    """
     observed: list[AlertCandidate] = []
     for rule in rules:
-        values = [
-            sample.value
-            for sample in samples
-            if sample.name == rule.metric
-            and all(pair in sample.labels for pair in rule.labels)
-        ]
-        if not values:
+        if rule.kind not in {"counter", "gauge"}:
+            raise ValueError("unsupported alert rule kind")
+        current = {
+            sample.labels: sample.value for sample in samples
+            if sample.name == rule.metric and all(pair in sample.labels for pair in rule.labels)
+        }
+        if not current:
             continue
-        value = sum(values)
-        if value > rule.threshold:
-            observed.append(
-                AlertCandidate(rule.code, rule.severity, rule.metric, value, rule.threshold)
+        if rule.kind == "counter":
+            if previous is None:
+                continue
+            baseline = {
+                sample.labels: sample.value for sample in previous
+                if sample.name == rule.metric and all(pair in sample.labels for pair in rule.labels)
+            }
+            # New or reset series do not have a trusted delta until next sample.
+            value = sum(
+                max(0.0, amount - baseline[labels])
+                for labels, amount in current.items()
+                if labels in baseline and amount >= baseline[labels]
             )
+        else:
+            value = sum(current.values())
+        if value > rule.threshold:
+            observed.append(AlertCandidate(
+                rule.code, rule.severity, rule.metric, value, rule.threshold
+            ))
     return tuple(observed)
