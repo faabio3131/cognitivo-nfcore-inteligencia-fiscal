@@ -168,3 +168,9 @@ Ao retomar o projeto, nunca continue apenas do chat. Reabra o cronograma, o ledg
 - P09-T01 ja possui `SafeTracer` e chamadas em `runtime/api.py`, `runtime/worker_composition.py`, `runtime/observability.py`; nao reconstruir. Executado no worktree `PYTHONPATH=C:\nfcore-p09-t02-current\src py -3 -m pytest -q tests/test_nfv1_p09_t01_runtime_trace_sink.py tests/runtime/test_p04_t03_worker_observability.py` com exit code 0 (alguns testes SKIP por dependencias/opcionais; nao converter SKIP em PASS).
 - Gate faltante T01: demonstrar cobertura de spans de DB e dependencias externas e prova do sink/exporter real no staging, com correlacao segura e sem vazamento. Traces escritos em stdout nos testes locais nao bastam para certificacao de exporter remoto. Nao deployar apenas para produzir evidencia sem autorizacao.
 - PR #206 HEAD `690a284718a84a2c7f3b4a2f4fb8a4c764f8043a`: Governance #385 SUCCESS e CI #964 ainda `in_progress` na ultima consulta. Verificar gates novamente antes de merge; nenhum merge autorizado por este registro.
+
+### P09-T01 delta de tracing DB — 2026-10-16
+
+- Achado reproduzivel: `runtime/api.py` emite operacao `db.readiness`, mas `StructuredLogTraceSink._ALLOWED_OPERATIONS` a omitia e serializava como `other`. Corrigida somente a allowlist fixa de operacoes, sem ampliar atributos livres, IDs, direitos ou dependencias.
+- Teste novo `tests/test_nfv1_p09_t01_db_readiness_export.py` verifica que `db.readiness`/`error` e latencia permanecem visiveis no sink estruturado e que contexto/segredo nao aparecem. Suite nova + `tests/test_nfv1_p09_t01_runtime_trace_sink.py` passou, junto de Ruff dos arquivos alterados (exit 0).
+- **Nao declarar P09-T01 concluida:** exporter real/staging, traces DB alem de readiness e chamadas externas permanecem sem prova operacional autenticada. Verificar CI/Governanca do HEAD remoto, manter T01 [ ] e T02 [ ]; nao fazer deploy para obter prova sem aprovacao.
