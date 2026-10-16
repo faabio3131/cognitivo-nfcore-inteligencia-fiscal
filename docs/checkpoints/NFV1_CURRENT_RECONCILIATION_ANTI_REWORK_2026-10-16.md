@@ -43,3 +43,11 @@ O arquivo `AGENTS.md` inclui anotações históricas de PRs e branches e o ledge
 ## 5. Regra para agentes e revisores
 
 Qualquer agente ou executor que não tenha consultado HEAD/CI/PR/runtime **deve declarar `CURRENT_NAO_VERIFICADO` e parar**. Qualquer conclusão sem os quatro vínculos (ID → aceite → PR/merge+CI → prova operacional quando aplicável) deve ser devolvida como `EVIDENCIA_INSUFICIENTE`. Alterações desta PR documental não comprovam funcionalidade nem encerram T01/T02/P05.
+
+## 6. Retificação factual P05 após recuperação do histórico (16/10/2026)
+
+**FATO CONFIRMADO:** o bloqueio de *conexão/inicialização do Worker* que consumiu os dias 13–15/10 foi resolvido. A recuperação histórica registra JSON sealed do Worker recadastrado e protegido, identidade GSM ativada, migration 17 e bindings API/Worker no staging, e Worker 1/1 online. Nova implantação da revisão `2f3689838cfbec1c6d2ffac614cb0eb364d91633` em 15/10 manteve API/Portal/Worker online, com smoke HTTP bem-sucedido. Consulta Railway `environment_status` em 16/10: **quatro serviços online, cada um 1/1, zero falhas recentes e zero alertas**.
+
+**CERTIFICAÇÃO EM CAMADAS:** `P05_WORKER_GSM_BOOTSTRAP = RECOVERED_OPERATIONAL`; `P05_STAGING_SERVICES = ONLINE`; `P05_HTTP_SMOKE = PASSED_HISTORICALLY`; `P05_FULL_AUTHENTICATED_E2E_AND_BUSINESS_PARITY = NOT_CERTIFIED`. A checkbox P05-T01 permanece formalmente `[ ]` por exigência do cronograma/ledger e falta de closeout integral de todos os critérios — **não** porque o Worker continue desconectado. É proibido transformar o texto histórico `BLOCKED_EXTERNAL` em instrução para repetir GSM/Worker/migration17/deploy; qualquer novo trabalho requer blocker concreto distinto e prova atual.
+
+**REGRA ANTI-RETRABALHO P05:** nenhuma recriação do JSON, rebinding GSM, reexecução da migration 17, redeploy da revisão validada ou nova recuperação de Worker, salvo falha atual demonstrável por health/log/runtime e análise de impacto. Próximo trabalho permitido: avaliação dos critérios ainda sem evidência (jornadas E2E autenticadas, paridade Web, integrações reais que dependam de terceiros), sem renomear essas pendências para `conexão do Worker`.
