@@ -74,6 +74,7 @@ class RuntimeApi:
         workload_credentials: tuple[WorkloadCredentialRecord, ...] = (),
         security_audit_sink: SecurityAuditSink | None = None,
         fiscal_operation_handlers: Mapping[str, FiscalOperationHandler] | None = None,
+        metrics: MetricsRegistry | None = None,
     ) -> None:
         self.settings = settings
         self.database: PostgresFiscalDatabase | None = None
@@ -101,6 +102,7 @@ class RuntimeApi:
                         workload_credentials=workload_credentials,
                         security_audit_sink=security_audit_sink,
                         fiscal_operation_handlers=fiscal_operation_handlers,
+                        metrics=metrics,
                         enable_cakto_checkout=(
                             settings.commercial_checkout_provider == "cakto"
                         ),
@@ -175,13 +177,14 @@ def create_runtime_app(
     fiscal_operation_handlers: Mapping[str, FiscalOperationHandler] | None = None,
 ) -> FastAPI:
     resolved = settings or RuntimeSettings.from_environ()
+    runtime_metrics = metrics or MetricsRegistry()
     runtime = RuntimeApi(
         resolved,
         workload_credentials=workload_credentials,
         security_audit_sink=security_audit_sink,
         fiscal_operation_handlers=fiscal_operation_handlers,
+        metrics=runtime_metrics,
     )
-    runtime_metrics = metrics or MetricsRegistry()
     runtime_logger = logger or StructuredLogger(
         service="nfcore-api",
         environment=resolved.environment.value,

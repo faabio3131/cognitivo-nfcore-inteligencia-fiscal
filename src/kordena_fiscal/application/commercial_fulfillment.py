@@ -26,6 +26,7 @@ from kordena_fiscal.product.commercial_fulfillment import (
     ValidatedCommercialEvent,
 )
 from kordena_fiscal.product.commercial_lifecycle import CommercialContract
+from kordena_fiscal.runtime.observability import MetricsRegistry
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,9 +61,23 @@ class CommercialFulfillmentService:
         *,
         contract_factory: Callable[[CommercialPurchaseRecord, datetime, str], CommercialContract]
         | None = None,
+        metrics: MetricsRegistry | None = None,
     ) -> None:
         self._unit_of_work_factory = unit_of_work_factory
         self._contract_factory = contract_factory
+        self._metrics = metrics
+
+    def _observe_fulfillment(self, *, replay: bool) -> None:
+        if self._metrics is None:
+            return
+        try:
+            self._metrics.increment(
+                "nfcore_commercial_fulfillment_total",
+                outcome="replay" if replay else "succeeded",
+            )
+        except Exception:
+            # Telemetry must never change committed purchase state.
+            return
 
     def process(
         self,
@@ -94,6 +109,7 @@ class CommercialFulfillmentService:
                     raise CommercialFulfillmentError(
                         "commercial event receipt exists without canonical purchase"
                     )
+                self._observe_fulfillment(replay=True)
                 return CommercialFulfillmentResult(purchase=purchase, replay=True)
 
             acquisition = self._resolve_acquisition(
@@ -115,6 +131,7 @@ class CommercialFulfillmentService:
                 if credited:
                     assert current is not None
                     uow.commit()
+                    self._observe_fulfillment(replay=True)
                     return CommercialFulfillmentResult(purchase=current, replay=True)
             if current is None:
                 purchase = self._create_purchase(
@@ -163,6 +180,7 @@ class CommercialFulfillmentService:
                     replace(acquisition, linked_purchase_id=purchase.purchase_id)
                 )
             uow.commit()
+            self._observe_fulfillment(replay=False)
             return CommercialFulfillmentResult(purchase=purchase, replay=False)
 
     def _contract_for_event(
