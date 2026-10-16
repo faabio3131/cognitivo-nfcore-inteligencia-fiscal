@@ -38,3 +38,9 @@ Confirmar CI/Governança pós-merge de `9045873`; obter prova de spans internos 
 - **Fiscal rejection:** busca de produtores `nfcore_*reject*` em `src/` não encontrou registro dedicado; validar o ponto determinístico de normalização de rejeições e evitar emitir métricas em um serviço paralelo.
 - **Fiscal reconciliation:** `nfcore_cakto_reconciliation_total` é reconciliação *comercial*, não fiscal; nenhum `nfcore_*reconcil*` fiscal localizado em `src/` nesta auditoria dirigida.
 - **Decisão:** instrumentar somente após localizar o contrato determinístico e o ponto autoritativo para cada resultado. Status T02 `IMPLEMENTED_NOT_CERTIFIED`, com quatro grupos ainda abertos; P09-T01 ainda precisa prova de spans no staging.
+
+## Atualização CURRENT após implementação na PR #207
+
+- `nfcore_commercial_fulfillment_total` agora tem produtor canônico em `CommercialFulfillmentService` com resultados `succeeded`/`replay`; `RuntimeApi` compartilha a registry da API via `RuntimeComposition`/`build_postgres_runtime_composition`. Commit inicial `7b64aad`. A auditoria anterior de ausência de produtor representa o **CURRENT anterior à implementação**, não o estado desta branch.
+- Gates locais do novo delta: 8 testes de fulfillment PASS; Ruff PASS; Mypy direcionado PASS; cronograma 59 tarefas PASS. Ainda sem CI verde deste HEAD ou prova de métrica em staging; logo `IMPLEMENTED_NOT_CERTIFIED`.
+- P09-T01 ainda precisa prova de spans de serviço no Railway; P09-T02 mantém provider errors, fiscal rejection e fiscal reconciliation em aberto. Não promover `[x]`.
