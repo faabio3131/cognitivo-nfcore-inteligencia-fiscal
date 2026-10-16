@@ -57,6 +57,7 @@ from .observability import (
     RequestTimer,
     SafeTracer,
     StructuredLogger,
+    StructuredLogTraceSink,
     TraceContext,
 )
 from .secret_manager import SecretBindingAdministration
@@ -181,10 +182,12 @@ def create_runtime_app(
         fiscal_operation_handlers=fiscal_operation_handlers,
     )
     runtime_metrics = metrics or MetricsRegistry()
-    runtime_tracer = tracer or SafeTracer()
     runtime_logger = logger or StructuredLogger(
         service="nfcore-api",
         environment=resolved.environment.value,
+    )
+    runtime_tracer = tracer if tracer is not None else SafeTracer(
+        StructuredLogTraceSink(runtime_logger)
     )
     composition = runtime.composition
     if (
