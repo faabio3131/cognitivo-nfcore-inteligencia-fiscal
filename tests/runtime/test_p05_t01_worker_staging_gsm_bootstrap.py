@@ -195,5 +195,17 @@ def test_invalid_cloud_payload_prevents_worker_readiness(monkeypatch, tmp_path: 
             access=lambda name: GsmPayload(name, b"corrupt", 0)
         ),
     )
+    from kordena_fiscal.runtime.observability import StructuredLogger
+
+    observed: list[str] = []
+    monkeypatch.setattr(
+        boot, "StructuredLogger",
+        lambda **_kwargs: StructuredLogger(
+            service="nfcore-worker", environment="test", sink=observed.append,
+        ),
+    )
     with pytest.raises(SecretResolutionError):
         factory(_FakeDb(_binding()), SimpleNamespace(environment=RuntimeEnvironment.STAGING))
+    assert any("worker_operational_alert_candidate" in line for line in observed)
+    assert any("secret_failure" in line for line in observed)
+    assert not any("corrupt" in line or "pilot-tenant" in line for line in observed)
