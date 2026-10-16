@@ -141,3 +141,15 @@ Ao retomar o projeto, nunca continue apenas do chat. Reabra o cronograma, o ledg
 6. P09-T01/T02 e P05 são gates separados: tracing/métricas em código não homologam staging; deployment SUCCESS não comprova jornada do cliente. A prioridade comercial Web não autoriza deploy, migration, segredo real ou fiscal real.
 7. Fechar cada PR com HEAD, gates PR e pós-merge, alterações, blockers e **próxima tarefa permitida** no repositório. A análise apenas no chat não vale como continuidade.
 8. Executar `python3 scripts/check_nfcore_plan.py` e CI. **O validador verifica estrutura; não autentica GitHub ou Railway**. Os dois níveis de prova são obrigatórios.
+
+
+## Checkpoint de execucao P09-T02 — 2026-10-16 (continuar, nao reiniciar)
+
+- Fonte de verdade no inicio deste recorte: `main=95cd0a852aea001c7bde0a84e5e0c2b4ac111be6`; rever GitHub e CI antes de cada merge. PR #201 ainda aberta (correcao de overflow em `MetricsRegistry`), com CI #952 e Governance #373 SUCCESS no HEAD `d76e538e84db93315c0960a4835fd51d986c29e0`; PR #205 Draft documenta a matriz de aceite, nao certifica T01/T02.
+- Worktree isolado no PC: `C:\nfcore-p09-t02-current`, branch `feat/nfv1-p09-t02-remaining-instrumentation-20261016`, baseada em main citada. Checkout historico `C:\nfcore-p05-migrations` em detached HEAD `65c58b6` permanece preservado.
+- **Armadilha de ambiente confirmada:** `py -3 -m pytest` sem `PYTHONPATH` carregava `kordena_fiscal` de `C:\Users\faabi\nfcore-t04-work\src`, causando `ImportError` em `test_nfv1_p09_t02_http_metrics.py`. Reexecutar com `PYTHONPATH=C:\nfcore-p09-t02-current\src` resolveu: tres arquivos direcionados, 16 testes PASS. Nao alterar codigo para mascarar contaminacao de import.
+- Uma alteracao inesperada em `.github/PULL_REQUEST_TEMPLATE.md` surgiu no worktree durante o checkout. Nao incorporar, descartar ou sobrescrever sem identificar origem; `git add` deve selecionar somente caminhos revisados.
+- Instrumentacao CURRENT ja identificada em `runtime/observability.py` (Worker/queue), `runtime/api.py` (HTTP/dependency/activation), `web/app.py` (HTTP), `web/commercial_release.py` (offer), `runtime/commercial_observability.py` (eventos) e `product/cakto.py` (webhook/processing). Antes de adicionar counters, localizar producer + caminho de runtime + testes.
+- Ausencias ainda nao certificadas: metricas de fulfillment, reconciliation, provider errors e fiscal rejection; diferenciar metric name presente apenas em teste de evento produtivo realmente instrumentado. P09-T01 tracing/exporter continua separadamente pendente; nenhuma checkbox promovida.
+- P05 Worker/GSM e migration17 recuperados; T02 same-SHA staging documentado na PR #203. **Nao repetir deploy, credenciais, migrations, backup/restore ou bootstrap**. T01/T03/T04/T05 ainda possuem gates de prova distintos.
+- Nao declarar T02 DONE sem testes/CI e evidencia para cada item do cronograma; sem merge em main, deploy ou operacoes externas sem aprovacao especifica.
