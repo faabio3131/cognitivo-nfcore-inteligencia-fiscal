@@ -2,12 +2,13 @@
 
 from datetime import UTC, datetime
 
-from kordena_fiscal.application.commercial_fulfillment import CommercialFulfillmentService
-from kordena_fiscal.runtime.observability import MetricsRegistry
-from tests.application.test_cl11_commercial_fulfillment_service import (
+from test_cl11_commercial_fulfillment_service import (
     MemoryCommercialDatabase,
     event,
 )
+
+from kordena_fiscal.application.commercial_fulfillment import CommercialFulfillmentService
+from kordena_fiscal.runtime.observability import MetricsRegistry
 
 
 def test_committed_and_replayed_fulfillment_count_without_pii() -> None:
