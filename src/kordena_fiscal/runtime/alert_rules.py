@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
+from kordena_fiscal.domain import ExecutionScope
 from kordena_fiscal.observability.alerts import AlertRegistry
 from kordena_fiscal.observability.events import ObservabilityContext
 from kordena_fiscal.runtime.observability import MetricSample, MetricsRegistry
+from kordena_fiscal.security.secrets import SecretAuditEvent
+from kordena_fiscal.security.signing import CertificateReference
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,3 +234,41 @@ def publish_alert_candidates(
         if alert is not None:
             published += 1
     return published
+
+
+def certificate_expiry_signal(
+    reference: CertificateReference, scope: ExecutionScope, now: datetime
+) -> OperationalSignals:
+    """Read safe certificate metadata only after verifying canonical tenant/unit scope."""
+    from kordena_fiscal.domain import FiscalValidationError
+
+    if now.utcoffset() is None:
+        raise FiscalValidationError("certificate observation instant must be timezone-aware")
+    if (reference.tenant_id, reference.unit_id) != (scope.tenant_id, scope.unit_id):
+        raise FiscalValidationError("certificate observation scope mismatch")
+    return OperationalSignals(
+        certificate_days_remaining=(reference.expires_at - now).total_seconds() / 86400
+    )
+
+
+def secret_audit_signal(event: SecretAuditEvent) -> OperationalSignals:
+    """Project canonical secret audit outcome; never load or log its secret material."""
+    if event.outcome == "resolved":
+        return OperationalSignals(secret_resolution_ok=True)
+    if event.outcome == "denied":
+        return OperationalSignals(secret_resolution_ok=False)
+    return OperationalSignals()
+
+
+def railway_deployment_signal(status: str) -> OperationalSignals:
+    """Consume an authenticated Railway deployment status, not an inferred URL check.
+
+    The platform/Command connector owns fetching this value. Pending/unknown
+    deployment states are never converted into healthy/unhealthy claims.
+    """
+    normalized = status.strip().upper()
+    if normalized == "SUCCESS":
+        return OperationalSignals(deployment_healthy=True)
+    if normalized in {"FAILED", "CRASHED"}:
+        return OperationalSignals(deployment_healthy=False)
+    return OperationalSignals()
