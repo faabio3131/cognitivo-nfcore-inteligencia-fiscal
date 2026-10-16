@@ -181,7 +181,8 @@ class _TracedWebhookTransport:
         # The signed delivery handler validates response types. Tracing must not
         # replace that validation with AttributeError or reinterpret the result.
         status = response.status_code if isinstance(response, WebhookDeliveryResponse) else None
-        self._metric(timer.elapsed(), "ok" if status is not None and 200 <= status <= 299 else "error")
+        outcome = "ok" if status is not None and 200 <= status <= 299 else "error"
+        self._metric(timer.elapsed(), outcome)
         self._tracer.record(
             operation="external.webhook", context=context, started_at=started,
             elapsed_seconds=timer.elapsed(),
