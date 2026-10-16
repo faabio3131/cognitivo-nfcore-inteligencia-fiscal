@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from kordena_fiscal.runtime.observability import MetricSample
+from kordena_fiscal.runtime.observability import MetricSample, MetricsRegistry
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,3 +81,94 @@ def evaluate_alert_candidates(
                 rule.code, rule.severity, rule.metric, value, rule.threshold
             ))
     return tuple(observed)
+
+
+@dataclass(frozen=True, slots=True)
+class OperationalSignals:
+    """Trusted, pre-validated observations; None means not observed, not healthy."""
+
+    certificate_days_remaining: float | None = None
+    secret_resolution_ok: bool | None = None
+    database_ready: bool | None = None
+    deployment_healthy: bool | None = None
+
+
+def evaluate_operational_signals(signals: OperationalSignals) -> tuple[AlertCandidate, ...]:
+    """Only explicit observations may create alerts; no network or secret access."""
+    import math
+
+    alerts: list[AlertCandidate] = []
+    days = signals.certificate_days_remaining
+    if days is not None:
+        if not math.isfinite(days):
+            raise ValueError("certificate expiry observation must be finite")
+        if days <= 30:
+            alerts.append(AlertCandidate("certificate_expiry", "warning",
+                                         "certificate_days_remaining", days, 30))
+    for code, ok in (
+        ("secret_failure", signals.secret_resolution_ok),
+        ("db_unavailable", signals.database_ready),
+        ("deployment_unhealthy", signals.deployment_healthy),
+    ):
+        if ok is False:
+            alerts.append(AlertCandidate(code, "critical", code, 1.0, 0.0))
+    return tuple(alerts)
+
+
+def fiscal_rejection_rate(
+    current: tuple[MetricSample, ...],
+    previous: tuple[MetricSample, ...],
+    *,
+    threshold: float = 0.1,
+) -> AlertCandidate | None:
+    """Ratio of observed rejected authorizations to all finished authorizations.
+
+    Requires both counter families and a valid prior sample. Missing denominator
+    or reset counters are not interpreted as safe nor as a real rejection rate.
+    """
+    import math
+
+    if not math.isfinite(threshold) or not 0 <= threshold <= 1:
+        raise ValueError("invalid rejection rate threshold")
+
+    def amount(samples: tuple[MetricSample, ...], name: str) -> float | None:
+        matches = [item.value for item in samples if item.name == name]
+        return sum(matches) if matches else None
+
+    rejected_now = amount(current, "nfcore_fiscal_rejections_total")
+    rejected_before = amount(previous, "nfcore_fiscal_rejections_total")
+    finalized_now = amount(current, "nfcore_fiscal_authorizations_finalized_total")
+    finalized_before = amount(previous, "nfcore_fiscal_authorizations_finalized_total")
+    if None in (rejected_now, rejected_before, finalized_now, finalized_before):
+        return None
+    assert rejected_now is not None and rejected_before is not None
+    assert finalized_now is not None and finalized_before is not None
+    if rejected_now < rejected_before or finalized_now < finalized_before:
+        return None
+    rejected = rejected_now - rejected_before
+    total = finalized_now - finalized_before
+    if total <= 0 or rejected > total:
+        return None
+    rate = rejected / total
+    return (AlertCandidate("fiscal_rejection_rate", "warning", "ratio", rate, threshold)
+            if rate > threshold else None)
+
+
+class InternalAlertMonitor:
+    """Poll existing registry; expose candidates to a caller without auto-sending."""
+
+    def __init__(self, metrics: MetricsRegistry) -> None:
+        self._metrics = metrics
+        self._previous: tuple[MetricSample, ...] | None = None
+
+    def poll(self, *, signals: OperationalSignals | None = None) -> tuple[AlertCandidate, ...]:
+        current = self._metrics.snapshot()
+        candidates = list(evaluate_alert_candidates(current, previous=self._previous))
+        if self._previous is not None:
+            ratio = fiscal_rejection_rate(current, self._previous)
+            if ratio is not None:
+                candidates.append(ratio)
+        if signals is not None:
+            candidates.extend(evaluate_operational_signals(signals))
+        self._previous = current
+        return tuple(candidates)
