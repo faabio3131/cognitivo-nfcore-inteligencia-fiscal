@@ -162,6 +162,11 @@ class InternalAlertMonitor:
     def __init__(self, metrics: MetricsRegistry) -> None:
         self._metrics = metrics
         self._previous: tuple[MetricSample, ...] | None = None
+        self._latest: tuple[AlertCandidate, ...] = ()
+
+    @property
+    def latest(self) -> tuple[AlertCandidate, ...]:
+        return self._latest
 
     def poll(self, *, signals: OperationalSignals | None = None) -> tuple[AlertCandidate, ...]:
         current = self._metrics.snapshot()
@@ -173,7 +178,8 @@ class InternalAlertMonitor:
         if signals is not None:
             candidates.extend(evaluate_operational_signals(signals))
         self._previous = current
-        return tuple(candidates)
+        self._latest = tuple(candidates)
+        return self._latest
 
 
 # The existing V2-13 AlertRegistry remains the single owner of alert identity,

@@ -40,6 +40,7 @@ from kordena_fiscal.contingency import (
 from kordena_fiscal.contingency.outbox import OutboxClaimSelection
 from kordena_fiscal.persistence.ports import FiscalUnitOfWorkFactory
 
+from .alert_rules import InternalAlertMonitor
 from .config import RuntimeConfigurationError
 from .observability import (
     MetricsRegistry,
@@ -115,9 +116,13 @@ class _TracedOutboxHandler:
 class _TracingWorkerObserver:
     """Preserve the certified P04 observer while recording worker cycles."""
 
-    def __init__(self, observer: WorkerObservability, tracer: SafeTracer) -> None:
+    def __init__(
+        self, observer: WorkerObservability, tracer: SafeTracer,
+        alerts: InternalAlertMonitor | None = None,
+    ) -> None:
         self._observer = observer
         self._tracer = tracer
+        self._alerts = alerts
 
     def worker_started(self) -> None:
         self._observer.worker_started()
@@ -128,10 +133,20 @@ class _TracingWorkerObserver:
     def cycle_completed(self, result: BackgroundCycleResult) -> None:
         self._observer.cycle_completed(result)
         self._record(result.elapsed_seconds, "ok")
+        self._poll_alerts()
 
     def cycle_failed(self, *, error_type: str, elapsed_seconds: float) -> None:
         self._observer.cycle_failed(error_type=error_type, elapsed_seconds=elapsed_seconds)
         self._record(elapsed_seconds, "error")
+        self._poll_alerts()
+
+    def _poll_alerts(self) -> None:
+        if self._alerts is not None:
+            try:
+                self._alerts.poll()
+            except Exception:
+                # Internal candidate evaluation can never stop the durable worker.
+                pass
 
     def _record(self, elapsed_seconds: float, outcome: str) -> None:
         self._tracer.record(
@@ -275,6 +290,7 @@ class ProductionWorkerComposition:
     operations: frozenset[str]
     metrics: MetricsRegistry
     observer: WorkerObservability
+    alert_monitor: InternalAlertMonitor | None = None
 
     def health(self) -> WorkerHealth:
         return self.observer.health()
@@ -313,6 +329,7 @@ def build_production_worker_runtime(
         )
     )
     metrics = MetricsRegistry()
+    alert_monitor = InternalAlertMonitor(metrics)
     traced_handlers = {
         operation: _TracedOutboxHandler(handler, runtime_tracer, metrics)
         for operation, handler in handlers.items()
@@ -356,7 +373,7 @@ def build_production_worker_runtime(
     )
     runtime = BackgroundWorkerRuntime(
         worker=worker,
-        observer=_TracingWorkerObserver(observer, runtime_tracer),
+        observer=_TracingWorkerObserver(observer, runtime_tracer, alert_monitor),
         batch_size=batch_size,
         lease_duration=lease_duration,
         idle_wait_seconds=idle_wait_seconds,
@@ -367,6 +384,7 @@ def build_production_worker_runtime(
         operations=routed.operations,
         metrics=metrics,
         observer=observer,
+        alert_monitor=alert_monitor,
     )
 
 
