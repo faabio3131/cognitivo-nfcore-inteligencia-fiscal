@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from kordena_fiscal.observability.alerts import AlertRegistry
+from kordena_fiscal.observability.events import ObservabilityContext
 from kordena_fiscal.runtime.observability import MetricSample, MetricsRegistry
 
 
@@ -172,3 +174,53 @@ class InternalAlertMonitor:
             candidates.extend(evaluate_operational_signals(signals))
         self._previous = current
         return tuple(candidates)
+
+
+# The existing V2-13 AlertRegistry remains the single owner of alert identity,
+# deduplication, sanitization, sinks and lifecycle. The metrics evaluator only
+# projects bounded candidates and never constructs tenant authority itself.
+_ALERT_KIND = {
+    "http_5xx": "http-5xx",
+    "provider_errors": "provider-error",
+    "worker_backlog": "queue-backlog",
+    "worker_dead_letter": "dead-letter",
+    "fiscal_rejection": "fiscal-rejection",
+    "fiscal_rejection_rate": "rejection-rate",
+    "worker_cycle_failure": "worker-cycle-failure",
+    "certificate_expiry": "certificate-expiry",
+    "secret_failure": "secret-failure",
+    "db_unavailable": "db-unavailable",
+    "deployment_unhealthy": "deployment-unhealthy",
+}
+
+
+def publish_alert_candidates(
+    candidates: tuple[AlertCandidate, ...],
+    *,
+    registry: AlertRegistry,
+    context: ObservabilityContext,
+) -> int:
+    """Delegate all alert persistence/deduplication to canonical AlertRegistry.
+
+    A caller must provide an already-authorized context, never user-supplied
+    tenant fields. No external delivery or credential resolution occurs here.
+    """
+    from kordena_fiscal.observability.alerts import AlertKind, AlertSeverity
+
+    published = 0
+    for candidate in candidates:
+        kind = _ALERT_KIND.get(candidate.code)
+        if kind is None:
+            continue
+        alert = registry.emit(
+            kind=AlertKind(kind),
+            severity=AlertSeverity(candidate.severity),
+            context=context,
+            message_code=f"runtime.{candidate.code}",
+            dimension="runtime",
+            attributes={"observed": candidate.observed,
+                        "threshold": candidate.threshold},
+        )
+        if alert is not None:
+            published += 1
+    return published
