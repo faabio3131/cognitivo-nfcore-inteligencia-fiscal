@@ -271,3 +271,8 @@ A busca de produtores reais confirmou ausência de instrumentação específica 
 
 - Gate real PR #207 HEAD `3a03a25` FAIL, run `38939269899`, job `117102623244`, Pytest interrompido na coleta: `ModuleNotFoundError: No module named 'tests'` no novo teste de fulfillment. Corrigido import entre módulos de teste para resolução local pelo pytest sem tocar na autoridade comercial. Suite local de 8 testes PASS, Ruff corrigido PASS, validador do plano 59 IDs PASS.
 - Auditoria de fiscal: `application/service.py` registra `IssuanceAttemptStatus.REJECTED` como disposição de replay; não confundir replay com nova rejeição. `gateway/authorization.py` é autoridade de resultado de provedor; métricas somente ao redor do resultado canônico persistido ou transporte conforme responsabilidade. P09-T01 operacional segue bloqueada por spans staging não comprovados; não promover status.
+
+### P09-T02 — Reconciliação fiscal instrumentada (2026-10-16)
+
+- No serviço canônico `FiscalApplicationService.reconcile_operation`, adicionado contador `nfcore_fiscal_reconciliation_total` **após** persistência e commit, com `outcome` derivado exclusivamente de `ReconciliationStatus` (enum), sem tenant/document/provider IDs nem payload. `runtime/composition.py` compartilha o `MetricsRegistry` opcional da API com o mesmo serviço, sem segunda autoridade de telemetria. Se a métrica falhar, não modifica estado fiscal. A reconciliação comercial Cakto permanece separada.
+- Testes existentes de reconciliação/fulfillment 11 PASS; Ruff PASS; Mypy direcionado PASS; cronograma 59 IDs PASS. Sem teste específico novo para a métrica fiscal ainda, nem CI deste novo HEAD; **não certificada**. P09-T01 staging spans ainda sem prova; provider errors e fiscal rejection seguem abertas.

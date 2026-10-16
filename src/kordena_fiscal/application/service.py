@@ -45,6 +45,7 @@ from kordena_fiscal.reconciliation import (
     FiscalReconciliationEngine,
     FiscalReconciliationResult,
 )
+from kordena_fiscal.runtime.observability import MetricsRegistry
 
 
 class IssuanceResumeDisposition(StrEnum):
@@ -87,7 +88,9 @@ class FiscalApplicationService:
         *,
         state_machine: FiscalStateMachine | None = None,
         reconciliation: FiscalReconciliationEngine | None = None,
+        metrics: MetricsRegistry | None = None,
     ) -> None:
+        self._metrics = metrics
         self._uow_factory = uow_factory
         self._state_machine = state_machine or FiscalStateMachine()
         self._reconciliation = reconciliation or FiscalReconciliationEngine()
@@ -362,6 +365,14 @@ class FiscalApplicationService:
         with self._uow_factory() as uow:
             uow.reconciliations.save(result)
             uow.commit()
+        if self._metrics is not None:
+            try:
+                self._metrics.increment(
+                    "nfcore_fiscal_reconciliation_total", outcome=result.status.value
+                )
+            except Exception:
+                # Metrics must never invalidate already committed fiscal state.
+                pass
         return result
 
     def get_reconciliation(

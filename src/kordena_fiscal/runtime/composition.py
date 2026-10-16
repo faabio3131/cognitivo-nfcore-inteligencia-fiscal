@@ -169,7 +169,7 @@ def build_postgres_runtime_composition(
         cakto_checkout_administration = CaktoCheckoutAdministrationService(
             cakto_commercial_database
         )
-    fiscal_application = FiscalApplicationService(database)
+    fiscal_application = FiscalApplicationService(database, metrics=metrics)
     canonical_handlers = dict(fiscal_operation_handlers or {})
     canonical_handlers.setdefault(
         "queryArchiveReference", build_archive_reference_handler(database)
