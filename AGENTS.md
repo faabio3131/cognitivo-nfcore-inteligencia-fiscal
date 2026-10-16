@@ -283,6 +283,46 @@ A busca de produtores reais confirmou ausência de instrumentação específica 
 - `tests/issuance/test_nfce_orchestration.py` ampliado com casos de rejeição e exceção do gateway. Suite de NFC-e + teste específico da reconciliação fiscal: 10 PASS; Ruff de fontes e testes PASS. A falha de gateway representada no teste é sintética, não homologação externa. `nfcore_fiscal_reconciliation_total` já adicionado ao `FiscalApplicationService` após commit e ligado à registry no composition root.
 - Permanecem gates: CI completa da PR #207 no HEAD atual; provar wiring de métricas dos handlers de NF-e/NFS-e efetivamente configurados; tracing serviço real staging P09-T01; autorização específica para deploy/secret e demais controles da organização. Não converter `IMPLEMENTED_NOT_CERTIFIED` em `[x]` prematuramente.
 
+
+### Execução retomada P09-T03 — 2026-10-16
+
+- Branch isolada a partir da `main=e4ffd584`: `feat/nfv1-p09-t03-internal-alert-rules-20261016`, sem tocar na PR documental #208.
+- Novo avaliador determinístico `runtime/alert_rules.py` lê `MetricSample` da `MetricsRegistry` canônica e produz candidatos de alertas de HTTP 5xx, provider errors, worker backlog, dead-letter, fiscal rejection e falha de ciclo. Sem side effect, envio externo, tenant ID/PII, segredos ou rota paralela. Série ausente não é tratada como saudável.
+- `tests/runtime/test_nfv1_p09_t03_alert_rules.py`: 2 PASS; Ruff PASS; `scripts/check_nfcore_plan.py` 59 IDs PASS. São **candidatos e thresholds de demonstração**, não política operacional homologada: faltam fontes de expiração de certificado, secret failure, DB, deployment, denominador de rejection rate; conexão a um ciclo de avaliação, integração e roteamento de notificações. Não marcar P09-T03 `[x]`.
+- Regra de continuidade: não usar testes externos/contabilidade como bloqueio de construção. Não confundir esse incremento candidato com alertas ativos em staging.
+
+### P09-T03 — correção de contadores vs gauges (2026-10-16)
+
+- Correção interna no avaliador `alert_rules.py`: contadores acumulativos exigem dois snapshots e um delta não negativo, evitando reemitir alerta sobre erros históricos. Série nova, ausente ou resetada não é computada sem baseline válido; gauge de backlog usa valor presente. Nenhuma telemetria externa, segredo, tenant label, pager ou envio foi incluído.
+- Tests `tests/runtime/test_nfv1_p09_t03_alert_rules.py`: 2 PASS com delta, reset e ausência de baseline; Ruff PASS e Mypy direcionado PASS. Esta etapa ainda NÃO inclui política de roteamento, certificados, segredo, DB, deploy, rejection rate com denominador ou avaliação em runtime, então P09-T03 continua `IMPLEMENTED_NOT_CERTIFIED`.
+- A CI anterior da PR #209 falhou em `tests/runtime/test_p04_t04_worker_container.py::test_real_continuous_idle_process_signal_exit_and_restart[2]`, timeout do subprocesso após 10s; não desabilitar o teste. Confirmar CI no novo HEAD e investigar se reproduzir antes de merge.
+
+### P09-T03 — sinais operacionais e ciclo de avaliação (2026-10-16)
+
+- `InternalAlertMonitor.poll()` passa a avaliar a mesma `MetricsRegistry`, com baseline por coleta e sem efeitos externos. `OperationalSignals` recebe observações explícitas (expiração de certificado em dias, secret resolution, DB readiness, deploy health); `None` significa desconhecido, nunca `OK`. Nenhuma credencial ou certificado real é consultado pelo monitor.
+- `fiscal_rejection_rate()` exige ambos os contadores canônicos `nfcore_fiscal_rejections_total` e `nfcore_fiscal_authorizations_finalized_total`, cada um em dois snapshots e com denominador positivo. Na falta de produtor `nfcore_fiscal_authorizations_finalized_total` integrado, a taxa **não dispara nem pode ser alegada ativa**. Evita inventar taxa por usar tentativas como denominador não equivalente.
+- Testes dirigidos novos de sinais, missingness, rate, reset e poll: 5 PASS; Ruff PASS; Mypy PASS. Ainda faltam conectores das fontes reais em execução, exposição governada de alertas e entrega/ack/dedup; P09-T03 `IMPLEMENTED_NOT_CERTIFIED`. A PR #209 permanece sem merge ou deploy.
+
+### P09-T03 — incremento operacional / integrações internas (2026-10-16)
+
+- `InternalAlertMonitor` conectado à instância existente de `MetricsRegistry` no composition root da API, acionado nos próprios caminhos `/health/ready` e `/internal/metrics`, sem criar nova API ou instância autoritativa. Métricas mantém campo `metrics`; adiciona `alert_candidates` restrito a códigos, severidade e números. Não faz notificações externas.
+- `OperationalSignals` representa exclusivamente observações presentes de validade de certificado, resposta da autoridade de segredos, health do banco e saúde de deploy. `None` significa desconhecido; **somente readiness DB foi conectado diretamente ao runtime API**. Fontes periódicas reais de certificado, secret manager e Railway deployment ainda não estão conectadas — não declarar alarme ativo para esses itens.
+- `nfcore_fiscal_authorizations_finalized_total` agora é emitido pelo orquestrador **NFC-e** depois de `mark_authorized` ou `mark_rejected`, com `outcome` controlado. `fiscal_rejection_rate()` exige delta positivo desse denominador real e numerator NFC-e. Não representar toda NF-e/NFS-e como coberta.
+- A autoridade preexistente `observability/alerts.py` (`AlertRegistry`, dedup e `OperationalAlertEvaluator`) foi identificada: novos candidatos podem ser publicados por `publish_alert_candidates` passando `ObservabilityContext` confiável, reutilizando o registro canônico, sem segunda persistência ou sistema de alertas. Nenhuma origem de tenant é inferida de HTTP desautorizado.
+- Suite dirigida alerta/API/NFC-e: **15 PASS e 1 SKIP local (GSM ausente)**, Ruff PASS, Mypy de 3 fontes PASS. CI Linux deve provar teste API efetivo e regressão completa. P09-T03 segue `IMPLEMENTED_NOT_CERTIFIED`, sem deploy/merge.
+
+### P09-T03 — avaliação no ciclo canônico do Worker (2026-10-16)
+
+- O monitor de alertas foi conectado ao `_TracingWorkerObserver` da composição contínua, após `cycle_completed` e `cycle_failed`, aproveitando a mesma `MetricsRegistry` e sem interferir com claim/retentativas/outbox. `ProductionWorkerComposition.alert_monitor` torna o último conjunto de candidatos inspecionável sem expor um novo endpoint de Worker.
+- `InternalAlertMonitor.latest` é atualizado apenas por `poll()`. Qualquer falha do monitor é isolada do ciclo fiscal. Teste com baseline real comprova alerta `worker_dead_letter` apenas quando há incremento, não em leituras repetidas, além de falha da telemetria não autoritativa. 8 PASS nos testes dirigidos P09-T03, Ruff e Mypy direcionados PASS.
+- Avaliação API e Worker processam métricas **distintas por serviço**; não consolidar em um único tenant ou supor visibilidade de Worker via API. O Core só projeta candidatos; alertas ativos por tenant permanecem governados por `AlertRegistry` com contexto confiável. Homologação com terceiros e fontes de deployment real continuam separadas.
+
+### P09-T03 — adapters de fontes canônicas (2026-10-16)
+
+- `certificate_expiry_signal`: usa apenas `CertificateReference.expires_at` da autoridade de assinatura, depois de confirmar `ExecutionScope` tenant/unidade; não lê PFX ou material privado. `secret_audit_signal`: usa exclusivamente o outcome do `SecretAuditEvent` produzido pelo `SecretResolver`, sem expor IDs, tenant ou valor do segredo. `railway_deployment_signal`: converte apenas estados explícitos autenticados (`SUCCESS`, `FAILED`, `CRASHED`); `DEPLOYING`/desconhecido permanecem `None`. São adapters testados de payloads confiáveis, **não criam sondas ou credenciais externas**.
+- Os eventos de origem dependem de invocação pela autoridade concreta, e deploy Railway depende de observações do plano de operação/Command; não declarar monitoramento contínuo de certificado/segredo/deploy apenas pela existência desses adapters. As integrações não ativadas seguem `NOT_CONNECTED`, distinta de homologação fiscal.
+- Suite P09-T03 adapters + Worker + Core: **10 PASS**, Ruff PASS e Mypy direcionado PASS. Evitar duplicar `AlertRegistry` V2-13 ou inventar estado de saúde. A PR #209 segue Draft/sem merge.
+
 ### CHECKPOINT STAGING — PR #207 merge/deploy (2026-10-16)
 
 - **GitHub CURRENT:** PR #207 MERGED, `main=e4ffd584c4bc66632e80d1ab1448cdb67cd914ea`, pré-merge CI #984 SUCCESS e Governança #405 SUCCESS. Pós-merge Governança `38943329740` SUCCESS; CI pós-merge `38943329765` ainda em execução na última consulta.

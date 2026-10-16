@@ -339,6 +339,7 @@ class NfceIssuanceOrchestrator:
                 attempt.generation,
                 protocol_reference,
             )
+            self._observe("nfcore_fiscal_authorizations_finalized_total", outcome="authorized")
         elif authorization.status is AuthorizationStatus.REJECTED:
             rejection_code = authorization.rejection_code
             rejection_message = authorization.rejection_message
@@ -357,6 +358,7 @@ class NfceIssuanceOrchestrator:
                 rejection_reason,
             )
             self._observe("nfcore_fiscal_rejections_total", outcome="rejected")
+            self._observe("nfcore_fiscal_authorizations_finalized_total", outcome="rejected")
 
         return NfceIssuanceResult(
             attempt=attempt,

@@ -32,6 +32,13 @@ class AlertKind(StrEnum):
     SEQUENCE_GAP = "sequence-gap"
     CONTINGENCY_PROLONGED = "contingency-prolonged"
     UNKNOWN_PROVIDER_OUTCOME = "unknown-provider-outcome"
+    FISCAL_REJECTION = "fiscal-rejection"
+    HTTP_5XX = "http-5xx"
+    PROVIDER_ERROR = "provider-error"
+    WORKER_CYCLE_FAILURE = "worker-cycle-failure"
+    SECRET_FAILURE = "secret-failure"
+    DB_UNAVAILABLE = "db-unavailable"
+    DEPLOYMENT_UNHEALTHY = "deployment-unhealthy"
 
 
 class AlertSeverity(StrEnum):

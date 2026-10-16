@@ -21,12 +21,18 @@ from google.oauth2.service_account import Credentials as ServiceAccountCredentia
 from kordena_fiscal.contingency.outbox import OutboxClaimSelection
 from kordena_fiscal.domain import ExecutionScope, FiscalEnvironment
 from kordena_fiscal.persistence.postgres import PostgresFiscalDatabase
-from kordena_fiscal.security.secrets import SecretReference, SecretResolver, SecretScope
+from kordena_fiscal.security.secrets import (
+    SecretAuditEvent,
+    SecretReference,
+    SecretResolver,
+    SecretScope,
+)
 from kordena_fiscal.vault.google_secret_manager import (
     DurableGsmReader,
     GoogleSignatureSecretBackend,
 )
 
+from .alert_rules import evaluate_operational_signals, secret_audit_signal
 from .config import RuntimeConfigurationError, RuntimeEnvironment, RuntimeSettings
 from .gsm_staging_identity_policy import (
     PROJECT_ID,
@@ -243,6 +249,17 @@ def staging_gsm_handler_factory(
         def audit(event: object) -> None:
             outcome = getattr(event, "outcome", "denied")
             logger.emit("INFO", "worker_gsm_secret_access", outcome=outcome)
+            if isinstance(event, SecretAuditEvent):
+                # Actual canonical resolver outcomes, never secret values/IDs.
+                for candidate in evaluate_operational_signals(secret_audit_signal(event)):
+                    try:
+                        logger.emit(
+                            "WARNING", "worker_operational_alert_candidate",
+                            code=candidate.code, severity=candidate.severity,
+                        )
+                    except Exception:
+                        # Advisory telemetry must not override fiscal security authority.
+                        pass
 
         resolver = SecretResolver(
             GoogleSignatureSecretBackend(reader, provider_id=provider),

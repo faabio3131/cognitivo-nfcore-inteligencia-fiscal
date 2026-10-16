@@ -437,8 +437,10 @@ def test_nfce_rejection_metric_is_safe_and_not_counted_on_replay() -> None:
     result = orchestrator.issue(command)
     assert result.attempt.status is IssuanceAttemptStatus.REJECTED
     assert metrics.as_dicts() == [
+        {"name": "nfcore_fiscal_authorizations_finalized_total", "value": 1.0,
+         "labels": {"outcome": "rejected"}},
         {"name": "nfcore_fiscal_rejections_total", "value": 1.0,
-         "labels": {"outcome": "rejected"}}
+         "labels": {"outcome": "rejected"}},
     ]
 
 

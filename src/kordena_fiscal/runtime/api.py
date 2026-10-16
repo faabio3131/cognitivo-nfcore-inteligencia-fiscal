@@ -6,6 +6,7 @@ import os
 import re
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
@@ -46,6 +47,7 @@ from kordena_fiscal.web.staging_webhook_approval import create_staging_webhook_e
 from kordena_fiscal.web.staging_webhook_probe import create_staging_webhook_probe_router
 
 from .activation_email import build_activation_delivery_from_environ
+from .alert_rules import InternalAlertMonitor, OperationalSignals
 from .api_staging_gsm_probe import staging_probe_verifier
 from .cakto import build_cakto_webhook_router
 from .composition import RuntimeComposition, build_postgres_runtime_composition
@@ -332,6 +334,8 @@ def create_runtime_app(
         else None
     )
     app.state.nfcore_metrics = runtime_metrics
+    alert_monitor = InternalAlertMonitor(runtime_metrics)
+    app.state.nfcore_alert_monitor = alert_monitor
     app.state.nfcore_logger = runtime_logger
     app.state.nfcore_tracer = runtime_tracer
     app.state.nfcore_production_authority = production_authority
@@ -441,6 +445,12 @@ def create_runtime_app(
         db_timer = RequestTimer()
         db_started = datetime.now(UTC)
         healthy, reason = runtime.ready()
+        # Health checks drive real internal evaluation without external I/O or paging.
+        app.state.nfcore_alert_candidates = alert_monitor.poll(
+            signals=OperationalSignals(
+                database_ready=None if reason == "composition_unavailable" else healthy
+            )
+        )
         if resolved.persistence_backend == "postgres":
             runtime_tracer.record(
                 operation="db.readiness",
@@ -462,7 +472,12 @@ def create_runtime_app(
 
     @app.get("/internal/metrics", tags=["operability"])
     async def metric_snapshot() -> dict[str, object]:
-        return {"metrics": runtime_metrics.as_dicts()}
+        # Preserve the existing metrics contract while exposing bounded candidates.
+        candidates = alert_monitor.poll()
+        return {
+            "metrics": runtime_metrics.as_dicts(),
+            "alert_candidates": [asdict(candidate) for candidate in candidates],
+        }
 
     @app.get("/runtime/profile", tags=["health"])
     async def profile() -> dict[str, object]:

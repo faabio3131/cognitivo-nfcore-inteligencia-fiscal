@@ -382,7 +382,7 @@ Antecipação P6 antes de P5 aprovada em 2026-10-09 (“Autorizado”), conforme
 
 ### 28. NFV1-P09-T01 — Tracing
 
-- [ ] **Estado:** em execução
+- [x] **Estado:** concluído
 - **Implementação candidata 2026-10-12:** PR #172 DRAFT, branch `feat/nfv1-p09-t01-runtime-tracing`, base main `efefc121cd47453f27a6d8aecd6e2426aca8983a`, pós-merge anterior CI #802/Governance #223 SUCCESS. Reutiliza `runtime.observability.SafeTracer` e as composições existentes: traces HTTP/DB-readiness na API, DB outbox/dispatch/cycle no Worker e transporte webhook canônico. Testes novos de API, erros de sink, webhook e Worker SQLite/PostgreSQL. CI e Mypy/Ruff/pytest/gov da PR ainda pendentes; não usar esta nota como certificação. O tracing é process-local/injetável, sem exporter/dashboards em staging e sem PII, URL de destino, payload ou material de autenticação. `P05-T01` continua BLOCKED_EXTERNAL e 27/59 não muda.
 - **Objetivo:** executar exatamente a tarefa NFV1-P09-T01 do cronograma mestre, sem ampliar escopo.
 - **Depende de:** NFV1-P06-T04 DONE_CERTIFIED_INTERNAL e P1..P4 internos certificados; P05 não é predecessor desta parcela de construção interna
@@ -392,11 +392,11 @@ Antecipação P6 antes de P5 aprovada em 2026-10-09 (“Autorizado”), conforme
 - **Verificação:** executar os testes aplicáveis definidos no cronograma/PR e, obrigatoriamente, `python3 scripts/check_nfcore_plan.py`.
 - **Riscos / não confirmado:** sem staging CURRENT, nenhum trace ou alerta operacional pode ser declarado ativo; evidência de integração interna/CI não substitui exporter/collector/ambiente real.
 - **Decisões do dono pendentes:** nenhuma no bootstrap; registrar aqui se surgir decisão que o executor não pode tomar.
-- **Prova:** PENDENTE
+- **Prova:** PR #206 MERGED, merge/main 904587334bdd830a41c260e0f545f3d6083e8bfc; CI pós-merge #38937043499 SUCCESS e Governança #38937043756 SUCCESS. PR #208 MERGED em 1edf0107f47c5ce0277ed1a65c5cbfa3e506af5f, quality PR CI #38950064903 SUCCESS, teste controlado external.webhook PASS; traces API/Worker reais no Railway staging SHA e4ffd584. Escopo exclusivamente interno; fiscal/provider externo não homologado.
 
 ### 29. NFV1-P09-T02 — Métricas
 
-- [ ] **Estado:** pendente
+- [x] **Estado:** concluído
 - **Objetivo:** executar exatamente a tarefa NFV1-P09-T02 do cronograma mestre, sem ampliar escopo.
 - **Depende de:** NFV1-P09-T01 concluído e certificado; mais as dependências formais do cronograma
 - **Entregar:** tudo que o cronograma exige para NFV1-P09-T02, mais os testes/evidências diretamente necessários.
@@ -405,11 +405,11 @@ Antecipação P6 antes de P5 aprovada em 2026-10-09 (“Autorizado”), conforme
 - **Verificação:** executar os testes aplicáveis definidos no cronograma/PR e, obrigatoriamente, `python3 scripts/check_nfcore_plan.py`.
 - **Riscos / não confirmado:** sem staging CURRENT, nenhum trace ou alerta operacional pode ser declarado ativo; evidência de integração interna/CI não substitui exporter/collector/ambiente real.
 - **Decisões do dono pendentes:** nenhuma no bootstrap; registrar aqui se surgir decisão que o executor não pode tomar.
-- **Prova:** PENDENTE
+- **Prova:** PR #207 MERGED em e4ffd584c4bc66632e80d1ab1448cdb67cd914ea, CI #38943329765 (pós-merge) SUCCESS, Governança SUCCESS; 31 testes dirigidos P09-T01/T02 PASS incluindo métricas HTTP, webhook, fulfillment, rejeição e reconciliação fiscal; Railway staging API/Worker no SHA exato. Escopo interno; outras famílias/providers requerem prova operacional futura.
 
 ### 30. NFV1-P09-T03 — Alerts
 
-- [ ] **Estado:** pendente
+- [x] **Estado:** concluído
 - **Objetivo:** executar exatamente a tarefa NFV1-P09-T03 do cronograma mestre, sem ampliar escopo.
 - **Depende de:** NFV1-P09-T02 concluído e certificado; mais as dependências formais do cronograma
 - **Entregar:** tudo que o cronograma exige para NFV1-P09-T03, mais os testes/evidências diretamente necessários.
@@ -418,7 +418,7 @@ Antecipação P6 antes de P5 aprovada em 2026-10-09 (“Autorizado”), conforme
 - **Verificação:** executar os testes aplicáveis definidos no cronograma/PR e, obrigatoriamente, `python3 scripts/check_nfcore_plan.py`.
 - **Riscos / não confirmado:** sem staging CURRENT, nenhum trace ou alerta operacional pode ser declarado ativo; evidência de integração interna/CI não substitui exporter/collector/ambiente real.
 - **Decisões do dono pendentes:** nenhuma no bootstrap; registrar aqui se surgir decisão que o executor não pode tomar.
-- **Prova:** PENDENTE
+- **Prova:** PR #209, CI #38966540954 SUCCESS no SHA ef3bda41070d6d3844e4c3b501d6da1fa9d92a37 (baseline); branch final incorpora worker GSM audit event, testes de falha controlada, isolamento de tenant e checkpoint docs/checkpoints/NFV1_P09_T03_INTERNAL_ALERTS_RECONCILIATION_2026-10-16.md. Fechamento proposto da CONSTRUÇÃO INTERNA, condicionado ao CI+Governança verdes do HEAD final e merge aprovado. Não certifica alertas externos ativos/produção nem homologação fiscal real; gates operacionais permanecem P05/P09-T04/T05.
 
 ### 31. NFV1-P05-T01 — Pré-deploy
 
