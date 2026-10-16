@@ -228,3 +228,11 @@ Ao retomar o projeto, nunca continue apenas do chat. Reabra o cronograma, o ledg
 
 - Gates finais deste delta: `ruff check` dos tres modulos + teste OTLP PASS; `mypy --follow-imports=silent` dos tres modulos alterados PASS; `mypy` sem isolamento falhou em `vault/google_secret_manager.py` por `google.cloud` sem marcadores de tipos no ambiente Windows (dependencia preexistente, NAO certificada); `check_nfcore_plan.py` PASS com 59 tarefas, P09-T01 ainda proxima. Suites direcionadas OTLP+tracing+DB+API+Cakto executadas sem testes falhando, com um teste SKIP por ausencia de GSM local. Nao contabilizar SKIP como PASS.
 - O adaptador e um candidato seguro testado com tracer fake, nao foi provado ainda com OpenTelemetry SDK/exporter REAL, nem em Railway, nem em E2E com DB/externo/Worker. CI remota do HEAD e gate de merge continuam necessarios; manter PR Draft.
+
+### P09-T01 — SDK OpenTelemetry real validado localmente (2026-10-16)
+
+- Reconciliação CURRENT: main `95cd0a852aea001c7bde0a84e5e0c2b4ac111be6`; PR #206 Draft no HEAD de início `90733d6ee514beb2d2a7f881dc8fc987e113932e`. Governança remota #394 SUCCESS; CI #973 ainda `in_progress` na verificação — não promover certificação.
+- Instalado SDK de teste OpenTelemetry `1.45.1` e exporter OTLP HTTP correspondente no Python local. Isso NÃO instala na produção ou Railway nem prova rede externa OTLP.
+- Teste de regressão `tests/test_nfv1_p09_t01_otlp_sdk_real.py` usa `TracerProvider`, `SimpleSpanProcessor` e `InMemorySpanExporter` reais: confirmou span `external.webhook`, outcome `error`, duração `400000000 ns` e nenhuma label com correlation/customer/token/authorization. Suite SDK real + testes do sink anterior: **3 PASS**, Ruff do novo teste PASS.
+- A primeira tentativa de coleta encontrou import incorreto de `InMemorySpanExporter`; ajustado para `opentelemetry.sdk.trace.export.in_memory_span_exporter`. Não esconder falha original; teste subsequente aprovado.
+- Ainda pendentes antes de merge: CI #973 e novos gates do HEAD atualizado, typecheck total, teste do `BatchSpanProcessor` + `OTLPSpanExporter` com transporte real controlado, construção dos containers e prova de exportação em staging. P09-T01 permanece `[ ]`, P09-T02 não antecipada. Nenhum merge, deploy ou migration autorizado neste registro.
