@@ -33,7 +33,7 @@ A composição fiscal existente já recebe `fiscal_operation_handlers` e protege
 | Portal | UI premium e contratos existentes | sem alteração visual, mesmo frontend canônico | reconstrução de frontend |
 | Segurança | autenticação e tenant/unidade no caminho canônico | sem bypass, testes negativos e fail-closed por ambiente | credencial de terceiros ou incremento de permissões |
 
-**Gates locais deste bloco:** testes dirigidos de helpers e provider query; `ruff check`; `ruff format --check`; `mypy` quando disponível; `npm run test:frontend`; `python scripts/check_nfcore_plan.py`; CI/Governança da PR em HEAD exato. Registre resultados somente depois de executar.
+**Gates locais deste bloco:** testes dirigidos de helpers e provider query; teste de integração Web local com sessão, CSRF, RBAC/unidade e consulta fiscal sintética sobre SQLite isolado; `ruff check`; `ruff format --check`; `mypy` quando disponível; `npm run test:frontend`; `python scripts/check_nfcore_plan.py`; CI/Governança da PR em HEAD exato. Registre resultados somente depois de executar.
 
 **Pendente de prova:** runtime API completo sob PostgreSQL Linux de teste, autenticação e operações Portal E2E, integração real/contratos de billing Command, infraestrutura Web unificada e deploy governado. A integração externa é diferida, mas a segurança interna não.
 
