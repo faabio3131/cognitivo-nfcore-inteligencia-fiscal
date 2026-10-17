@@ -71,13 +71,15 @@ def test_postgres_trial_portal_and_worker_share_canonical_state(settings) -> Non
         created = post_trial(client)
         assert created.status_code == 201
         assert post_trial(client).status_code == 200
-        assert len(delivery.calls) == 1
-        assert delivery.calls[0][0] == BODY["buyer_email"]
+        # Trial replay may legitimately resend a fresh activation link. It must
+        # not create a second purchase, subscription, tenant or owner.
+        assert len(delivery.calls) == 2
+        assert all(email == BODY["buyer_email"] for email, _ in delivery.calls)
 
         _activate_and_login(
             client,
             email=BODY["buyer_email"],
-            reset_token=delivery.calls[0][1].reset_token,
+            reset_token=delivery.calls[-1][1].reset_token,
         )
         database = app.state.nfcore_runtime.database
         with database.connection() as connection:
