@@ -38,4 +38,12 @@ for key, value in expected.items():
 
 curl --fail --silent --show-error --max-time 20 "$portal_url/" >/dev/null
 
+# A public API must never expose tenant/unit bootstrap without a session.
+# --disable prevents a local curlrc from injecting credentials into the probe.
+bootstrap_status="$(curl --disable --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' "$api_url/v1/portal/bootstrap")"
+if [ "$bootstrap_status" != "401" ]; then
+  echo "staging smoke: FAIL unauthenticated portal bootstrap returned HTTP $bootstrap_status (expected 401)"
+  exit 1
+fi
+
 echo "staging smoke: PASS"
