@@ -29,6 +29,7 @@ from kordena_fiscal.contingency import (
 from kordena_fiscal.domain import ExecutionScope, FiscalEnvironment
 from kordena_fiscal.runtime import api as runtime_api
 from kordena_fiscal.runtime.worker_composition import build_production_worker_runtime
+from kordena_fiscal.web.human_auth import CSRF_COOKIE, CSRF_HEADER
 
 settings = postgres_settings
 
@@ -176,3 +177,95 @@ def test_postgres_signed_command_claim_activation_login_and_replay(settings) -> 
                 connection.execute("SELECT COUNT(*) FROM fm_commercial_subscriptions").fetchone()[0]
                 == 1
             )
+
+
+def test_p05_t03_postgres_trial_activation_and_session_revocation(settings) -> None:
+    """Internal smoke: recovery-driven activation and session lifecycle on the real DB."""
+    delivery = Delivery()
+    app = runtime_api.create_runtime_app(settings, **trial_options(delivery))
+    publish_trial(app)
+    with TestClient(app, base_url="https://testserver") as client:
+        assert client.get("/v1/auth/me").status_code == 401
+        assert client.get("/v1/portal/bootstrap").status_code == 401
+
+        assert post_trial(client).status_code == 201
+        assert len(delivery.calls) == 1
+        _activate_and_login(
+            client,
+            email=BODY["buyer_email"],
+            reset_token=delivery.calls[0][1].reset_token,
+        )
+
+        current = client.get("/v1/auth/me")
+        assert current.status_code == 200
+        assert current.json()["account"]["email"] == BODY["buyer_email"]
+        assert current.json()["account"]["tenant_id"]
+        csrf = client.cookies.get(CSRF_COOKIE)
+        assert csrf
+
+        # A session may not be terminated by a third-party site without CSRF proof.
+        missing_csrf = client.post("/v1/auth/logout")
+        assert missing_csrf.status_code == 403
+        assert client.get("/v1/portal/bootstrap").status_code == 200
+
+        logout = client.post("/v1/auth/logout", headers={CSRF_HEADER: csrf})
+        assert logout.status_code == 204
+        assert client.get("/v1/auth/me").status_code == 401
+        assert client.get("/v1/portal/bootstrap").status_code == 401
+
+
+def test_p05_t04_postgres_trial_owner_cannot_spoof_tenant_unit_or_csrf(settings) -> None:
+    """Internal E2E: tenant/unit are backend authority even after commercial onboarding."""
+    delivery = Delivery()
+    app = runtime_api.create_runtime_app(settings, **trial_options(delivery))
+    publish_trial(app)
+    with TestClient(app, base_url="https://testserver") as client:
+        assert post_trial(client).status_code == 201
+        _activate_and_login(
+            client,
+            email=BODY["buyer_email"],
+            reset_token=delivery.calls[0][1].reset_token,
+        )
+        csrf = client.cookies.get(CSRF_COOKIE)
+        assert csrf
+        # Trial only provisions the organization and owner; unit setup is its
+        # own canonical onboarding action, not a hidden side-effect of signup.
+        units_before = client.get("/v1/portal/surfaces/units")
+        assert units_before.status_code == 200
+        assert units_before.json()["rows"] == []
+        onboard = client.post(
+            "/v1/portal/operations/onboardUnit",
+            json={"unit_id": "test-unit", "display_name": "Synthetic test unit"},
+            headers={CSRF_HEADER: csrf, "Idempotency-Key": "p05-t04-unit-setup"},
+        )
+        assert onboard.status_code == 200, onboard.text
+        units = client.get("/v1/portal/surfaces/units")
+        assert units.status_code == 200
+        unit_rows = units.json()["rows"]
+        assert len(unit_rows) == 1
+        own_unit = unit_rows[0]["unit_id"]
+        assert own_unit == "test-unit"
+
+        route = "/v1/portal/operations/queryFiscalDocument"
+        payload = {"unit_id": own_unit, "document_id": "synthetic-local-document"}
+        assert client.post(route, json=payload).status_code == 403
+
+        tenant_spoof = client.post(
+            route,
+            json={**payload, "tenant_id": "other-tenant"},
+            headers={CSRF_HEADER: csrf},
+        )
+        assert tenant_spoof.status_code == 400
+        assert tenant_spoof.json()["detail"]["code"] == "BROWSER_AUTHORITY_REJECTED"
+
+        unit_spoof = client.post(
+            route,
+            json={**payload, "unit_id": "foreign-unit"},
+            headers={CSRF_HEADER: csrf},
+        )
+        # An unregistered unit is rejected by the canonical registry (409);
+        # it must never reach an unconfigured fiscal provider.
+        assert unit_spoof.status_code == 409
+
+        # Access to one client's UI cannot activate unconfigured fiscal providers.
+        assert client.get("/runtime/profile").json()["fiscal_production_activated"] is False
