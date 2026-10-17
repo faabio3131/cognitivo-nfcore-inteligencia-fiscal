@@ -52,7 +52,11 @@ from .api_staging_gsm_probe import staging_probe_verifier
 from .cakto import build_cakto_webhook_router
 from .composition import RuntimeComposition, build_postgres_runtime_composition
 from .config import RuntimeSettings
-from .development_commercial_ingress import development_commercial_ingress
+from .development_commercial_ingress import (
+    development_command_resolver,
+    development_commercial_ingress,
+)
+from .development_fiscal_ingress import development_fiscal_ingress
 from .fiscal_runtime import FiscalOperationHandler
 from .observability import (
     MetricsRegistry,
@@ -715,6 +719,12 @@ _development_ingress = development_commercial_ingress(_entrypoint_settings, os.e
 app = create_runtime_app(
     _entrypoint_settings,
     password_reset_delivery=build_activation_delivery_from_environ(),
+    command_secret_resolver=development_command_resolver(
+        _entrypoint_settings, os.environ
+    ),
+    fiscal_operation_handlers=development_fiscal_ingress(
+        _entrypoint_settings, os.environ
+    ),
     commercial_acquisition_security=_development_ingress.get(
         "commercial_acquisition_security"
     ),
