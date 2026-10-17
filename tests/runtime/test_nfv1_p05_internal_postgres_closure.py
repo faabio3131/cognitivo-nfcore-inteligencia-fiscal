@@ -26,6 +26,7 @@ from kordena_fiscal.contingency import (
     FiscalOutboxService,
     FiscalOutboxStatus,
 )
+from kordena_fiscal.control_plane import FiscalOrganization, FiscalUnitRegistration
 from kordena_fiscal.domain import ExecutionScope, FiscalEnvironment
 from kordena_fiscal.runtime import api as runtime_api
 from kordena_fiscal.runtime.worker_composition import build_production_worker_runtime
@@ -246,6 +247,29 @@ def test_p05_t04_postgres_trial_owner_cannot_spoof_tenant_unit_or_csrf(settings)
         own_unit = unit_rows[0]["unit_id"]
         assert own_unit == "test-unit"
 
+        # Register a real foreign tenant/unit in the same PostgreSQL test
+        # database: isolation must hold even when the unit actually exists.
+        database = app.state.nfcore_runtime.database
+        with database.unit_of_work() as uow:
+            uow.control_plane.add_organization(
+                FiscalOrganization(
+                    tenant_id="foreign-tenant",
+                    legal_name="Synthetic Foreign Tenant Ltda",
+                )
+            )
+            uow.control_plane.add_unit(
+                FiscalUnitRegistration(
+                    tenant_id="foreign-tenant",
+                    unit_id="foreign-unit",
+                    display_name="Synthetic Foreign Unit",
+                    enabled_environments=frozenset({FiscalEnvironment.HOMOLOGATION}),
+                )
+            )
+            uow.commit()
+        scoped_units = client.get("/v1/portal/surfaces/units")
+        assert scoped_units.status_code == 200
+        assert [row["unit_id"] for row in scoped_units.json()["rows"]] == [own_unit]
+
         route = "/v1/portal/operations/queryFiscalDocument"
         payload = {"unit_id": own_unit, "document_id": "synthetic-local-document"}
         assert client.post(route, json=payload).status_code == 403
@@ -263,8 +287,8 @@ def test_p05_t04_postgres_trial_owner_cannot_spoof_tenant_unit_or_csrf(settings)
             json={**payload, "unit_id": "foreign-unit"},
             headers={CSRF_HEADER: csrf},
         )
-        # An unregistered unit is rejected by the canonical registry (409);
-        # it must never reach an unconfigured fiscal provider.
+        # Even a registered unit of another tenant fails closed (409),
+        # without reaching an unconfigured fiscal provider.
         assert unit_spoof.status_code == 409
 
         # Access to one client's UI cannot activate unconfigured fiscal providers.
