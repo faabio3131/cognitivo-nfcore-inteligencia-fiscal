@@ -111,3 +111,13 @@ input[type="checkbox"] { width: 20px; min-height: 20px; justify-self: start; }
 @media (prefers-reduced-motion: reduce) {
   input, select, textarea { transition: none; }
 }
+
+/* Login and password reset: accessible visibility control, no change to auth. */
+.password-field { position: relative; min-width: 0; }
+.password-field input { padding-right: 54px; }
+.password-visibility-toggle { position: absolute; top: 50%; right: 7px; transform: translateY(-50%); display: grid; place-items: center; width: 40px; height: 40px; padding: 8px; color: #dbe7f3; background: transparent; border: 0; border-radius: 8px; cursor: pointer; }
+.password-visibility-toggle svg { width: 21px; height: 21px; }
+.password-visibility-toggle:hover { color: #8ff5ff; background: rgba(37,99,255,.13); }
+.password-visibility-toggle:focus-visible { outline: 2px solid #00e5ff; outline-offset: 2px; }
+.password-guidance { margin: -5px 0 0; color: #b6c9dc; font-size: 12px; line-height: 1.6; }
+.password-guidance strong { color: #e8f1ff; }
