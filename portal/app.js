@@ -1457,9 +1457,13 @@ loginForm.addEventListener("submit", async (event) => {
   }
 });
 
-document.querySelectorAll("[data-password-toggle]").forEach((button) => {
+document.querySelectorAll("[data-password-toggle]").forEach((element) => {
+  if (!(element instanceof HTMLButtonElement)) return;
+  const button = element;
   button.addEventListener("click", () => {
-    const input = document.getElementById(button.getAttribute("data-password-toggle"));
+    const targetId = button.getAttribute("data-password-toggle");
+    if (!targetId) return;
+    const input = document.getElementById(targetId);
     if (!(input instanceof HTMLInputElement)) return;
     const show = input.type === "password";
     input.type = show ? "text" : "password";
