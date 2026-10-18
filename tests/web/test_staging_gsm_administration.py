@@ -158,7 +158,8 @@ def test_commercial_trial_binding_cannot_be_approved_by_tenant_owner() -> None:
     admin = _BindingAdmin()
     client = _client(create_staging_gsm_binding_router(_Identity(_Actor(admin=False)), admin))
     client.cookies.update(COOKIES)
-    assert client.post("/internal/staging/commercial-trial-binding", headers=HEADERS).status_code == 403
+    denied = client.post("/internal/staging/commercial-trial-binding", headers=HEADERS)
+    assert denied.status_code == 403
     assert not admin.bound
 
 
