@@ -133,7 +133,7 @@ def create_staging_gsm_binding_router(
         from kordena_fiscal.web.portal_api import _csrf
         from kordena_fiscal.web.pricing_admin import _platform_actor
 
-        authority, actor = _platform_actor(request, identity)
+        authority, _principal = _platform_actor(request, identity)
         _csrf(request, identity, authority)
         if await request.body():
             raise HTTPException(status_code=400, detail="BODY_NOT_ALLOWED")
@@ -159,7 +159,7 @@ def create_staging_gsm_binding_router(
             if previous is not None and previous != binding:
                 raise SecretResolutionError("commercial binding cannot be replaced")
             administration.put(
-                actor=actor,
+                actor=authority,
                 binding=binding,
                 expected_revision=0,
                 correlation_id=uuid4().hex,
