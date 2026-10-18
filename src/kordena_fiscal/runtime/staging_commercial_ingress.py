@@ -97,7 +97,7 @@ def staging_commercial_ingress(
         declared: dict[str, tuple[SecretReference, SecretScope, str]] = {}
         for channel in enabled:
             prefix = f"NFCORE_STAGING_COMMERCIAL_{channel}_"
-            reference = SecretReference(source[prefix + "REFERENCE"], int(source[prefix + "VERSION"]))
+            reference = SecretReference(\n                source[prefix + "REFERENCE"], int(source[prefix + "VERSION"])\n            )
             resource = source[prefix + "RESOURCE"]
             if not _RESOURCE.fullmatch(resource):
                 raise ValueError("invalid staging resource")
