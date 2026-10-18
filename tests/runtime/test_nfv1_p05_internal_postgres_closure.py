@@ -234,6 +234,16 @@ def test_p05_t04_postgres_trial_owner_cannot_spoof_tenant_unit_or_csrf(settings)
         units_before = client.get("/v1/portal/surfaces/units")
         assert units_before.status_code == 200
         assert units_before.json()["rows"] == []
+        # The onboarding mutation itself must reject CSRF omission and leave
+        # the canonical PostgreSQL unit registry unchanged.
+        missing_onboard_csrf = client.post(
+            "/v1/portal/operations/onboardUnit",
+            json={"unit_id": "test-unit", "display_name": "Synthetic test unit"},
+            headers={"Idempotency-Key": "p05-t04-unit-no-csrf"},
+        )
+        assert missing_onboard_csrf.status_code == 403
+        assert client.get("/v1/portal/surfaces/units").json()["rows"] == []
+
         onboard = client.post(
             "/v1/portal/operations/onboardUnit",
             json={"unit_id": "test-unit", "display_name": "Synthetic test unit"},
