@@ -146,3 +146,15 @@ test("customer configuration forms use existing portal commands and distinguish 
   assert.match(script, /egress-decision-form/);
   assert.match(script, /if \(!bootstrapState\?\.platform_admin\) return/);
 });
+
+
+test("password visibility and creation guidance use the canonical policy", () => {
+  assert.ok(html.includes('id="login-password-guidance"'));
+  assert.ok(html.includes("12 a 1.024 caracteres"));
+  assert.ok(html.includes("letras, números, espaços e símbolos são aceitos"));
+  assert.ok(html.includes('data-password-toggle="login-password"'));
+  assert.ok(html.includes('data-password-toggle="password-reset-new-password"'));
+  assert.ok(html.includes('aria-pressed="false"'));
+  assert.ok(script.includes('input.type = show ? "text" : "password"'));
+  assert.ok(script.includes('button.setAttribute("aria-pressed", String(show))'));
+});

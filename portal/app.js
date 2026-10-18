@@ -1457,6 +1457,22 @@ loginForm.addEventListener("submit", async (event) => {
   }
 });
 
+document.querySelectorAll("[data-password-toggle]").forEach((element) => {
+  if (!(element instanceof HTMLButtonElement)) return;
+  const button = element;
+  button.addEventListener("click", () => {
+    const targetId = button.getAttribute("data-password-toggle");
+    if (!targetId) return;
+    const input = document.getElementById(targetId);
+    if (!(input instanceof HTMLInputElement)) return;
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    button.setAttribute("aria-pressed", String(show));
+    button.setAttribute("aria-label", show ? "Ocultar senha" : "Mostrar senha");
+    button.title = show ? "Ocultar senha" : "Mostrar senha";
+  });
+});
+
 forgotPasswordAction.addEventListener("click", showPasswordResetRequest);
 passwordResetRequestCancel.addEventListener("click", showRegularLogin);
 passwordResetRequestForm.addEventListener("submit", async (event) => {
