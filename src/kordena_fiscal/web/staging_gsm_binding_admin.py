@@ -13,6 +13,8 @@ from kordena_fiscal.security.human_identity import HumanIdentityService
 from kordena_fiscal.security.secret_binding import SecretBinding
 from kordena_fiscal.security.secrets import SecretResolutionError
 from kordena_fiscal.web.human_auth import CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE
+from kordena_fiscal.web.portal_api import _csrf
+from kordena_fiscal.web.pricing_admin import _platform_actor
 
 _PILOT_TENANT = "nfcore-staging-e2e"
 _PILOT_UNIT = "pilot-gsm-staging"
@@ -130,9 +132,6 @@ def create_staging_gsm_binding_router(
         This does not enable a public trial. It only registers the vetted
         external secret reference under the existing human admin authority.
         """
-        from kordena_fiscal.web.portal_api import _csrf
-        from kordena_fiscal.web.pricing_admin import _platform_actor
-
         authority, _principal = _platform_actor(request, identity)
         _csrf(request, identity, authority)
         if await request.body():
