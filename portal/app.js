@@ -378,7 +378,12 @@ function fiscalRowElement(row) {
   const primary = row.document_id || row.document_reference || row.source_id || row.entry_id || row.reference_id || row.binding_id || row.destination_id || row.module_id || row.policy_id || row.document_kind || "Registro";
   const state = row.readiness || row.state || row.status || row.kind || "registrado";
   const display = {registro: primary, escopo: `${text(row.unit_id)} · ${text(row.environment)} · ${text(row.record_type || row.code || "capability")}`, state};
-  const wrapper = rowElement(display);
+  return appendRecordDetails(rowElement(display), row);
+}
+
+/** Show the complete authorized projection instead of dropping commercial fields. */
+/** @param {HTMLElement} wrapper @param {Record<string, unknown>} row */
+function appendRecordDetails(wrapper, row) {
   const details = document.createElement("details");
   const summary = document.createElement("summary");
   summary.textContent = "Detalhes do registro";
@@ -449,7 +454,11 @@ function appendOnboardingControls(article) {
     article.append(notice);
     return;
   }
-  if (stage !== "unit_setup_required" || !bootstrapState?.permissions.includes("configuration.write")) return;
+  // The same canonical onboarding operation also registers additional units.
+  // Do not make the customer lose this Web capability after their first unit.
+  if (!["unit_setup_required", "basic_setup_complete"].includes(stage)
+    || !bootstrapState?.permissions.includes("configuration.write")
+    || bootstrapState?.projection.unit_scope !== "all") return;
 
   const form = document.createElement("form");
   form.className = "panel-form";
@@ -470,13 +479,23 @@ function appendOnboardingControls(article) {
   const submit = document.createElement("button");
   submit.className = "primary";
   submit.type = "submit";
-  submit.textContent = "Cadastrar unidade em homologação";
+  submit.textContent = stage === "basic_setup_complete"
+    ? "Adicionar unidade em homologação" : "Cadastrar unidade em homologação";
   const statusLine = document.createElement("p");
   statusLine.className = "form-error";
   statusLine.setAttribute("role", "status");
   form.append(unitLabel, nameLabel, submit, statusLine);
+  /** @type {{fingerprint:string,key:string}|null} */
+  let attempt = null;
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!form.reportValidity()) return;
+    const payload = {unit_id: unitInput.value.trim(), display_name: nameInput.value.trim()};
+    const fingerprint = JSON.stringify(payload);
+    // A network interruption must not mint a new request key on retry.
+    if (!attempt || attempt.fingerprint !== fingerprint) {
+      attempt = {fingerprint, key: crypto.randomUUID()};
+    }
     statusLine.textContent = "";
     submit.disabled = true;
     try {
@@ -484,15 +503,14 @@ function appendOnboardingControls(article) {
         method: "POST",
         headers: {
           "X-CSRF-Token": csrfToken(),
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": attempt.key,
         },
-        body: JSON.stringify({
-          unit_id: unitInput.value.trim(),
-          display_name: nameInput.value.trim(),
-        }),
+        body: fingerprint,
       });
+      attempt = null;
       await bootstrap();
-      await renderSurface("onboarding");
+      // Show the newly registered unit on the existing authorized Units surface.
+      await renderSurface("units");
     } catch (error) {
       statusLine.textContent = error instanceof Error ? error.message : "Não foi possível cadastrar a unidade";
     } finally {
@@ -1333,7 +1351,14 @@ async function renderSurface(viewId) {
       empty.textContent = scopedViews.has(viewId) ? "Nenhum registro nesta página do escopo autorizado." : "Nenhum registro disponível neste escopo autorizado.";
       grid.append(empty);
     } else {
-      for (const row of rows) grid.append(scopedViews.has(viewId) || viewId === "support" ? fiscalRowElement(row) : rowElement(row));
+      for (const row of rows) {
+        const entry = scopedViews.has(viewId) || viewId === "support"
+          ? fiscalRowElement(row)
+          : ["units", "billing", "plans", "usage"].includes(viewId)
+            ? appendRecordDetails(rowElement(row), row)
+            : rowElement(row);
+        grid.append(entry);
+      }
     }
     loading.remove();
     article.append(grid);
@@ -1355,7 +1380,7 @@ async function renderSurface(viewId) {
       appendCustomerConfiguration(article, viewId, rows);
       article.append(notice);
     }
-    if (viewId === "onboarding") appendOnboardingControls(article);
+    if (viewId === "onboarding" || viewId === "units") appendOnboardingControls(article);
     if (viewId === "users") appendUserAdministration(article, rows);
     if (["inutilizations", "documents", "issuances", "reconciliation"].includes(viewId)) await appendFiscalRecovery(article);
     if (viewId === "inutilizations") appendInutilizationForm(article);
