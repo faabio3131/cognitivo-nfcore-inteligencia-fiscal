@@ -670,6 +670,38 @@ async function renderPricingAdmin() {
     });
 
     article.replaceChildren(summary, form, statusLine);
+    // This is an operator action on the same platform-admin Web surface.
+    // The API, not this browser, decides whether a staging binding may exist.
+    const profile = await api("/runtime/profile");
+    if (profile.environment === "staging") {
+      const setup = document.createElement("section");
+      const explanation = document.createElement("p");
+      explanation.textContent = "Staging: registrar a referência já aprovada do segredo de trial no cofre canônico. A ação exige administração da plataforma, não cria preços nem ativa pagamentos.";
+      const bind = document.createElement("button");
+      bind.type = "button";
+      bind.className = "secondary";
+      bind.textContent = "Registrar assinatura comercial do staging";
+      const result = document.createElement("p");
+      result.setAttribute("role", "status");
+      bind.addEventListener("click", async () => {
+        bind.disabled = true;
+        result.textContent = "Registrando referência autorizada...";
+        try {
+          const response = await api("/internal/staging/commercial-trial-binding", {
+            method: "POST", headers: {"X-CSRF-Token": csrfToken()},
+          });
+          result.textContent = response.status === "bound"
+            ? "Binding comercial registrado. O segredo continua protegido no Google Secret Manager."
+            : "Não foi possível confirmar o binding.";
+        } catch (error) {
+          result.textContent = error instanceof Error ? error.message : "Binding negado pela autoridade da plataforma.";
+        } finally {
+          bind.disabled = false;
+        }
+      });
+      setup.append(explanation, bind, result);
+      article.append(setup);
+    }
   } catch (error) {
     statusLine.textContent = error instanceof Error ? error.message : "Falha ao carregar catálogo comercial";
   }
