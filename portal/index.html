@@ -21,7 +21,14 @@
       <p>Entre com sua conta. Tenant, permissões e unidades são definidos exclusivamente pela sessão autenticada.</p>
       <form id="login-form">
         <label>E-mail<input id="login-email" name="email" type="email" autocomplete="username" required></label>
-        <label>Senha<input id="login-password" name="password" type="password" autocomplete="current-password" required></label>
+        <label for="login-password">Senha</label>
+        <div class="password-field">
+          <input id="login-password" name="password" type="password" autocomplete="current-password" aria-describedby="login-password-guidance" required>
+          <button class="password-visibility-toggle" type="button" data-password-toggle="login-password" aria-label="Mostrar senha" aria-pressed="false" title="Mostrar senha">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.7-6 10-6 10 6 10 6-3.7 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <p id="login-password-guidance" class="form-hint password-guidance">Primeiro acesso ou ainda sem senha? Use <strong>Esqueci minha senha</strong> para solicitar a criação ou redefinição, se sua conta estiver habilitada. A nova senha deve ter <strong>12 a 1.024 caracteres</strong>; letras, números, espaços e símbolos são aceitos.</p>
         <button class="primary" type="submit">Entrar</button>
         <button class="ghost" id="forgot-password-action" type="button">Esqueci minha senha</button>
         <p id="login-error" class="form-error" role="alert" aria-live="polite"></p>
@@ -41,7 +48,13 @@
           Use de 12 a 1024 caracteres. Letras, números, espaços e símbolos são permitidos.
           Senhas fortes sugeridas pelo navegador ou por gerenciadores de senha são aceitas.
         </p>
-        <label>Nova senha<input id="password-reset-new-password" name="new_password" type="password" autocomplete="new-password" minlength="12" maxlength="1024" aria-describedby="password-policy" required></label>
+        <label for="password-reset-new-password">Nova senha</label>
+        <div class="password-field">
+          <input id="password-reset-new-password" name="new_password" type="password" autocomplete="new-password" minlength="12" maxlength="1024" aria-describedby="password-policy" required>
+          <button class="password-visibility-toggle" type="button" data-password-toggle="password-reset-new-password" aria-label="Mostrar senha" aria-pressed="false" title="Mostrar senha">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.7-6 10-6 10 6 10 6-3.7 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
         <button class="primary" type="submit">Alterar senha</button>
         <p id="password-reset-complete-status" class="form-error" role="alert" aria-live="polite"></p>
       </form>
