@@ -443,3 +443,59 @@ test("tenant admin user management exposes only approved delegated roles and ser
   expect(command.tenant_id).toBeUndefined();
   expect(command.platform_admin).toBeUndefined();
 });
+
+
+for (const width of [320, 390, 1280]) {
+  test(`operational navigation prioritizes the workspace at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.route("**/v1/portal/bootstrap", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        tenant_id: "synthetic-ux", role: "owner", platform_admin: false,
+        unit_ids: ["unit-a"], permissions: ["portal.read"],
+        projection: {
+          production_state: "HUMAN_APPROVAL_REQUIRED",
+          authorized_units: [{ unit_id: "unit-a", display_name: "Synthetic unit", environments: ["homologation"] }],
+          available_surfaces: ["overview", "documents", "issuances", "onboarding", "units", "support"],
+        },
+      }),
+    }));
+    await page.route("**/v1/portal/surfaces/**", (route) => route.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({ rows: [{ unit_id: "unit-a", display_name: "Synthetic unit" }] }),
+    }));
+    await page.route("**/v1/portal/fiscal-intents**", (route) => route.fulfill({
+      status: 200, contentType: "application/json", body: '{"rows":[]}',
+    }));
+
+    await page.goto("/");
+    const banner = page.locator(".product-banner");
+    const pillars = page.locator(".mission-strip");
+    const readiness = page.locator("#critical-state");
+    await expect(banner).toBeVisible();
+    await expect(pillars).toBeVisible();
+    await expect(readiness).toContainText("HUMAN_APPROVAL_REQUIRED");
+
+    // A user leaving a scrolled overview must see tools immediately.
+    await page.evaluate(() => window.scrollTo({ top: 600, behavior: "instant" }));
+    for (const name of ["Documentos", "Emissões", "Onboarding", "Unidades", "Suporte"]) {
+      await page.getByRole("button", { name, exact: true }).click();
+      await expect(banner).toBeHidden();
+      await expect(pillars).toBeHidden();
+      await expect(readiness).toBeVisible();
+      await expect(readiness).toContainText("HUMAN_APPROVAL_REQUIRED");
+      await expect(page.locator("#workspace .panel").first()).toBeVisible();
+      const workspaceTop = await page.locator("#workspace").evaluate((element) => element.getBoundingClientRect().top);
+      expect(workspaceTop).toBeGreaterThanOrEqual(0);
+      expect(workspaceTop).toBeLessThan(900);
+      await expect(page.locator("#app-shell")).toHaveClass(/is-operational-view/);
+    }
+
+    await page.getByRole("button", { name: "Visão geral", exact: true }).click();
+    await expect(banner).toBeVisible();
+    await expect(pillars).toBeVisible();
+    await expect(readiness).toBeVisible();
+    await expect(page.locator("#app-shell")).not.toHaveClass(/is-operational-view/);
+  });
+}

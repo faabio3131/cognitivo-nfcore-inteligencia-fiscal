@@ -1273,8 +1273,14 @@ function appendInutilizationForm(article) {
 async function renderSurface(viewId) {
   const generation = ++surfaceGeneration;
   workspace.setAttribute("aria-busy", "false");
-  if (currentView !== viewId) fiscalPageOffset = 0;
+  if (currentView !== viewId) {
+    fiscalPageOffset = 0;
+    // Switching modules must reveal their tools, not preserve a scrolled hero.
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
   currentView = viewId;
+  // Branding belongs to the overview; backend readiness remains visible everywhere.
+  appShell.classList.toggle("is-operational-view", viewId !== "overview");
   const label = navigation.flatMap((group) => group.items).find(([id]) => id === viewId)?.[1] || viewId;
   title.textContent = label;
   document.querySelectorAll(".nav-button").forEach((element) => {
@@ -1421,6 +1427,7 @@ function applyBootstrap(state) {
     ? "Readiness retornado pelo backend; operações continuam sujeitas a RBAC e gates fiscais."
     : `${safetyStates.blocked}: Produção permanece bloqueada até que o backend comprove os gates aplicáveis (${safetyStates.external} / ${safetyStates.approval}).`;
   buildNavigation();
+  appShell.classList.remove("is-operational-view");
   renderOverview();
 }
 
