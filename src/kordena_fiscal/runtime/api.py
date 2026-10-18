@@ -51,7 +51,7 @@ from .alert_rules import InternalAlertMonitor, OperationalSignals
 from .api_staging_gsm_probe import staging_probe_verifier
 from .cakto import build_cakto_webhook_router
 from .composition import RuntimeComposition, build_postgres_runtime_composition
-from .config import RuntimeSettings
+from .config import RuntimeConfigurationError, RuntimeSettings
 from .development_commercial_ingress import (
     development_command_resolver,
     development_commercial_ingress,
@@ -67,6 +67,7 @@ from .observability import (
 )
 from .otel_trace_sink import build_trace_sink
 from .secret_manager import SecretBindingAdministration
+from .staging_commercial_ingress import staging_commercial_ingress
 from .security import configure_edge_security
 
 _TRACE_REFERENCE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}\Z")
@@ -205,6 +206,15 @@ def create_runtime_app(
         and runtime.database is not None
     ):
         staging_probe_security = staging_probe_verifier(runtime.database)
+    if resolved.environment.value == "staging" and runtime.database is not None:
+        # Separate channel-specific GSM bindings, validated against the same
+        # canonical external vault and existing nfcore-api identity.
+        governed_ingress = staging_commercial_ingress(runtime.database)
+        if governed_ingress:
+            if commercial_trial_security is not None or commercial_acquisition_security is not None:
+                raise RuntimeConfigurationError("duplicate commercial ingress authority")
+            commercial_trial_security = governed_ingress.get("commercial_trial_security")
+            commercial_acquisition_security = governed_ingress.get("commercial_acquisition_security")
     selected_checkout = commercial_checkout_projector
     selected_checkout_starter = commercial_checkout_starter
     selected_checkout_processing = commercial_checkout_processing_configured
