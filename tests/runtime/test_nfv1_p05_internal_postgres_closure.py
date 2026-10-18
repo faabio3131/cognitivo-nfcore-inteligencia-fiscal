@@ -257,6 +257,18 @@ def test_p05_t04_postgres_trial_owner_cannot_spoof_tenant_unit_or_csrf(settings)
         own_unit = unit_rows[0]["unit_id"]
         assert own_unit == "test-unit"
 
+        # Replaying the same onboarding intent must never duplicate durable
+        # registration, even if the client retries after losing the response.
+        onboard_replay = client.post(
+            "/v1/portal/operations/onboardUnit",
+            json={"unit_id": "test-unit", "display_name": "Synthetic test unit"},
+            headers={CSRF_HEADER: csrf, "Idempotency-Key": "p05-t04-unit-setup"},
+        )
+        assert onboard_replay.status_code == 200
+        assert [row["unit_id"] for row in client.get(
+            "/v1/portal/surfaces/units"
+        ).json()["rows"]] == [own_unit]
+
         # Register a real foreign tenant/unit in the same PostgreSQL test
         # database: isolation must hold even when the unit actually exists.
         database = app.state.nfcore_runtime.database
