@@ -62,7 +62,9 @@ def test_portal_brand_shell_preserves_accessibility_and_responsive_contract() ->
     assert 'lang="pt-BR"' in index
     assert "assets/favicon.svg" in index
     assert "assets/nfcore-emblem-approved.png" in index
-    assert "assets/nfcore-logo-approved.png" in index
+    assert 'src="assets/nfcore-logo-core-only.png"' in index
+    assert (PORTAL / "assets" / "nfcore-logo-core-only.png").is_file()
+    assert (PORTAL / "assets" / "nfcore-logo-approved.png").is_file()
     assert "assets/fm-nfcore-mark.svg" not in index
     for breakpoint in ("1050px", "760px", "480px"):
         assert breakpoint in styles

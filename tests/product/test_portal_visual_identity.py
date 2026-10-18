@@ -14,13 +14,13 @@ def test_v1_commercial_identity_is_applied() -> None:
 
     assert "FM NFCORE V1.0" in html
     assert "Infraestrutura fiscal. Sob controle." in html
-    assert "FM NFCORE · Commercial Launch Edition · V1.0" in html
+    assert "FM CORE · Commercial Launch Edition · V1.0" in html
     assert "--brand-primary: #2563ff" in css
     assert "--brand-cyan: #00e5ff" in css
     assert html.count('src="assets/nfcore-emblem-approved.png"') >= 2
-    assert 'src="assets/nfcore-logo-approved.png"' in html
+    assert 'src="assets/nfcore-logo-core-only.png"' in html
     assert 'class="product-banner-logo-approved"' in html
-    assert 'alt="FM NFCORE — Infrastructure Mission Control"' in html
+    assert 'alt="NF no cubo e CORE — Infrastructure Mission Control"' in html
     assert 'src="assets/fm-nfcore-mark.svg"' not in html
     assert 'href="assets/favicon.svg"' in html
 
