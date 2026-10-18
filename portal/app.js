@@ -184,7 +184,9 @@ function appendFiscalActions(article) {
 }
 
 
-/** Query the existing authorized archive handler; metadata only, no fiscal provider. */
+/** Query the existing authorized archive handler; metadata only, no fiscal provider.
+ * @param {HTMLElement} article
+ */
 function appendArchiveLookup(article) {
   const configured = bootstrapState?.projection.configured_fiscal_operations;
   if (!Array.isArray(configured) || !configured.includes("queryArchiveReference")
@@ -518,7 +520,8 @@ function appendOnboardingControls(article) {
   }
   // The same canonical onboarding operation also registers additional units.
   // Do not make the customer lose this Web capability after their first unit.
-  if (!["unit_setup_required", "basic_setup_complete"].includes(stage)
+  if (typeof stage !== "string"
+    || !["unit_setup_required", "basic_setup_complete"].includes(stage)
     || !bootstrapState?.permissions.includes("configuration.write")
     || bootstrapState?.projection.unit_scope !== "all") return;
 
