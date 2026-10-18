@@ -733,3 +733,103 @@ dialog::backdrop { background: rgba(2,7,13,.75); backdrop-filter: blur(7px); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
+
+/* NFCore Mission Control — refinement exclusively visual (NF-UX 02–05).
+   Scope: legibility, layout and decorative empty-state treatment.
+   No data, permissions, navigation or runtime behavior is changed. */
+.nav-group-label {
+  color: #94afc9;
+}
+
+.nav-button {
+  color: #d6e4f0;
+}
+
+.sidebar-foot > p {
+  color: #92acc5;
+}
+
+.platform-health small {
+  color: #a7bfd5;
+}
+
+#fiscal-unit-filter,
+#fiscal-environment-filter,
+#configuration-existing {
+  width: 100%;
+  max-width: 520px;
+}
+
+#customer-configuration-form {
+  width: 100%;
+  max-width: 960px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  column-gap: 20px;
+  row-gap: 16px;
+}
+
+#customer-configuration-form > label {
+  min-width: 0;
+}
+
+#customer-configuration-form > label:first-child,
+#customer-configuration-form > p,
+#customer-configuration-form > button {
+  grid-column: 1 / -1;
+}
+
+#customer-configuration-form > label:first-child {
+  max-width: 520px;
+}
+
+#customer-configuration-form > button {
+  justify-self: start;
+}
+
+.grid-list > .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 168px;
+  gap: 12px;
+  padding: 28px 24px;
+  border-color: rgba(90, 135, 175, .42);
+  background: radial-gradient(ellipse at 50% 0%, rgba(37, 99, 255, .08), transparent 72%), rgba(8, 18, 31, .18);
+  color: #bdd0e1;
+  line-height: 1.55;
+}
+
+.grid-list > .empty-state::before {
+  content: "";
+  display: block;
+  flex: 0 0 42px;
+  width: 42px;
+  border: 1px solid rgba(143, 168, 194, .34);
+  border-radius: 11px;
+  background:
+    linear-gradient(#9bb7cd, #9bb7cd) center 15px / 16px 2px no-repeat,
+    linear-gradient(#789bb7, #789bb7) center 22px / 16px 2px no-repeat,
+    linear-gradient(155deg, rgba(143, 168, 194, .13), rgba(143, 168, 194, .025));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
+}
+
+@media (max-width: 1080px) {
+  #customer-configuration-form {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 560px;
+  }
+}
+
+@media (max-width: 620px) {
+  .grid-list > .empty-state {
+    min-height: 148px;
+    padding: 22px 16px;
+  }
+
+  #customer-configuration-form > button {
+    width: 100%;
+    justify-self: stretch;
+  }
+}
