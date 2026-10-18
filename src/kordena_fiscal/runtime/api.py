@@ -67,8 +67,8 @@ from .observability import (
 )
 from .otel_trace_sink import build_trace_sink
 from .secret_manager import SecretBindingAdministration
-from .staging_commercial_ingress import staging_commercial_ingress
 from .security import configure_edge_security
+from .staging_commercial_ingress import staging_commercial_ingress
 
 _TRACE_REFERENCE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}\Z")
 
@@ -214,7 +214,9 @@ def create_runtime_app(
             if commercial_trial_security is not None or commercial_acquisition_security is not None:
                 raise RuntimeConfigurationError("duplicate commercial ingress authority")
             commercial_trial_security = governed_ingress.get("commercial_trial_security")
-            commercial_acquisition_security = governed_ingress.get("commercial_acquisition_security")
+            commercial_acquisition_security = governed_ingress.get(
+                "commercial_acquisition_security"
+            )
     selected_checkout = commercial_checkout_projector
     selected_checkout_starter = commercial_checkout_starter
     selected_checkout_processing = commercial_checkout_processing_configured
