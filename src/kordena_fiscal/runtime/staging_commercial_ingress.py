@@ -13,6 +13,7 @@ import os
 import re
 from collections.abc import Mapping
 from datetime import UTC, datetime
+from typing import Literal
 
 from kordena_fiscal.persistence.postgres import PostgresFiscalDatabase
 from kordena_fiscal.security.s2s import WebhookSecurity
@@ -40,7 +41,7 @@ _CHANNELS = {
 }
 _PROVIDER = "google-secret-manager"
 _PLATFORM_TENANT = "nfcore-platform"
-_WORKLOAD = "nfcore-api"
+_WORKLOAD: Literal["nfcore-api"] = "nfcore-api"
 
 
 class _CommercialSigningKeys:
