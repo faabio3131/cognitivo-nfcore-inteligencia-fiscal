@@ -43,7 +43,7 @@ Critério: **INTEGRADO** = caminho UI→API/serviço codificado (não significa 
 
 1. Não reconstruir o Portal. Reutilizar `onboardUnit` em **Onboarding e Unidades** após a primeira unidade, somente com `configuration.write` e escopo de todas as unidades; proteger retries de rede mantendo a mesma idempotency key para conteúdo idêntico.
 2. Expor a consulta ao arquivo persistido que o API runtime já suporta via `queryArchiveReference`, usando `document.query`, seleção de unidade/ambiente e retornando apenas metadados autorizados.
-3. Exibir os campos completos que as autoridades comerciais devolvem em Billing, Planos e Uso; nenhuma regra de cobrança, preço ou status foi movida para a UI.
+3. Exibir os campos completos que as autoridades existentes devolvem em Billing, Planos, Uso, Auditoria, Usuários, Empresa, Onboarding, Ambientes e Unidades; nenhuma regra de cobrança, preço, permissão ou status foi movida para a UI.
 
 ## Pendências verdadeiras para produto vendável — ordem por impacto
 
