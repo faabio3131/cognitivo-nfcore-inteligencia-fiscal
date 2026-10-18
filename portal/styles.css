@@ -833,3 +833,10 @@ dialog::backdrop { background: rgba(2,7,13,.75); backdrop-filter: blur(7px); }
     justify-self: stretch;
   }
 }
+
+/* Brand wordmark: the cube already contains NF. */
+.brand-copy .brand-nfcore {
+  background-image: linear-gradient(90deg, #f4f9ff, #56baff 45%, #00e5ff);
+  font-size: 18px;
+  letter-spacing: -.035em;
+}
