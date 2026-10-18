@@ -146,3 +146,15 @@ test("customer configuration forms use existing portal commands and distinguish 
   assert.match(script, /egress-decision-form/);
   assert.match(script, /if \(!bootstrapState\?\.platform_admin\) return/);
 });
+
+
+test("password visibility and creation guidance use the canonical policy", () => {
+  assert.match(html, /id="login-password-guidance"/);
+  assert.match(html, /12 a 1\\.024 caracteres/);
+  assert.match(html, /letras, números, espaços e símbolos são aceitos/);
+  assert.match(html, /data-password-toggle="login-password"/);
+  assert.match(html, /data-password-toggle="password-reset-new-password"/);
+  assert.match(html, /aria-pressed="false"/);
+  assert.match(script, /input\\.type = show \\? "text" : "password"/);
+  assert.match(script, /setAttribute\\("aria-pressed", String\\(show\\)\\)/);
+});
