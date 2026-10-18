@@ -372,6 +372,10 @@ button.danger { background: rgba(128, 34, 55, .38); color: #ffdbe1; border-color
 .mission-strip span { padding: 10px 12px; background: rgba(8,18,31,.88); color: #809ab2; font-size: 10px; }
 .mission-strip strong { margin-right: 5px; color: var(--brand-cyan); letter-spacing: .08em; }
 
+/* Operational pages prioritize real tools. Keep the full brand experience on Overview. */
+.shell.is-operational-view .product-banner,
+.shell.is-operational-view .mission-strip { display: none; }
+
 .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 11px; margin-bottom: 12px; }
 .metric, .panel {
   background: linear-gradient(180deg, rgba(15,39,71,.92), rgba(9,25,44,.96));
@@ -398,6 +402,9 @@ button.danger { background: rgba(128, 34, 55, .38); color: #ffdbe1; border-color
   line-height: 1.5;
 }
 .assurance-strip strong { color: #e4f8ff; }
+/* Fail-closed readiness is never hidden, only compacted outside the overview. */
+.shell.is-operational-view .assurance-strip { padding: 8px 12px; margin-bottom: 12px; }
+.shell.is-operational-view .assurance-icon { width: 24px; height: 24px; }
 .assurance-icon {
   flex: 0 0 auto;
   display: grid;
