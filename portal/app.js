@@ -1419,7 +1419,7 @@ async function renderSurface(viewId) {
       for (const row of rows) {
         const entry = scopedViews.has(viewId) || viewId === "support"
           ? fiscalRowElement(row)
-          : ["units", "billing", "plans", "usage"].includes(viewId)
+          : ["onboarding", "companies", "units", "environments", "users", "audit", "billing", "plans", "usage"].includes(viewId)
             ? appendRecordDetails(rowElement(row), row)
             : rowElement(row);
         grid.append(entry);
