@@ -184,6 +184,68 @@ function appendFiscalActions(article) {
 }
 
 
+/** Query the existing authorized archive handler; metadata only, no fiscal provider. */
+function appendArchiveLookup(article) {
+  const configured = bootstrapState?.projection.configured_fiscal_operations;
+  if (!Array.isArray(configured) || !configured.includes("queryArchiveReference")
+      || !bootstrapState?.permissions.includes("document.query")) return;
+  const form = document.createElement("form");
+  form.id = "archive-lookup-form";
+  form.className = "panel-form";
+  const label = document.createElement("label");
+  label.textContent = "Referência do documento arquivado";
+  const reference = document.createElement("input");
+  reference.name = "document_reference";
+  reference.required = true;
+  reference.maxLength = 256;
+  reference.autocomplete = "off";
+  reference.placeholder = "Referência do documento";
+  label.append(reference);
+  const help = document.createElement("p");
+  help.textContent = "Consulta de metadados internos por unidade e ambiente. Não realiza emissão nem contato com provedor fiscal.";
+  const submit = document.createElement("button");
+  submit.className = "primary";
+  submit.type = "submit";
+  submit.textContent = "Consultar arquivo fiscal";
+  const statusLine = document.createElement("p");
+  statusLine.setAttribute("role", "status");
+  const entries = document.createElement("div");
+  entries.className = "grid-list";
+  form.append(label, help, submit, statusLine, entries);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    if (!selectedFiscalUnit) {
+      statusLine.textContent = "Selecione uma unidade autorizada.";
+      return;
+    }
+    submit.disabled = true;
+    statusLine.textContent = "Consultando arquivo...";
+    entries.replaceChildren();
+    try {
+      const data = await api("/v1/portal/operations/queryArchiveReference", {
+        method: "POST",
+        headers: {"X-CSRF-Token": csrfToken()},
+        body: JSON.stringify({
+          unit_id: selectedFiscalUnit,
+          environment: selectedFiscalEnvironment,
+          document_reference: reference.value.trim(),
+        }),
+      });
+      const rows = Array.isArray(data.entries) ? data.entries : [];
+      statusLine.textContent = data.found === true
+        ? `Referência encontrada: ${rows.length} registro(s) arquivado(s).`
+        : "Nenhum registro arquivado para esta referência no escopo selecionado.";
+      for (const row of rows) entries.append(fiscalRowElement(row));
+    } catch (error) {
+      statusLine.textContent = error instanceof Error ? error.message : "Falha ao consultar o arquivo";
+    } finally {
+      submit.disabled = false;
+    }
+  });
+  article.append(form);
+}
+
 function csrfToken() {
   const prefix = "nfcore_csrf=";
   const entry = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith(prefix));
@@ -1381,6 +1443,7 @@ async function renderSurface(viewId) {
       article.append(notice);
     }
     if (viewId === "onboarding" || viewId === "units") appendOnboardingControls(article);
+    if (viewId === "documents") appendArchiveLookup(article);
     if (viewId === "users") appendUserAdministration(article, rows);
     if (["inutilizations", "documents", "issuances", "reconciliation"].includes(viewId)) await appendFiscalRecovery(article);
     if (viewId === "inutilizations") appendInutilizationForm(article);
