@@ -3,8 +3,8 @@
 **Estado:** EM_EXECUCAO (trilha subordinada ao cronograma mestre de 59 IDs).  
 **Decisão:** autorização explícita do proprietário em 18/10/2026 para construir/corrigir autonomamente e **mergear PRs BUILD-ONLY 100% verdes**, preservando decisões humanas para credenciais, custos, preço, segurança nova, deploy, produção e atos irreversíveis.  
 **Cronograma de escopo:** `docs/NFCORE_V1_BUILD_INTEGRATION_EXECUTION_2026-10-18.md` — anexo, **não substitui** `docs/NFCORE_V1_EXECUTION_LEDGER.md`.  
-**Próximo bloco executável:** `NFV1-BLD-00`.  
-**Última reconciliação:** auditada main `44cddbabb4e91b55dcc730e6976fcc2ce7f00d75`; CI #1054 + Gov #475 SUCCESS; site novo main `f2f995bed15cc371fcfb4ccb09d1e321ff209f8a`. Isto não certifica nenhum BLD.
+**Próximo bloco executável:** `NFV1-BLD-01`.  
+**Última reconciliação:** main `b15527e725213c3c1cb848692306a95dd7c240df`; BLD-00 PR #226 mergeada, CI #1062/Gov #483 e CI pós-merge #1063/Gov #484 SUCCESS; BLD-01 aguardando auditoria de delta e provas próprias.
 
 ## Semântica de estado e prova
 
@@ -21,15 +21,15 @@ Cada `Evidência` abaixo é levantamento de baseline, **não certificação do b
 ## Blocos (ordem de execução)
 
 ### NFV1-BLD-00 — Inventário integral de paridade
-- **Estado:** IN_PROGRESS
+- **Estado:** DONE
 - **Depende de:** docs/NFCORE_V1_BUILD_INTEGRATION_EXECUTION_2026-10-18.md §4 BLD-00
 - **CURRENT:** main 44cddbabb4e91b55dcc730e6976fcc2ce7f00d75 CI #1054/Gov #475 SUCCESS; checkpoint NFV1_WEB_PARITY_AND_FUNCTIONAL_INTEGRATION_2026-10-18.md histórico. Falta auditoria **completa de todas as ações** no CURRENT e matriz de gaps.
 - **Target e aceite:** seção `NFV1-BLD-00` do anexo de execução.
-- **Evidência final:** PENDENTE; candidata de auditoria em docs/checkpoints/NFV1_BLD00_CURRENT_FUNCTIONAL_PARITY_2026-10-19.md; primeiro verificar CI/Governança da PR da auditoria, depois registrar merge SHA e CI/Gov pós-merge, sem promover DONE antecipadamente.
+- **Evidência final:** PR #226, HEAD `f42bc2f0916c0385b752d240028023979f9fa182`, CI #1062 SUCCESS / Gov #483 SUCCESS; merge SHA `b15527e725213c3c1cb848692306a95dd7c240df`, CI #1063 SUCCESS / Gov #484 SUCCESS (mesmo SHA); matriz `docs/checkpoints/NFV1_BLD00_CURRENT_FUNCTIONAL_PARITY_2026-10-19.md`, 26 áreas navegacionais, 2 ações especiais, gaps e limites de evidência explícitos. Sem deploy/produção/homologação.
 - **Pendência / decisão humana:** se surgir, registrar o bloqueio exato com decisão necessária, sem gerar novo serviço, preço ou credencial.
 
 ### NFV1-BLD-01 — Identidade, onboarding e Portal operacional
-- **Estado:** PENDING
+- **Estado:** IN_PROGRESS
 - **Depende de:** BLD-00 concluído; exceto coleta de dados não destrutiva paralela
 - **CURRENT:** Login/logout/recovery/onboardUnit/UserAdmin já têm código, testes e evidências. Corrigir apenas gaps surgidos da BLD-00; não reabrir P02 DONE sem regressão.
 - **Target e aceite:** seção `NFV1-BLD-01` do anexo de execução.

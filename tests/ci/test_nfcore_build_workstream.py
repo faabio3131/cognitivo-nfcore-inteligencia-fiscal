@@ -24,9 +24,10 @@ def inputs() -> tuple[str, str]:
 def test_initial_build_ledger_is_valid_without_claiming_completion() -> None:
     plan, ledger = inputs()
     assert not assess(plan, ledger)
-    # BLD-00 may be IN_PROGRESS during audit; eight successor blocks remain PENDING.
-    assert ledger.count("- **Estado:** PENDING") == 8
+    # Current workstream must have one active block and the other eight accounted for.
+    assert ledger.count("- **Estado:** PENDING") == 7
     assert ledger.count("- **Estado:** IN_PROGRESS") == 1
+    assert ledger.count("- **Estado:** DONE") == 1
     assert "CONSTRUCTION_AND_WEB_INTEGRATION_COMPLETE" in plan
 
 
@@ -39,9 +40,9 @@ def test_no_missing_or_reordered_build_block() -> None:
 def test_cannot_skip_missing_work_with_ci_or_fake_evidence() -> None:
     plan, ledger = inputs()
     changed = ledger.replace(
-        "### NFV1-BLD-01 — Identidade, onboarding e Portal operacional\n"
+        "### NFV1-BLD-02 — Paridade fiscal Web e executores internos\n"
         "- **Estado:** PENDING",
-        "### NFV1-BLD-01 — Identidade, onboarding e Portal operacional\n"
+        "### NFV1-BLD-02 — Paridade fiscal Web e executores internos\n"
         "- **Estado:** DONE",
         1,
     )
@@ -51,7 +52,7 @@ def test_cannot_skip_missing_work_with_ci_or_fake_evidence() -> None:
 
 def test_rejects_duplicate_concurrent_work_or_missing_proof() -> None:
     plan, ledger = inputs()
-    active = ledger.replace("- **Estado:** PENDING", "- **Estado:** IN_PROGRESS", 2)
+    active = ledger.replace("- **Estado:** PENDING", "- **Estado:** IN_PROGRESS", 1)
     assert any("mais de um bloco" in x for x in assess(plan, active))
     missing = re.sub(
         r"(### NFV1-BLD-00[\s\S]*?)- \*\*Evidência final:\*\*.*",
