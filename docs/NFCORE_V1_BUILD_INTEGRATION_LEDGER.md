@@ -3,8 +3,8 @@
 **Estado:** EM_EXECUCAO (trilha subordinada ao cronograma mestre de 59 IDs).  
 **Decisão:** autorização explícita do proprietário em 18/10/2026 para construir/corrigir autonomamente e **mergear PRs BUILD-ONLY 100% verdes**, preservando decisões humanas para credenciais, custos, preço, segurança nova, deploy, produção e atos irreversíveis.  
 **Cronograma de escopo:** `docs/NFCORE_V1_BUILD_INTEGRATION_EXECUTION_2026-10-18.md` — anexo, **não substitui** `docs/NFCORE_V1_EXECUTION_LEDGER.md`.  
-**Próximo bloco executável:** `NFV1-BLD-01`.  
-**Última reconciliação:** main `74089d694b50f4809810e34e9fed6899a68c37e1`; BLD-00 PR #226 com CI #1063/Gov #484 SUCCESS, fechamento PR #227 com CI #1066/Gov #487 SUCCESS; BLD-01 em execução, PR #228 mergeada (CI #1067/Gov #488 SUCCESS), Governança pós-merge #489 SUCCESS, CI pós-merge #1068 ainda em execução nesta verificação. BUILD-01 não declarado DONE.
+**Próximo bloco executável:** `NFV1-BLD-02`.  
+**Última reconciliação:** main `caf9c8278c469d1b87aa15b49c73f824d2eda430`; PRs #228, #229, #230 integradas. CI pós-merge #1068/Gov #489, #1070/Gov #491 e #1072/Gov #493 SUCCESS nos respectivos HEADs. BLD-01 fechamento BUILD interno; BLD-02 iniciada sem prometer transporte oficial ou deploy.
 
 ## Semântica de estado e prova
 
@@ -29,15 +29,15 @@ Cada `Evidência` abaixo é levantamento de baseline, **não certificação do b
 - **Pendência / decisão humana:** se surgir, registrar o bloqueio exato com decisão necessária, sem gerar novo serviço, preço ou credencial.
 
 ### NFV1-BLD-01 — Identidade, onboarding e Portal operacional
-- **Estado:** IN_PROGRESS
-- **Depende de:** BLD-00 concluído; exceto coleta de dados não destrutiva paralela
-- **CURRENT:** Login/logout/recovery/onboardUnit/UserAdmin já têm código, testes e evidências. PR #228 corrigiu a confirmação visível após refresh de usuários (merge `74089d694b50f4809810e34e9fed6899a68c37e1`; CI #1067/Gov #488 SUCCESS antes do merge; Gov #489 SUCCESS pós-merge, CI #1068 pendente de conclusão). Prosseguir somente com deltas funcionais, sem reabrir P02 DONE nem considerar a Web publicada por merge.
-- **Target e aceite:** seção `NFV1-BLD-01` do anexo de execução.
-- **Evidência final:** PENDENTE (registrar PR + HEAD + merge SHA + CI/Gov PR e main + prova funcional apropriada).
-- **Pendência / decisão humana:** se surgir, registrar o bloqueio exato com decisão necessária, sem gerar novo serviço, preço ou credencial.
+- **Estado:** DONE
+- **Depende de:** BLD-00 certificado (PR #226/#227).
+- **CURRENT:** Sessão/login/logout, recuperação/ativação, onboarding e múltiplas unidades, usuário/OWNER e RBAC/CSRF/tenant já implementados no Portal e APIs canônicos, conforme testes dirigidos e matriz BLD-00. Sem segundo login. Deltas corrigidos nas PRs #228 (confirmação de usuários), #229 (respostas assíncronas antigas na navegação) e #230 (ação fiscal condicionada ao escopo autorizado).
+- **Target e aceite:** seção `NFV1-BLD-01` do anexo de execução. Conclusão refere-se ao BUILD interno integrado, não a deploy, browser E2E atual de todos os papéis ou homologação externa.
+- **Evidência final:** PR #228 merge SHA `74089d694b50f4809810e34e9fed6899a68c37e1`, CI #1067/Gov #488 e CI pós-merge #1068/Gov #489 SUCCESS; PR #229 merge SHA `8e07fa534d7fb488930b9e07e174363036635d53`, CI #1069/Gov #490 e CI pós-merge #1070/Gov #491 SUCCESS; PR #230 HEAD `e292a1b6f6d2a7bac2ac16fef706292045a37656`, merge SHA `caf9c8278c469d1b87aa15b49c73f824d2eda430`, CI #1071/Gov #492 e CI pós-merge #1072/Gov #493 SUCCESS. Provas: `tests/frontend/portal_contract.test.js`, `tests/e2e/portal.spec.js`, `tests/web/test_human_auth_routes.py`, `tests/runtime/test_p02_t04_users_rbac.py`, `tests/web/test_portal_api.py`, `docs/checkpoints/NFV1_BLD00_CURRENT_FUNCTIONAL_PARITY_2026-10-19.md`. Navegação Web publicada na revisão mais recente ainda não demonstrada; BLD-08 guarda essa evidência.
+- **Pendência / decisão humana:** nenhuma nova para concluir este bloco de BUILD interno; deploy, testes reais no browser/staging e homologação ficam em seus gates próprios.
 
 ### NFV1-BLD-02 — Paridade fiscal Web e executores internos
-- **Estado:** PENDING
+- **Estado:** IN_PROGRESS
 - **Depende de:** BLD-00 e BLD-01
 - **CURRENT:** queryArchiveReference é handler interno existente; outros handlers fiscais dependem de composição determinística e transportes corretos; PR #189 auditar sem copiar.
 - **Target e aceite:** seção `NFV1-BLD-02` do anexo de execução.
