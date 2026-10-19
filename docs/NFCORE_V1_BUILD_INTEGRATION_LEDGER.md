@@ -4,7 +4,7 @@
 **Decisão:** autorização explícita do proprietário em 18/10/2026 para construir/corrigir autonomamente e **mergear PRs BUILD-ONLY 100% verdes**, preservando decisões humanas para credenciais, custos, preço, segurança nova, deploy, produção e atos irreversíveis.  
 **Cronograma de escopo:** `docs/NFCORE_V1_BUILD_INTEGRATION_EXECUTION_2026-10-18.md` — anexo, **não substitui** `docs/NFCORE_V1_EXECUTION_LEDGER.md`.  
 **Próximo bloco executável:** `NFV1-BLD-01`.  
-**Última reconciliação:** main `b15527e725213c3c1cb848692306a95dd7c240df`; BLD-00 PR #226 mergeada, CI #1062/Gov #483 e CI pós-merge #1063/Gov #484 SUCCESS; BLD-01 aguardando auditoria de delta e provas próprias.
+**Última reconciliação:** main `74089d694b50f4809810e34e9fed6899a68c37e1`; BLD-00 PR #226 com CI #1063/Gov #484 SUCCESS, fechamento PR #227 com CI #1066/Gov #487 SUCCESS; BLD-01 em execução, PR #228 mergeada (CI #1067/Gov #488 SUCCESS), Governança pós-merge #489 SUCCESS, CI pós-merge #1068 ainda em execução nesta verificação. BUILD-01 não declarado DONE.
 
 ## Semântica de estado e prova
 
@@ -31,7 +31,7 @@ Cada `Evidência` abaixo é levantamento de baseline, **não certificação do b
 ### NFV1-BLD-01 — Identidade, onboarding e Portal operacional
 - **Estado:** IN_PROGRESS
 - **Depende de:** BLD-00 concluído; exceto coleta de dados não destrutiva paralela
-- **CURRENT:** Login/logout/recovery/onboardUnit/UserAdmin já têm código, testes e evidências. Corrigir apenas gaps surgidos da BLD-00; não reabrir P02 DONE sem regressão.
+- **CURRENT:** Login/logout/recovery/onboardUnit/UserAdmin já têm código, testes e evidências. PR #228 corrigiu a confirmação visível após refresh de usuários (merge `74089d694b50f4809810e34e9fed6899a68c37e1`; CI #1067/Gov #488 SUCCESS antes do merge; Gov #489 SUCCESS pós-merge, CI #1068 pendente de conclusão). Prosseguir somente com deltas funcionais, sem reabrir P02 DONE nem considerar a Web publicada por merge.
 - **Target e aceite:** seção `NFV1-BLD-01` do anexo de execução.
 - **Evidência final:** PENDENTE (registrar PR + HEAD + merge SHA + CI/Gov PR e main + prova funcional apropriada).
 - **Pendência / decisão humana:** se surgir, registrar o bloqueio exato com decisão necessária, sem gerar novo serviço, preço ou credencial.
