@@ -1,5 +1,8 @@
 # FM NFCORE V1 — CRONOGRAMA MESTRE DE CONCLUSÃO E CERTIFICAÇÃO
 
+> **Decisão posterior aprovada (18/10/2026) — execução BUILD-ONLY antes de homologação externa:** `docs/NFCORE_V1_BUILD_INTEGRATION_EXECUTION_2026-10-18.md` é o **anexo subordinado de execução** para concluir **código e integração na mesma Web** sem reabrir fases internas certificadas. Seu estado/provas estão em `docs/NFCORE_V1_BUILD_INTEGRATION_LEDGER.md`, com governança em `AGENTS.md`. Isto **não acrescenta, renumera nem encerra** nenhum dos 59 itens deste mestre; a precedência interna BLD não transforma P05/P07/P08/P09/P10/P11/P12 em DONE. A homologação fiscal e comercial real, operações finais, backups periódicos e produção permanecem pendentes e ocorrerão no momento próprio. Autorização de merge automático **somente** para PRs BUILD-ONLY inteiramente verdes, não para deploy, gasto, credenciais, DNS ou operações irreversíveis.
+
+
 **Status:** CANONICAL EXECUTION CONTROL CANDIDATE  
 **Data-base da auditoria:** 2026-10-05  
 **Projeto:** NFCore Commercial Launch  
