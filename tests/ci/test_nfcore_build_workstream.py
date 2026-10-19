@@ -40,9 +40,9 @@ def test_no_missing_or_reordered_build_block() -> None:
 def test_cannot_skip_missing_work_with_ci_or_fake_evidence() -> None:
     plan, ledger = inputs()
     changed = ledger.replace(
-        "### NFV1-BLD-01 — Identidade, onboarding e Portal operacional\n"
+        "### NFV1-BLD-02 — Paridade fiscal Web e executores internos\n"
         "- **Estado:** PENDING",
-        "### NFV1-BLD-01 — Identidade, onboarding e Portal operacional\n"
+        "### NFV1-BLD-02 — Paridade fiscal Web e executores internos\n"
         "- **Estado:** DONE",
         1,
     )
