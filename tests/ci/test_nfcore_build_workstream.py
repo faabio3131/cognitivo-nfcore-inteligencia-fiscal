@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from scripts.check_nfcore_build_workstream import ROOT, assess
 
