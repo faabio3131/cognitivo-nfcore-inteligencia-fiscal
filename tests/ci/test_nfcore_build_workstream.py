@@ -6,7 +6,8 @@ from pathlib import Path
 from runpy import run_path
 
 # CI installs only src/, not scripts/ as an importable package.
-module = run_path(str(Path(__file__).resolve().parents[2] / "scripts/check_nfcore_build_workstream.py"))
+script = Path(__file__).resolve().parents[2] / "scripts/check_nfcore_build_workstream.py"
+module = run_path(str(script))
 ROOT = module["ROOT"]
 assess = module["assess"]
 
