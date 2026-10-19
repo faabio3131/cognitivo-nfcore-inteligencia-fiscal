@@ -1442,6 +1442,8 @@ async function renderSurface(viewId) {
       environment: selectedFiscalEnvironment, limit: "100", offset: String(fiscalPageOffset),
     })}` : "";
     const response = await api(`/v1/portal/surfaces/${encodeURIComponent(viewId)}${filters}`);
+    // A prior request cannot overwrite a newer navigation or unit selection.
+    if (generation !== surfaceGeneration) return;
     const grid = document.createElement("div");
     grid.className = "grid-list";
     const rows = Array.isArray(response.rows) ? response.rows : [];
@@ -1497,6 +1499,7 @@ async function renderSurface(viewId) {
       article.append(previous, next);
     }
   } catch (error) {
+    if (generation !== surfaceGeneration) return;
     loading.textContent = error instanceof Error ? error.message : "Falha ao carregar superfície";
     loading.className = "form-error";
     loading.setAttribute("role", "alert");

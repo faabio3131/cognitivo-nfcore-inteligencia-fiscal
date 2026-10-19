@@ -164,3 +164,9 @@ test("user administration keeps success acknowledgement after refreshed workspac
   assert.match(script, /workspace\.querySelector\("#user-administration-form \[role='status'\]"\)/);
   assert.match(script, /visibleStatus\.textContent = confirmation/);
 });
+
+test("outdated portal requests cannot overwrite current navigation on success or error", () => {
+  assert.match(script, /const response = await api\(`\/v1\/portal\/surfaces\/.*?\n\s*\/\/ A prior request cannot overwrite/);
+  assert.match(script, /if \(generation !== surfaceGeneration\) return;\s*const grid/);
+  assert.match(script, /catch \(error\) \{\s*if \(generation !== surfaceGeneration\) return;\s*loading\.textContent/);
+});
