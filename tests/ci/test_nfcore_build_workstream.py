@@ -52,7 +52,7 @@ def test_cannot_skip_missing_work_with_ci_or_fake_evidence() -> None:
 
 def test_rejects_duplicate_concurrent_work_or_missing_proof() -> None:
     plan, ledger = inputs()
-    active = ledger.replace("- **Estado:** PENDING", "- **Estado:** IN_PROGRESS", 2)
+    active = ledger.replace("- **Estado:** PENDING", "- **Estado:** IN_PROGRESS", 1)
     assert any("mais de um bloco" in x for x in assess(plan, active))
     missing = re.sub(
         r"(### NFV1-BLD-00[\s\S]*?)- \*\*Evidência final:\*\*.*",
