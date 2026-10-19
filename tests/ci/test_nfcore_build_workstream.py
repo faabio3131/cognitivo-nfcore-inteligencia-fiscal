@@ -25,9 +25,9 @@ def test_initial_build_ledger_is_valid_without_claiming_completion() -> None:
     plan, ledger = inputs()
     assert not assess(plan, ledger)
     # Current workstream must have one active block and the other eight accounted for.
-    assert ledger.count("- **Estado:** PENDING") == 7
+    assert ledger.count("- **Estado:** PENDING") == 6
     assert ledger.count("- **Estado:** IN_PROGRESS") == 1
-    assert ledger.count("- **Estado:** DONE") == 1
+    assert ledger.count("- **Estado:** DONE") == 2
     assert "CONSTRUCTION_AND_WEB_INTEGRATION_COMPLETE" in plan
 
 
@@ -40,7 +40,7 @@ def test_no_missing_or_reordered_build_block() -> None:
 def test_cannot_skip_missing_work_with_ci_or_fake_evidence() -> None:
     plan, ledger = inputs()
     changed = ledger.replace(
-        "### NFV1-BLD-02 — Paridade fiscal Web e executores internos\n"
+        "### NFV1-BLD-03 — Trial first-party no NFCore e site estático\n"
         "- **Estado:** PENDING",
         "### NFV1-BLD-02 — Paridade fiscal Web e executores internos\n"
         "- **Estado:** DONE",
