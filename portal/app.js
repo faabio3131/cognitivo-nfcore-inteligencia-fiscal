@@ -159,16 +159,18 @@ function appendFiscalActions(article) {
   article.append(recoveryNotice);
   const operations = bootstrapState?.projection.configured_fiscal_operations;
   const configured = Array.isArray(operations) ? operations : [];
+  const authorizedScope = authorizedFiscalUnits().some((unit) =>
+    unit.unit_id === selectedFiscalUnit && unit.environments.includes(selectedFiscalEnvironment));
   for (const option of operationId.options) {
     const permission = fiscalOperationPermissions[/** @type {keyof typeof fiscalOperationPermissions} */ (option.value)];
-    option.disabled = !configured.includes(option.value) || !bootstrapState?.permissions.includes(permission);
+    option.disabled = !authorizedScope || !configured.includes(option.value) || !bootstrapState?.permissions.includes(permission);
     option.hidden = option.disabled;
   }
   const allowed = Array.from(operationId.options).filter((option) => !option.disabled);
   if (!allowed.length) {
     const blocked = document.createElement("p");
     blocked.setAttribute("role", "status");
-    blocked.textContent = "Operação fiscal indisponível neste escopo: executor não configurado ou permissão ausente. Nenhuma emissão foi realizada.";
+    blocked.textContent = "Operação fiscal indisponível neste escopo: unidade/ambiente, executor ou permissão não autorizados. Nenhuma emissão foi realizada.";
     article.append(blocked);
     return;
   }

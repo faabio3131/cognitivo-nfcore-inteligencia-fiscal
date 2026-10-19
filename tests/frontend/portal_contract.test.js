@@ -170,3 +170,9 @@ test("outdated portal requests cannot overwrite current navigation on success or
   assert.match(script, /if \(generation !== surfaceGeneration\) return;\s*const grid/);
   assert.match(script, /catch \(error\) \{\s*if \(generation !== surfaceGeneration\) return;\s*loading\.textContent/);
 });
+
+test("fiscal actions require current authorized unit and environment", () => {
+  assert.match(script, /const authorizedScope = authorizedFiscalUnits\(\)\.some/);
+  assert.match(script, /unit\.unit_id === selectedFiscalUnit && unit\.environments\.includes\(selectedFiscalEnvironment\)/);
+  assert.match(script, /option\.disabled = !authorizedScope \|\| !configured\.includes\(option\.value\)/);
+});
