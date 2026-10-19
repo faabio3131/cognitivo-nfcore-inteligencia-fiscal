@@ -39,6 +39,8 @@ def create_commercial_release_router(
     checkout: CommercialCheckoutProjector | None = None,
     *,
     checkout_processing_configured: bool = False,
+    trial_ingress_configured: bool = False,
+    trial_site_channel_configured: bool = False,
     delivery_readiness: CommercialDeliveryPathReadiness | None = None,
     operational_readiness: Callable[[], bool] | None = None,
     runtime_metrics: MetricsRegistry | None = None,
@@ -100,6 +102,29 @@ def create_commercial_release_router(
             delivery=resolved_delivery_readiness,
             operational_readiness=operational_readiness,
         )
+        # Public trial is separate from checkout, but must be explicitly
+        # authorized, remotely signed and capable of activation.
+        trial_enabled = bool(
+            release_current is not None
+            and release_current.commercially_approved
+            and pricing_current is not None
+            and any(
+                plan.enabled and plan.trial_days > 0
+                and any(
+                    price.enabled and price.price_id in plan.price_ids
+                    for price in pricing_current.prices
+                )
+                for plan in pricing_current.plans
+            )
+            and trial_ingress_configured
+            and trial_site_channel_configured
+            and resolved_delivery_readiness.ready
+        )
+        if trial_enabled and operational_readiness is not None:
+            try:
+                trial_enabled = operational_readiness() is True
+            except Exception:
+                trial_enabled = False
         checkout_payload = checkout_projection.to_public_mapping(
             processing_configured=processing_configured,
             expose_urls=purchase_enabled,
@@ -119,8 +144,8 @@ def create_commercial_release_router(
             "release": release_payload,
             "checkout": checkout_payload,
             "purchase_enabled": purchase_enabled,
-            # Trial release is a separate authority and is not inferred from trial_days.
-            "trial_enabled": False,
+            # Neither trial_days nor signer configuration alone grants public release.
+            "trial_enabled": trial_enabled,
         }
 
     @router.get("/v1/admin/commercial-release")
