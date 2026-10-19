@@ -2,6 +2,9 @@
 
 > Este arquivo registra **estado e prova** das tarefas definidas em `docs/NFCORE_V1_COMPLETION_MASTER_EXECUTION_SCHEDULE_2026-10-05.md`. Ele não redefine escopo. O cronograma continua sendo a autoridade de escopo, dependências, critérios e gates. O validador exige correspondência exata de IDs e ordem.
 
+> **Trilha BUILD-ONLY aprovada em 18/10/2026:** para terminar construção e integração **antes** de homologação externa, usar o anexo `docs/NFCORE_V1_BUILD_INTEGRATION_EXECUTION_2026-10-18.md` e o ledger subordinado `docs/NFCORE_V1_BUILD_INTEGRATION_LEDGER.md`. Este ledger original **não é promovido por reflexo** de CI, PR de BUILD, backup/restore histórico ou teste sintético; seus 59 IDs e estados permanecem estáveis até satisfação independente dos próprios critérios. A autonomia de merge verde definida em `AGENTS.md` restringe-se à trilha BUILD-ONLY.
+
+
 ## Cabeçalho
 
 - **Objetivo:** executar integralmente o cronograma mestre de conclusão do FM NFCORE V1 sem pular tarefas e sem marcar conclusão sem prova.
