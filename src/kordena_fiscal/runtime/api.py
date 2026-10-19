@@ -718,6 +718,14 @@ def create_runtime_app(
                 selected_checkout_processing and commercial_acquisition is not None
             ),
             commercial_delivery_readiness=commercial_delivery_readiness,
+            commercial_trial_ingress_configured=(
+                app.state.nfcore_commercial_trial is not None
+            ),
+            # Explicitly operator-attested FM Site S2S route. Never infer
+            # channel readiness from a secret existing on the API.
+            commercial_trial_site_channel_configured=(
+                os.getenv("NFCORE_SITE_TRIAL_CHANNEL_READY", "") == "true"
+            ),
             commercial_operational_readiness=commercial_operational_readiness,
             cakto_checkout_administration=cakto_checkout_administration,
             runtime_metrics=runtime_metrics,

@@ -267,6 +267,8 @@ def create_app(
     commercial_release_administration: CommercialReleaseAdministrationService | None = None,
     commercial_checkout: CommercialCheckoutProjector | None = None,
     commercial_checkout_processing_configured: bool = False,
+    commercial_trial_ingress_configured: bool = False,
+    commercial_trial_site_channel_configured: bool = False,
     commercial_delivery_readiness: CommercialDeliveryPathReadiness | None = None,
     commercial_operational_readiness: Callable[[], bool] | None = None,
     cakto_checkout_administration: CaktoCheckoutAdministrationService | None = None,
@@ -392,6 +394,10 @@ def create_app(
                         commercial_checkout_processing_configured
                     ),
                     delivery_readiness=commercial_delivery_readiness,
+                    trial_ingress_configured=commercial_trial_ingress_configured,
+                    trial_site_channel_configured=(
+                        commercial_trial_site_channel_configured
+                    ),
                     operational_readiness=commercial_operational_readiness,
                     runtime_metrics=http_metrics,
                 )
