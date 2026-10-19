@@ -26,6 +26,10 @@ class _Account:
     enabled: bool = True
     is_platform_admin: bool = True
 
+    @property
+    def platform_admin(self) -> bool:
+        return self.is_platform_admin
+
 
 class _Actor:
     def __init__(self, admin: bool = True, allow_integration: bool = True) -> None:
@@ -125,6 +129,38 @@ def test_binding_rejects_non_platform_admin() -> None:
     client.cookies.update(COOKIES)
     assert client.post("/internal/staging/gsm-binding", headers=HEADERS).status_code == 403
     assert not administration.bound
+
+
+def test_commercial_trial_binding_is_platform_only_and_replay_safe() -> None:
+    administration = _BindingAdmin()
+    client = _client(create_staging_gsm_binding_router(_Identity(_Actor()), administration))
+    url = "/internal/staging/commercial-trial-binding"
+    assert client.post(url).status_code == 401
+    client.cookies.update(COOKIES)
+    assert client.post(url).status_code == 403
+    assert client.post(url, headers=HEADERS, json={"tenant_id": "attacker"}).status_code == 400
+    response = client.post(url, headers=HEADERS)
+    assert response.status_code == 200
+    assert len(administration.bound) == 1
+    bound = administration.bound[0]
+    assert bound.reference_id == "sec_nfcore_commercial_trial_staging_01"
+    assert bound.tenant_id == "nfcore-platform" and bound.unit_id is None
+    assert bound.purpose == "commercial-trial-ingress"
+    assert bound.workload_id == "nfcore-api"
+    assert bound.cloud_version == "1"
+    assert bound.resource.endswith("nfcore-commercial-trial-stg")
+    assert bound.not_after is not None
+    assert client.post(url, headers=HEADERS).status_code == 200
+    assert len(administration.bound) == 1
+
+
+def test_commercial_trial_binding_cannot_be_approved_by_tenant_owner() -> None:
+    admin = _BindingAdmin()
+    client = _client(create_staging_gsm_binding_router(_Identity(_Actor(admin=False)), admin))
+    client.cookies.update(COOKIES)
+    denied = client.post("/internal/staging/commercial-trial-binding", headers=HEADERS)
+    assert denied.status_code == 403
+    assert not admin.bound
 
 
 class _Store:

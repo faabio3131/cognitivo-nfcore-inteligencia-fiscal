@@ -152,6 +152,36 @@ def test_portal_api_proxy_preserves_auth_boundary_and_cookies(
         upstream_thread.join(timeout=2)
 
 
+
+def test_portal_proxy_allows_only_exact_staging_admin_path_and_public_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("NFCORE_PORTAL_API_UPSTREAM", raising=False)
+    portal, thread = _start_server(
+        partial(_secure_portal_handler(), directory=str(tmp_path))
+    )
+    try:
+        host, port = portal.server_address
+        for path, method, status in (
+            ("/internal/staging/commercial-trial-binding", "POST", 503),
+            ("/internal/staging/commercial-trial-binding", "GET", 404),
+            ("/internal/staging/other-binding", "POST", 404),
+            ("/runtime/profile", "GET", 503),
+            ("/runtime/profile", "POST", 404),
+        ):
+            request = Request(
+                f"http://{host}:{port}{path}", method=method,
+                data=b"" if method == "POST" else None,
+            )
+            with pytest.raises(HTTPError) as error:
+                urlopen(request, timeout=2)  # noqa: S310
+            assert error.value.code == status
+    finally:
+        portal.shutdown()
+        portal.server_close()
+        thread.join(timeout=2)
+
+
 def test_portal_api_proxy_rejects_credentialed_upstream(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

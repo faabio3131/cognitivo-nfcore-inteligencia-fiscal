@@ -27,6 +27,11 @@ _PORTAL_CSP = "; ".join(
 )
 
 _API_PREFIX = "/v1/"
+# Narrow, audited operator paths exposed without a general /internal/ proxy.
+_SPECIAL_PROXY_PATHS = {
+    "/runtime/profile": frozenset({"GET", "HEAD"}),
+    "/internal/staging/commercial-trial-binding": frozenset({"POST"}),
+}
 _MAX_PROXY_REQUEST_BYTES = 1024 * 1024
 _MAX_PROXY_RESPONSE_BYTES = 2 * 1024 * 1024
 _PROXY_TIMEOUT_SECONDS = 15
@@ -95,7 +100,10 @@ class SecurePortalHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def _is_api_request(self) -> bool:
-        return urlsplit(self.path).path.startswith(_API_PREFIX)
+        path = urlsplit(self.path).path
+        return path.startswith(_API_PREFIX) or self.command in _SPECIAL_PROXY_PATHS.get(
+            path, frozenset()
+        )
 
     def _json_error(self, status: int, message: str) -> None:
         body = json.dumps({"detail": message}, separators=(",", ":")).encode("utf-8")
@@ -138,7 +146,7 @@ class SecurePortalHandler(SimpleHTTPRequestHandler):
             return
 
         parsed_request = urlsplit(self.path)
-        if not parsed_request.path.startswith(_API_PREFIX):
+        if not self._is_api_request():
             self._json_error(404, "not found")
             return
 

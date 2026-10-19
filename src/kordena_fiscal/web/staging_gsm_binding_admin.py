@@ -13,6 +13,8 @@ from kordena_fiscal.security.human_identity import HumanIdentityService
 from kordena_fiscal.security.secret_binding import SecretBinding
 from kordena_fiscal.security.secrets import SecretResolutionError
 from kordena_fiscal.web.human_auth import CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE
+from kordena_fiscal.web.portal_api import _csrf
+from kordena_fiscal.web.pricing_admin import _platform_actor
 
 _PILOT_TENANT = "nfcore-staging-e2e"
 _PILOT_UNIT = "pilot-gsm-staging"
@@ -122,5 +124,47 @@ def create_staging_gsm_binding_router(
         except SecretResolutionError:
             raise HTTPException(status_code=409, detail="GSM_BINDING_DENIED") from None
         return {"status": "bound", "reference_id": _PILOT_REFERENCE}
+
+    @router.post("/internal/staging/commercial-trial-binding", include_in_schema=False)
+    async def register_commercial_trial_binding(request: Request) -> dict[str, str]:
+        """One exact platform-only metadata grant; no arbitrary input or secret bytes.
+
+        This does not enable a public trial. It only registers the vetted
+        external secret reference under the existing human admin authority.
+        """
+        authority, _principal = _platform_actor(request, identity)
+        _csrf(request, identity, authority)
+        if await request.body():
+            raise HTTPException(status_code=400, detail="BODY_NOT_ALLOWED")
+        try:
+            binding = SecretBinding(
+                reference_id="sec_nfcore_commercial_trial_staging_01",
+                tenant_id="nfcore-platform",
+                unit_id=None,
+                purpose="commercial-trial-ingress",
+                runtime_environment="staging",
+                fiscal_environment=None,
+                provider_id="google-secret-manager",
+                workload_id="nfcore-api",
+                kind="signature",
+                canonical_version=1,
+                resource="projects/fm-nfcore-staging/secrets/nfcore-commercial-trial-stg",
+                cloud_version="1",
+                not_after=datetime.fromisoformat("2026-11-17T00:00:00+00:00"),
+            )
+            if binding.not_after is None or binding.not_after <= datetime.now(UTC):
+                raise SecretResolutionError("commercial secret binding expired")
+            previous = administration.current_binding(binding.reference_id)
+            if previous is not None and previous != binding:
+                raise SecretResolutionError("commercial binding cannot be replaced")
+            administration.put(
+                actor=authority,
+                binding=binding,
+                expected_revision=0,
+                correlation_id=uuid4().hex,
+            )
+        except SecretResolutionError:
+            raise HTTPException(status_code=409, detail="COMMERCIAL_BINDING_DENIED") from None
+        return {"status": "bound", "reference_id": binding.reference_id}
 
     return router
