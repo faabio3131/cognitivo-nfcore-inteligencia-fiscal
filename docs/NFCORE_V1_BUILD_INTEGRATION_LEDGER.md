@@ -21,11 +21,11 @@ Cada `Evidência` abaixo é levantamento de baseline, **não certificação do b
 ## Blocos (ordem de execução)
 
 ### NFV1-BLD-00 — Inventário integral de paridade
-- **Estado:** PENDING
+- **Estado:** IN_PROGRESS
 - **Depende de:** docs/NFCORE_V1_BUILD_INTEGRATION_EXECUTION_2026-10-18.md §4 BLD-00
 - **CURRENT:** main 44cddbabb4e91b55dcc730e6976fcc2ce7f00d75 CI #1054/Gov #475 SUCCESS; checkpoint NFV1_WEB_PARITY_AND_FUNCTIONAL_INTEGRATION_2026-10-18.md histórico. Falta auditoria **completa de todas as ações** no CURRENT e matriz de gaps.
 - **Target e aceite:** seção `NFV1-BLD-00` do anexo de execução.
-- **Evidência final:** PENDENTE (registrar PR + HEAD + merge SHA + CI/Gov PR e main + prova funcional apropriada).
+- **Evidência final:** PENDENTE; candidata de auditoria em docs/checkpoints/NFV1_BLD00_CURRENT_FUNCTIONAL_PARITY_2026-10-19.md; primeiro verificar CI/Governança da PR da auditoria, depois registrar merge SHA e CI/Gov pós-merge, sem promover DONE antecipadamente.
 - **Pendência / decisão humana:** se surgir, registrar o bloqueio exato com decisão necessária, sem gerar novo serviço, preço ou credencial.
 
 ### NFV1-BLD-01 — Identidade, onboarding e Portal operacional
