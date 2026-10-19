@@ -24,7 +24,9 @@ def inputs() -> tuple[str, str]:
 def test_initial_build_ledger_is_valid_without_claiming_completion() -> None:
     plan, ledger = inputs()
     assert not assess(plan, ledger)
-    assert ledger.count("- **Estado:** PENDING") == 9
+    # BLD-00 may be IN_PROGRESS during audit; eight successor blocks remain PENDING.
+    assert ledger.count("- **Estado:** PENDING") == 8
+    assert ledger.count("- **Estado:** IN_PROGRESS") == 1
     assert "CONSTRUCTION_AND_WEB_INTEGRATION_COMPLETE" in plan
 
 
