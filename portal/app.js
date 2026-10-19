@@ -1228,7 +1228,7 @@ function appendUserAdministration(article, rows) {
         headers: {"X-CSRF-Token": csrfToken(), "Idempotency-Key": attempt.key},
         body: JSON.stringify(payload),
       });
-      statusLine.textContent = result.created
+      const confirmation = result.created
         ? "Usuário criado. A senha deve ser definida pelo fluxo existente de recuperação."
         : result.replay
           ? "Estado já aplicado; nenhuma duplicação foi criada."
@@ -1236,6 +1236,9 @@ function appendUserAdministration(article, rows) {
       attempt = null;
       await bootstrap();
       await renderSurface("users");
+      // Re-render replaces the form; keep the acknowledged result visible.
+      const visibleStatus = workspace.querySelector("#user-administration-form [role='status']");
+      if (visibleStatus) visibleStatus.textContent = confirmation;
     } catch (error) {
       statusLine.textContent = error instanceof Error ? error.message : "Administração de usuário rejeitada";
       submit.disabled = false;
