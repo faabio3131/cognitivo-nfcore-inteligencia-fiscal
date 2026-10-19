@@ -47,6 +47,28 @@ Nenhuma etapa é concluída por declaração sem evidência.
 
 ## NFCore Commercial Launch — execução governada por plano mestre
 
+### REGIME ATUAL APROVADO — BUILD-ONLY, CONSTRUIR + INTEGRAR PRIMEIRO (18/10/2026)
+
+**Autorização explícita do proprietário:** concluir a construção e integração NFCore V1 **sem ficar repetindo P05, P02, backup/restore ou homologações já comprovadas**. Esta seção **prevalece sobre bloqueios de ordem históricos apenas para a trilha interna BUILD-ONLY**; o cronograma de 59 tarefas, seus checkboxes e os gates externos/produção **continuam válidos e não são modificados**.
+
+**Ler antes de executar:** 
+1. este `AGENTS.md`;
+2. `docs/NFCORE_V1_BUILD_INTEGRATION_EXECUTION_2026-10-18.md` (anexo executivo, não segundo plano mestre);
+3. `docs/NFCORE_V1_BUILD_INTEGRATION_LEDGER.md` (fila de construção);
+4. cronograma mestre e ledger de 59 tarefas para escopo/gates posteriores;
+5. GitHub CURRENT/PR/CI + diffs, runtime e checkpoints de evidência.
+
+**Protocolo executável:** executar o primeiro `NFV1-BLD-xx` aberto e seus deltas reais; auditar todos os módulos **código→API→Web→DB/Worker** antes de programar, confrontar PRs abertas e merges, reconhecer o que está `ALREADY_INTEGRATED`. Se bloqueio externo/humano impedir ativação em staging, registrar bloqueio e continuar **somente** trabalho interno independente sem promover o bloco bloqueado ou pular conclusão. Não reiniciar fases certificadas.
+
+**Autonomia de PR e merge — AUTORIZADA pelo proprietário para esta trilha:** criar branch/PR por alteração pequena, implementar, corrigir até todos os gates exigidos ficarem **SUCCESS no HEAD exato**, governança e CI verdes, diff conferido e risco classificado; colocar Ready e fazer **merge sem solicitar nova autorização**. Se check falhar, corrigir a **causa** e executar novamente; não retirar, desativar ou contornar testes/branch protection; só avançar quando pós-merge CI/Gov também estiver verde. A autorização não é carta branca para merge de PR legada ou de outras trilhas. Não confundir teste local verde com CI remota verde.
+
+**Continuam exigindo decisão/autorização humana específica:** preço/plano/duração do trial, provider oficial, nova política sensível de segurança, uso ou criação de credencial/segredo real, conta ou gasto, migrations/alterações destrutivas em ambiente persistente, deploy e infraestrutura, DNS/domínio, mudança de visibilidade, pagamento real, emissão fiscal oficial, produção e irreversíveis. Não fazer deploy por consequência do merge.
+
+**Limite desta fase:** não fazer homologação externa, certificação comercial/produção, P09-T04 backups recorrentes/RPO/RTO, P05-T05 rehearsal real de rollback, nem migrar ambiente definitivo por mera busca de checkbox. O backup+restore isolado histórico já tem prova. Usar somente testes dirigidos e CI que protegem o código enquanto ele é integrado; ensaios externos completos ficam após construção demonstrável. Nenhum dado de cliente real foi recebido nesta fase.
+
+**Validação automatizada adicional:** `python3 scripts/check_nfcore_build_workstream.py` valida sequência/evidências estruturais BUILD; `python3 scripts/check_nfcore_plan.py` continua protegendo os 59 IDs originais. Nenhum deles prova por si só disponibilidade Web. Fechar PRs com SHA/CI/resultado, atualizar o ledger BUILD e apontar próximo trabalho.
+
+
 Esta seção rege o trabalho do **FM NFCORE V1 — Commercial Launch** e complementa as regras históricas acima.
 
 ### Arquivos obrigatórios
