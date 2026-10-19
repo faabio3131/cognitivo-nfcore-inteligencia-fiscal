@@ -51,6 +51,9 @@ Portanto:
 
 Não criar um segundo plano mestre concorrente.
 
+**Exceção explícita aprovada pelo proprietário em 18/10/2026:** existe **um anexo de execução de construção e integração** `docs/NFCORE_V1_BUILD_INTEGRATION_EXECUTION_2026-10-18.md`, subordinado ao cronograma de 59 tarefas, com `docs/NFCORE_V1_BUILD_INTEGRATION_LEDGER.md` e validador próprio. Seu propósito é executar deltas de funcionalidade/integração interna **enquanto homologações externas e operação de produção permanecem deliberadamente diferidas**. Não modifica checkboxes, IDs, gates ou autorizações sensíveis do plano mestre. A aprovação permanente de **merge de PR BUILD-ONLY 100% verde** está restrita à seção vigente de `AGENTS.md`; merges externos e qualquer deploy continuam sob controles próprios.
+
+
 ## 4. Regra de execução
 
 1. Antes de qualquer trabalho, reconfirmar main, HEAD, PRs, CI e ambiente afetado.
