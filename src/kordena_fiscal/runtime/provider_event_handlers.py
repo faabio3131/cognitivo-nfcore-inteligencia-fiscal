@@ -34,7 +34,9 @@ def build_provider_cancel_handler(client: FiscalOperationsClient) -> FiscalOpera
         protocol = payload.get("authorization_protocol")
         reason = payload.get("justification")
         if not all(isinstance(item, str) for item in (raw_key, protocol, reason)):
-            raise FiscalValidationError("cancellation requires access_key, authorization_protocol and justification")
+            raise FiscalValidationError(
+                "cancellation requires access_key, authorization_protocol and justification"
+            )
         request = CancellationRequest.build(
             scope=scope,
             access_key=NfeAccessKey(raw_key),
@@ -69,8 +71,10 @@ def build_provider_inutilization_handler(client: FiscalOperationsClient) -> Fisc
         first = payload.get("first_number")
         last = payload.get("last_number")
         reason = payload.get("justification")
-        if any(type(item) is not int for item in (model, series, first, last)) or not isinstance(reason, str):
-            raise FiscalValidationError("inutilization requires integer model/series/range and justification")
+        if any(type(item) is not int for item in (model, series, first, last)) or not isinstance(\n            reason, str\n        ):
+            raise FiscalValidationError(
+                "inutilization requires integer model/series/range and justification"
+            )
         request = InutilizationRequest.build(
             scope=scope,
             model=ElectronicInvoiceModel(model),
