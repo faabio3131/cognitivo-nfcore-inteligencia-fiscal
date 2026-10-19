@@ -2,8 +2,13 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
+from runpy import run_path
 
-from scripts.check_nfcore_build_workstream import ROOT, assess
+# CI installs only src/, not scripts/ as an importable package.
+module = run_path(str(Path(__file__).resolve().parents[2] / "scripts/check_nfcore_build_workstream.py"))
+ROOT = module["ROOT"]
+assess = module["assess"]
 
 
 def inputs() -> tuple[str, str]:
