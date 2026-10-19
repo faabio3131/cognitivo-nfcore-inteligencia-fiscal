@@ -32,7 +32,7 @@ GET público real de `/runtime/profile` e `/v1/commercial/offer`, em 19/10:
 
 Legenda: **WIRED_CODE** = ligação codificada, não prova de jornada autenticada atual; **READ_ONLY** = projeção consultiva deliberada; **BLOCKED_RUNTIME** = UI/serviço implementados, dependência não disponível; **DEFERRED_EXTERNAL** = emissão, provider/pagamento/homologação reais; **GAP_CODE** = funcionalidade V1 necessária sem ingresso Web seguro implementado.
 
-Autoridade de acesso: `web/portal_api.py` mapeia 22 superfícies em `_SURFACE_PERMISSIONS` e 15 comandos `_OPERATION_PERMISSIONS`; a UI contém 26 entradas agrupadas (6 Operação, 8 Configuração e 12 Plataforma). As quatro superfícies especiais — `pricing-admin`, `commercial-release`, `checkout-admin`, `webhook-egress` — usam routers próprios. `_authenticated`, `_authorized`, `_csrf`, `_reject_browser_authority` e exigência de idempotência pertencem **ao servidor**, nunca à UI. A navegação consulta `/v1/portal/bootstrap` e `/v1/portal/surfaces/{surface_id}`.
+Autoridade de acesso: `web/portal_api.py` mapeia 22 superfícies em `_SURFACE_PERMISSIONS` e 14 comandos `_OPERATION_PERMISSIONS`; a UI contém 26 entradas agrupadas (6 Operação, 8 Configuração e 12 Plataforma). As quatro superfícies especiais — `pricing-admin`, `commercial-release`, `checkout-admin`, `webhook-egress` — usam routers próprios. `_authenticated`, `_authorized`, `_csrf`, `_reject_browser_authority` e exigência de idempotência pertencem **ao servidor**, nunca à UI. A navegação consulta `/v1/portal/bootstrap` e `/v1/portal/surfaces/{surface_id}`.
 
 | # | Superfície/ação V1 | Caminho / autoridade única | Estado BUILD no CURRENT |
 |---|---|---|---|
