@@ -158,3 +158,9 @@ test("password visibility and creation guidance use the canonical policy", () =>
   assert.ok(script.includes('input.type = show ? "text" : "password"'));
   assert.ok(script.includes('button.setAttribute("aria-pressed", String(show))'));
 });
+
+test("user administration keeps success acknowledgement after refreshed workspace", () => {
+  assert.match(script, /await renderSurface\("users"\);\s*\/\/ Re-render replaces the form/);
+  assert.match(script, /workspace\.querySelector\("#user-administration-form \[role='status'\]"\)/);
+  assert.match(script, /visibleStatus\.textContent = confirmation/);
+});
