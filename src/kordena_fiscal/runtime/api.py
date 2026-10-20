@@ -67,6 +67,7 @@ from .observability import (
     TraceContext,
 )
 from .otel_trace_sink import build_trace_sink
+from .public_trial_abuse import PostgresPublicTrialAbuseGate
 from .secret_manager import SecretBindingAdministration
 from .security import configure_edge_security
 from .staging_commercial_ingress import staging_commercial_ingress
@@ -671,6 +672,18 @@ def create_runtime_app(
     # Public intake is strictly opt-in and requires externally governed rate
     # limiting, explicit origins, durable commercial state and activation delivery.
     # It is not a fallback for the signed server-to-server commercial route.
+    configured_origins = os.getenv("NFCORE_PUBLIC_TRIAL_ALLOWED_ORIGINS", "").strip()
+    if configured_origins and public_trial_allowed_origins:
+        raise RuntimeConfigurationError("duplicate public trial origin configuration")
+    if configured_origins:
+        public_trial_allowed_origins = tuple(
+            value.strip() for value in configured_origins.split(",")
+        )
+    if public_trial_allowed_origins and public_trial_rate_limiter is None:
+        if runtime.database is not None:
+            public_trial_rate_limiter = PostgresPublicTrialAbuseGate(
+                runtime.database.connection
+            )
     if public_trial_allowed_origins or public_trial_rate_limiter is not None:
         if (
             composition is None
