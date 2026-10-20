@@ -661,6 +661,7 @@ def test_migration_v4_is_idempotent_and_preserves_certified_history(tmp_path) ->
         (13, "p02_t02_scoped_fiscal_projections"),
         (14, "customer_configuration_commands_and_egress"),
         (17, "external_secret_bindings"),
+        (18, "public_trial_rate_windows"),
     ]
     assert {
         "fm_control_plane_organizations",
