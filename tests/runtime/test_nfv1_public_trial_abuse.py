@@ -3,7 +3,7 @@
 from contextlib import contextmanager
 from datetime import UTC, datetime
 
-from kordena_fiscal.runtime.public_trial_abuse import PostgresPublicTrialAbuseGate, SCHEMA
+from kordena_fiscal.runtime.public_trial_abuse import SCHEMA, PostgresPublicTrialAbuseGate
 
 
 class Cursor:
