@@ -7,7 +7,7 @@
 - API: `/v1/public/trial-plans` (leitura estrita do catálogo FM publicado) e `/v1/public/trials` (chama `GovernedTrialService.begin`).
 - Trial, customer, identidade, owner, subscription, tenant e plano continuam sob o mesmo núcleo transacional. O formulário não fornece nem escolhe identidades de tenant.
 - Ingresso S2S pré-existente `/v1/commercial/trials` permanece autenticado por HMAC, **independente** do ingresso browser.
-- O cadastro público é habilitado somente quando o operador configura `NFCORE_PUBLIC_TRIAL_ALLOWED_ORIGINS` com as origens HTTPS exatas, separadas por vírgulas (por exemplo `https://fmtecnologiaia.com.br`), e a entrega de ativação está operacional. A variável não deve ser ativada antes da revisão do runtime e do schema.
+- O cadastro público é habilitado somente quando o operador configura `NFCORE_PUBLIC_TRIAL_ALLOWED_ORIGINS` com as origens HTTPS exatas, separadas por vírgulas (por exemplo `https://fmtecnologiaia.com.br`), e a entrega de ativação está operacional. A mesma origem deve constar de `NFCORE_ALLOWED_ORIGINS` (política CORS canônica) — caso contrário o runtime recusa a ativação em staging/produção. A variável não deve ser ativada antes da revisão do runtime e do schema.
 - URL de API comprovadamente alocada no Railway staging: `https://nfcore-api-production.up.railway.app`. Não significa que a rota de trial já esteja publicada.
 
 ## Persistência antiabuso necessária (SQL preparado — NÃO APLICADO)
