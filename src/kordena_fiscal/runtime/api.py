@@ -41,8 +41,8 @@ from kordena_fiscal.web.commercial_acquisition import (
     create_commercial_acquisition_router,
 )
 from kordena_fiscal.web.commercial_trial import create_commercial_trial_router
-from kordena_fiscal.web.public_trial import create_public_trial_router
 from kordena_fiscal.web.human_recovery import PasswordResetDelivery
+from kordena_fiscal.web.public_trial import create_public_trial_router
 from kordena_fiscal.web.staging_gsm_binding_admin import create_staging_gsm_binding_router
 from kordena_fiscal.web.staging_webhook_approval import create_staging_webhook_egress_router
 from kordena_fiscal.web.staging_webhook_probe import create_staging_webhook_probe_router
