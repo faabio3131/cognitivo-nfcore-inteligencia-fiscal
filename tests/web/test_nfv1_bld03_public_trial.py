@@ -76,3 +76,25 @@ def test_public_trial_requires_explicit_https_origin() -> None:
             rate_limiter=FixedWindowRateLimiter(max_requests=1, window_seconds=60),
             delivery=Delivery(),  # type: ignore[arg-type]
         )
+
+
+def test_public_trial_cors_preflight_requires_origin_and_restricted_headers() -> None:
+    service = Trial()
+    c = client(service)
+    good = {
+        "Origin": "https://fmtecnologia.com.br",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type,idempotency-key",
+    }
+    response = c.options("/v1/public/trials", headers=good)
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == good["Origin"]
+    denied = c.options(
+        "/v1/public/trials",
+        headers={**good, "Access-Control-Request-Headers": "authorization"},
+    )
+    assert denied.status_code == 403
+    assert c.options("/v1/public/trials", headers={
+        **good, "Origin": "https://attacker.example"
+    }).status_code == 403
+    assert service.calls == []
