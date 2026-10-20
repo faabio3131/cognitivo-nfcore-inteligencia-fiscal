@@ -12,14 +12,9 @@ from contextlib import AbstractContextManager
 from datetime import datetime
 from typing import Protocol
 
-SCHEMA = """
-CREATE TABLE fm_public_trial_rate_windows (
-    scope_key TEXT NOT NULL,
-    window_start BIGINT NOT NULL,
-    hits INTEGER NOT NULL CHECK (hits >= 1),
-    PRIMARY KEY (scope_key, window_start)
-)
-"""
+from kordena_fiscal.persistence.public_trial_rate_schema import PUBLIC_TRIAL_RATE_SCHEMA
+
+SCHEMA = PUBLIC_TRIAL_RATE_SCHEMA[0]
 
 
 class RowReader(Protocol):
