@@ -42,6 +42,7 @@ from kordena_fiscal.web.commercial_acquisition import (
 )
 from kordena_fiscal.web.commercial_trial import create_commercial_trial_router
 from kordena_fiscal.web.human_recovery import PasswordResetDelivery
+from kordena_fiscal.web.public_trial import PublicTrialAbuseGate, create_public_trial_router
 from kordena_fiscal.web.staging_gsm_binding_admin import create_staging_gsm_binding_router
 from kordena_fiscal.web.staging_webhook_approval import create_staging_webhook_egress_router
 from kordena_fiscal.web.staging_webhook_probe import create_staging_webhook_probe_router
@@ -66,6 +67,7 @@ from .observability import (
     TraceContext,
 )
 from .otel_trace_sink import build_trace_sink
+from .public_trial_abuse import PostgresPublicTrialAbuseGate
 from .secret_manager import SecretBindingAdministration
 from .security import configure_edge_security
 from .staging_commercial_ingress import staging_commercial_ingress
@@ -177,6 +179,8 @@ def create_runtime_app(
     commercial_trial_security: WebhookSecurity | None = None,
     staging_probe_security: WebhookSecurity | None = None,
     commercial_trial_rate_limiter: FixedWindowRateLimiter | None = None,
+    public_trial_allowed_origins: tuple[str, ...] = (),
+    public_trial_rate_limiter: PublicTrialAbuseGate | None = None,
     password_reset_delivery: PasswordResetDelivery | None = None,
     production_authority: ProductionExecutionAuthority | None = None,
     workload_credentials: tuple[WorkloadCredentialRecord, ...] = (),
@@ -661,6 +665,51 @@ def create_runtime_app(
                         window_seconds=3600,
                     )
                 ),
+                delivery=password_reset_delivery,
+            )
+        )
+
+    # Public intake is strictly opt-in and requires externally governed rate
+    # limiting, explicit origins, durable commercial state and activation delivery.
+    # It is not a fallback for the signed server-to-server commercial route.
+    configured_origins = os.getenv("NFCORE_PUBLIC_TRIAL_ALLOWED_ORIGINS", "").strip()
+    if configured_origins and public_trial_allowed_origins:
+        raise RuntimeConfigurationError("duplicate public trial origin configuration")
+    if configured_origins:
+        public_trial_allowed_origins = tuple(
+            value.strip() for value in configured_origins.split(",")
+        )
+    if public_trial_allowed_origins and public_trial_rate_limiter is None:
+        if runtime.database is not None:
+            public_trial_rate_limiter = PostgresPublicTrialAbuseGate(
+                runtime.database.connection
+            )
+    if public_trial_allowed_origins or public_trial_rate_limiter is not None:
+        if (
+            composition is None
+            or password_reset_delivery is None
+            or public_trial_rate_limiter is None
+            or not public_trial_allowed_origins
+        ):
+            raise RuntimeConfigurationError("public trial prerequisites are incomplete")
+        if resolved.is_production_like and not set(public_trial_allowed_origins).issubset(
+            resolved.allowed_origins
+        ):
+            raise RuntimeConfigurationError(
+                "public trial origins must be allowed by canonical edge CORS policy"
+            )
+        if resolved.is_production_like and isinstance(
+            public_trial_rate_limiter, FixedWindowRateLimiter
+        ):
+            raise RuntimeConfigurationError(
+                "public trial requires an externally shared anti-abuse gate"
+            )
+        app.include_router(
+            create_public_trial_router(
+                composition.commercial_trial,
+                pricing=composition.pricing_administration,
+                allowed_origins=public_trial_allowed_origins,
+                rate_limiter=public_trial_rate_limiter,
                 delivery=password_reset_delivery,
             )
         )
