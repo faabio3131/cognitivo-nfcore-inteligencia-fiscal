@@ -17,6 +17,11 @@ from .customer_configuration_schema import (
     CUSTOMER_CONFIGURATION_VERSION,
 )
 from .fiscal_scope_schema import FISCAL_SCOPE_NAME, FISCAL_SCOPE_SCHEMA, FISCAL_SCOPE_VERSION
+from .public_trial_rate_schema import (
+    PUBLIC_TRIAL_RATE_NAME,
+    PUBLIC_TRIAL_RATE_SCHEMA,
+    PUBLIC_TRIAL_RATE_VERSION,
+)
 from .ports import PersistenceStateError
 from .secret_binding_schema import (
     SECRET_BINDING_NAME,
@@ -758,6 +763,19 @@ class SqliteFiscalDatabase:
                      datetime.now().astimezone().isoformat()),
                 )
                 new_versions.append(SECRET_BINDING_VERSION)
+            if PUBLIC_TRIAL_RATE_VERSION not in applied:
+                for statement in PUBLIC_TRIAL_RATE_SCHEMA:
+                    connection.execute(statement)
+                connection.execute(
+                    "INSERT INTO fm_schema_migrations (version, name, applied_at) "
+                    "VALUES (?, ?, ?)",
+                    (
+                        PUBLIC_TRIAL_RATE_VERSION,
+                        PUBLIC_TRIAL_RATE_NAME,
+                        datetime.now().astimezone().isoformat(),
+                    ),
+                )
+                new_versions.append(PUBLIC_TRIAL_RATE_VERSION)
             connection.commit()
             return tuple(new_versions)
         except Exception:
