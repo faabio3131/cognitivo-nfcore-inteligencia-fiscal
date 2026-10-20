@@ -679,7 +679,9 @@ def create_runtime_app(
             or not public_trial_allowed_origins
         ):
             raise RuntimeConfigurationError("public trial prerequisites are incomplete")
-        if resolved.is_production_like and isinstance(public_trial_rate_limiter, FixedWindowRateLimiter):
+        if resolved.is_production_like and isinstance(
+            public_trial_rate_limiter, FixedWindowRateLimiter
+        ):
             raise RuntimeConfigurationError(
                 "public trial requires an externally shared anti-abuse gate"
             )
