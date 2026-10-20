@@ -17,12 +17,12 @@ from .customer_configuration_schema import (
     CUSTOMER_CONFIGURATION_VERSION,
 )
 from .fiscal_scope_schema import FISCAL_SCOPE_NAME, FISCAL_SCOPE_SCHEMA, FISCAL_SCOPE_VERSION
+from .ports import PersistenceStateError
 from .public_trial_rate_schema import (
     PUBLIC_TRIAL_RATE_NAME,
     PUBLIC_TRIAL_RATE_SCHEMA,
     PUBLIC_TRIAL_RATE_VERSION,
 )
-from .ports import PersistenceStateError
 from .secret_binding_schema import (
     SECRET_BINDING_NAME,
     SECRET_BINDING_SCHEMA,
