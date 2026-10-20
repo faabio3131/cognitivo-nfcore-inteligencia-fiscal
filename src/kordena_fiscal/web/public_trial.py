@@ -48,31 +48,66 @@ def create_public_trial_router(
         origin = request.headers.get("origin", "")
         headers = {"Cache-Control": "no-store, max-age=0"}
         if origin not in allowed_origins:
-            return JSONResponse(status_code=403, content={"detail": "origin denied"}, headers=headers)
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "origin denied"},
+                headers=headers,
+            )
         headers["Access-Control-Allow-Origin"] = origin
         headers["Vary"] = "Origin"
-        if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
-            return JSONResponse(status_code=415, content={"detail": "JSON required"}, headers=headers)
+        if (
+            request.headers.get("content-type", "").split(";")[0].strip().lower()
+            != "application/json"
+        ):
+            return JSONResponse(
+                status_code=415,
+                content={"detail": "JSON required"},
+                headers=headers,
+            )
         if request.headers.get("cookie") or request.headers.get("authorization"):
-            return JSONResponse(status_code=403, content={"detail": "anonymous request required"}, headers=headers)
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "anonymous request required"},
+                headers=headers,
+            )
         identity = request.client.host if request.client is not None else "unknown"
         if not rate_limiter.allow(f"public-trial:{identity}", datetime.now(UTC)):
-            return JSONResponse(status_code=429, content={"detail": "rate limited"}, headers=headers)
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "rate limited"},
+                headers=headers,
+            )
         key = request.headers.get("Idempotency-Key", "").strip()
         if not (8 <= len(key) <= 128 and key.isascii() and key.isprintable()):
-            return JSONResponse(status_code=400, content={"detail": "invalid idempotency key"}, headers=headers)
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "invalid idempotency key"},
+                headers=headers,
+            )
         body = await request.body()
         if len(body) > 4096:
-            return JSONResponse(status_code=413, content={"detail": "payload too large"}, headers=headers)
+            return JSONResponse(
+                status_code=413,
+                content={"detail": "payload too large"},
+                headers=headers,
+            )
         try:
             payload = json.loads(body)
         except (ValueError, UnicodeDecodeError):
-            return JSONResponse(status_code=400, content={"detail": "invalid JSON"}, headers=headers)
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "invalid JSON"},
+                headers=headers,
+            )
         fields = {"plan_id", "price_id", "buyer_email", "legal_name"}
         if not isinstance(payload, dict) or set(payload) != fields or not all(
             isinstance(payload[field], str) for field in fields
         ):
-            return JSONResponse(status_code=400, content={"detail": "invalid trial fields"}, headers=headers)
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "invalid trial fields"},
+                headers=headers,
+            )
         now = datetime.now(UTC)
         try:
             started = service.begin(
@@ -84,9 +119,17 @@ def create_public_trial_router(
                 now=now,
             )
         except CommercialFulfillmentError:
-            return JSONResponse(status_code=409, content={"detail": "trial unavailable"}, headers=headers)
+            return JSONResponse(
+                status_code=409,
+                content={"detail": "trial unavailable"},
+                headers=headers,
+            )
         except Exception:
-            return JSONResponse(status_code=503, content={"detail": "trial temporarily unavailable"}, headers=headers)
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "trial temporarily unavailable"},
+                headers=headers,
+            )
         if started.activation_reset is not None:
             try:
                 delivery.deliver(
@@ -94,7 +137,11 @@ def create_public_trial_router(
                     reset=started.activation_reset,
                 )
             except Exception:
-                return JSONResponse(status_code=503, content={"detail": "activation delivery unavailable"}, headers=headers)
+                return JSONResponse(
+                    status_code=503,
+                    content={"detail": "activation delivery unavailable"},
+                    headers=headers,
+                )
         return JSONResponse(
             status_code=200 if started.replay else 201,
             content={
