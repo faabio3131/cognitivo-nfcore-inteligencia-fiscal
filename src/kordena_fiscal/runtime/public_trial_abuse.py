@@ -12,7 +12,6 @@ from contextlib import AbstractContextManager
 from datetime import datetime
 from typing import Protocol
 
-
 SCHEMA = """
 CREATE TABLE fm_public_trial_rate_windows (
     scope_key TEXT NOT NULL,
