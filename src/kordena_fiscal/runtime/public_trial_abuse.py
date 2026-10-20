@@ -8,6 +8,7 @@ or database errors deny admission; no implicit in-memory downgrade.
 from __future__ import annotations
 
 import hashlib
+from contextlib import AbstractContextManager
 from datetime import datetime
 from typing import Protocol
 
@@ -22,12 +23,18 @@ CREATE TABLE fm_public_trial_rate_windows (
 """
 
 
+class RowReader(Protocol):
+    def fetchone(self) -> tuple[object, ...] | None: ...
+
+
 class SqlConnection(Protocol):
-    def execute(self, statement: str, parameters: tuple[object, ...] = ()) -> object: ...
+    def execute(
+        self, statement: str, parameters: tuple[object, ...] = ()
+    ) -> RowReader: ...
 
 
 class ConnectionFactory(Protocol):
-    def __call__(self) -> object: ...
+    def __call__(self) -> AbstractContextManager[SqlConnection]: ...
 
 
 class PostgresPublicTrialAbuseGate:
@@ -67,7 +74,7 @@ class PostgresPublicTrialAbuseGate:
             RETURNING hits
         """
         try:
-            with self._connection_factory() as connection:  # type: ignore[attr-defined]
+            with self._connection_factory() as connection:
                 row = connection.execute(
                     statement,
                     (scope, window, self._max_requests),
