@@ -701,6 +701,7 @@ def create_runtime_app(
         app.include_router(
             create_public_trial_router(
                 composition.commercial_trial,
+                pricing=composition.pricing_administration,
                 allowed_origins=public_trial_allowed_origins,
                 rate_limiter=public_trial_rate_limiter,
                 delivery=password_reset_delivery,
