@@ -4,6 +4,8 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
+from types import SimpleNamespace
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -33,6 +35,7 @@ def client(service: Trial) -> TestClient:
     app = FastAPI()
     app.include_router(create_public_trial_router(
         service,  # type: ignore[arg-type]
+        pricing=SimpleNamespace(current=None),  # type: ignore[arg-type]
         allowed_origins=("https://fmtecnologia.com.br",),
         rate_limiter=FixedWindowRateLimiter(max_requests=3, window_seconds=3600),
         delivery=Delivery(),  # type: ignore[arg-type]
@@ -72,6 +75,7 @@ def test_public_trial_requires_explicit_https_origin() -> None:
     with pytest.raises(ValueError):
         create_public_trial_router(
             Trial(),  # type: ignore[arg-type]
+            pricing=SimpleNamespace(current=None),  # type: ignore[arg-type]
             allowed_origins=("http://fmtecnologia.com.br",),
             rate_limiter=FixedWindowRateLimiter(max_requests=1, window_seconds=60),
             delivery=Delivery(),  # type: ignore[arg-type]
@@ -97,4 +101,15 @@ def test_public_trial_cors_preflight_requires_origin_and_restricted_headers() ->
     assert c.options("/v1/public/trials", headers={
         **good, "Origin": "https://attacker.example"
     }).status_code == 403
+    assert service.calls == []
+
+
+def test_unpublished_pricing_does_not_invent_trial_offers() -> None:
+    service = Trial()
+    response = client(service).get(
+        "/v1/public/trial-plans",
+        headers={"Origin": "https://fmtecnologia.com.br"},
+    )
+    assert response.status_code == 503
+    assert "plans" not in response.json()
     assert service.calls == []
