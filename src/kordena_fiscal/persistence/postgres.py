@@ -65,12 +65,12 @@ from .customer_configuration_schema import (
 )
 from .fiscal_scope_schema import FISCAL_SCOPE_NAME, FISCAL_SCOPE_SCHEMA, FISCAL_SCOPE_VERSION
 from .ports import PersistenceStateError
+from .pricing_catalog import PostgresPricingCatalogRepository
 from .public_trial_rate_schema import (
     PUBLIC_TRIAL_RATE_NAME,
     PUBLIC_TRIAL_RATE_SCHEMA,
     PUBLIC_TRIAL_RATE_VERSION,
 )
-from .pricing_catalog import PostgresPricingCatalogRepository
 from .secret_binding_schema import (
     SECRET_BINDING_NAME,
     SECRET_BINDING_SCHEMA,
