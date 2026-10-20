@@ -692,6 +692,12 @@ def create_runtime_app(
             or not public_trial_allowed_origins
         ):
             raise RuntimeConfigurationError("public trial prerequisites are incomplete")
+        if resolved.is_production_like and not set(public_trial_allowed_origins).issubset(
+            resolved.allowed_origins
+        ):
+            raise RuntimeConfigurationError(
+                "public trial origins must be allowed by canonical edge CORS policy"
+            )
         if resolved.is_production_like and isinstance(
             public_trial_rate_limiter, FixedWindowRateLimiter
         ):
