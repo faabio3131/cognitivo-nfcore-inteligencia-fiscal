@@ -7,6 +7,8 @@ from kordena_fiscal.persistence import SqliteFiscalDatabase
 
 def _remove_v5(connection: sqlite3.Connection) -> None:
     # Reconstruct the earlier schema, not just its migration ledger.
+    connection.execute("DROP TABLE fm_public_trial_rate_windows")
+    connection.execute("DELETE FROM fm_schema_migrations WHERE version = 18")
     connection.execute("DROP TABLE fm_secret_bindings")
     connection.execute("DELETE FROM fm_schema_migrations WHERE version = 17")
     connection.execute("DROP TABLE fm_configuration_commands")
