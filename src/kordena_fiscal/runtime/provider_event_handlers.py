@@ -84,10 +84,10 @@ def build_provider_inutilization_handler(client: FiscalOperationsClient) -> Fisc
             )
         request = InutilizationRequest.build(
             scope=scope,
-            model=ElectronicInvoiceModel(int(model)),
-            series=int(series),
-            first_number=int(first),
-            last_number=int(last),
+            model=ElectronicInvoiceModel(model),
+            series=series,
+            first_number=first,
+            last_number=last,
             justification=reason,
         )
         result = client.inutilize(request)
