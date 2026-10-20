@@ -71,7 +71,10 @@ def build_provider_inutilization_handler(client: FiscalOperationsClient) -> Fisc
         first = payload.get("first_number")
         last = payload.get("last_number")
         reason = payload.get("justification")
-        if any(type(item) is not int for item in (model, series, first, last)) or not isinstance(\n            reason, str\n        ):
+        if (
+            any(type(item) is not int for item in (model, series, first, last))
+            or not isinstance(reason, str)
+        ):
             raise FiscalValidationError(
                 "inutilization requires integer model/series/range and justification"
             )
