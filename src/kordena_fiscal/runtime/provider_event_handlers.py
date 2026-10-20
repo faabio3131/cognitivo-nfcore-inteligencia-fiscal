@@ -33,7 +33,11 @@ def build_provider_cancel_handler(client: FiscalOperationsClient) -> FiscalOpera
         raw_key = payload.get("access_key")
         protocol = payload.get("authorization_protocol")
         reason = payload.get("justification")
-        if not all(isinstance(item, str) for item in (raw_key, protocol, reason)):
+        if not (
+            isinstance(raw_key, str)
+            and isinstance(protocol, str)
+            and isinstance(reason, str)
+        ):
             raise FiscalValidationError(
                 "cancellation requires access_key, authorization_protocol and justification"
             )
@@ -80,10 +84,10 @@ def build_provider_inutilization_handler(client: FiscalOperationsClient) -> Fisc
             )
         request = InutilizationRequest.build(
             scope=scope,
-            model=ElectronicInvoiceModel(model),
-            series=series,
-            first_number=first,
-            last_number=last,
+            model=ElectronicInvoiceModel(int(model)),
+            series=int(series),
+            first_number=int(first),
+            last_number=int(last),
             justification=reason,
         )
         result = client.inutilize(request)
