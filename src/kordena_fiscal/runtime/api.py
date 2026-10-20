@@ -42,7 +42,7 @@ from kordena_fiscal.web.commercial_acquisition import (
 )
 from kordena_fiscal.web.commercial_trial import create_commercial_trial_router
 from kordena_fiscal.web.human_recovery import PasswordResetDelivery
-from kordena_fiscal.web.public_trial import create_public_trial_router
+from kordena_fiscal.web.public_trial import PublicTrialAbuseGate, create_public_trial_router
 from kordena_fiscal.web.staging_gsm_binding_admin import create_staging_gsm_binding_router
 from kordena_fiscal.web.staging_webhook_approval import create_staging_webhook_egress_router
 from kordena_fiscal.web.staging_webhook_probe import create_staging_webhook_probe_router
@@ -179,7 +179,7 @@ def create_runtime_app(
     staging_probe_security: WebhookSecurity | None = None,
     commercial_trial_rate_limiter: FixedWindowRateLimiter | None = None,
     public_trial_allowed_origins: tuple[str, ...] = (),
-    public_trial_rate_limiter: FixedWindowRateLimiter | None = None,
+    public_trial_rate_limiter: PublicTrialAbuseGate | None = None,
     password_reset_delivery: PasswordResetDelivery | None = None,
     production_authority: ProductionExecutionAuthority | None = None,
     workload_credentials: tuple[WorkloadCredentialRecord, ...] = (),
@@ -679,6 +679,10 @@ def create_runtime_app(
             or not public_trial_allowed_origins
         ):
             raise RuntimeConfigurationError("public trial prerequisites are incomplete")
+        if resolved.is_production_like and isinstance(public_trial_rate_limiter, FixedWindowRateLimiter):
+            raise RuntimeConfigurationError(
+                "public trial requires an externally shared anti-abuse gate"
+            )
         app.include_router(
             create_public_trial_router(
                 composition.commercial_trial,
