@@ -41,6 +41,7 @@ from kordena_fiscal.web.commercial_acquisition import (
     create_commercial_acquisition_router,
 )
 from kordena_fiscal.web.commercial_trial import create_commercial_trial_router
+from kordena_fiscal.web.public_trial import create_public_trial_router
 from kordena_fiscal.web.human_recovery import PasswordResetDelivery
 from kordena_fiscal.web.staging_gsm_binding_admin import create_staging_gsm_binding_router
 from kordena_fiscal.web.staging_webhook_approval import create_staging_webhook_egress_router
@@ -177,6 +178,8 @@ def create_runtime_app(
     commercial_trial_security: WebhookSecurity | None = None,
     staging_probe_security: WebhookSecurity | None = None,
     commercial_trial_rate_limiter: FixedWindowRateLimiter | None = None,
+    public_trial_allowed_origins: tuple[str, ...] = (),
+    public_trial_rate_limiter: FixedWindowRateLimiter | None = None,
     password_reset_delivery: PasswordResetDelivery | None = None,
     production_authority: ProductionExecutionAuthority | None = None,
     workload_credentials: tuple[WorkloadCredentialRecord, ...] = (),
@@ -661,6 +664,26 @@ def create_runtime_app(
                         window_seconds=3600,
                     )
                 ),
+                delivery=password_reset_delivery,
+            )
+        )
+
+    # Public intake is strictly opt-in and requires externally governed rate
+    # limiting, explicit origins, durable commercial state and activation delivery.
+    # It is not a fallback for the signed server-to-server commercial route.
+    if public_trial_allowed_origins or public_trial_rate_limiter is not None:
+        if (
+            composition is None
+            or password_reset_delivery is None
+            or public_trial_rate_limiter is None
+            or not public_trial_allowed_origins
+        ):
+            raise RuntimeConfigurationError("public trial prerequisites are incomplete")
+        app.include_router(
+            create_public_trial_router(
+                composition.commercial_trial,
+                allowed_origins=public_trial_allowed_origins,
+                rate_limiter=public_trial_rate_limiter,
                 delivery=password_reset_delivery,
             )
         )
