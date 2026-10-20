@@ -64,6 +64,11 @@ from .customer_configuration_schema import (
     CUSTOMER_CONFIGURATION_VERSION,
 )
 from .fiscal_scope_schema import FISCAL_SCOPE_NAME, FISCAL_SCOPE_SCHEMA, FISCAL_SCOPE_VERSION
+from .public_trial_rate_schema import (
+    PUBLIC_TRIAL_RATE_NAME,
+    PUBLIC_TRIAL_RATE_SCHEMA,
+    PUBLIC_TRIAL_RATE_VERSION,
+)
 from .ports import PersistenceStateError
 from .pricing_catalog import PostgresPricingCatalogRepository
 from .secret_binding_schema import (
@@ -813,6 +818,19 @@ class PostgresFiscalDatabase:
                          datetime.now().astimezone().isoformat()),
                     )
                     new_versions.append(SECRET_BINDING_VERSION)
+                if PUBLIC_TRIAL_RATE_VERSION not in applied:
+                    for statement in PUBLIC_TRIAL_RATE_SCHEMA:
+                        raw.execute(statement)
+                    raw.execute(
+                        "INSERT INTO fm_schema_migrations (version, name, applied_at) "
+                        "VALUES (%s, %s, %s)",
+                        (
+                            PUBLIC_TRIAL_RATE_VERSION,
+                            PUBLIC_TRIAL_RATE_NAME,
+                            datetime.now().astimezone().isoformat(),
+                        ),
+                    )
+                    new_versions.append(PUBLIC_TRIAL_RATE_VERSION)
                 raw.commit()
                 return tuple(new_versions)
             except Exception:
@@ -838,7 +856,7 @@ class PostgresFiscalDatabase:
         versions instead of creating tables during startup.
         """
         applied = self.applied_migrations()
-        required = tuple(range(1, SECRET_BINDING_VERSION + 1))
+        required = tuple(range(1, PUBLIC_TRIAL_RATE_VERSION + 1))
         if applied != required:
             raise PersistenceStateError(
                 "PostgreSQL schema is not at the certified migration version"
