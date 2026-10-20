@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from typing import Protocol
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Request
@@ -16,15 +17,20 @@ from fastapi.responses import JSONResponse
 
 from kordena_fiscal.application.commercial_trial import GovernedTrialService
 from kordena_fiscal.product.commercial_fulfillment import CommercialFulfillmentError
-from kordena_fiscal.security.s2s import FixedWindowRateLimiter
 from kordena_fiscal.web.human_recovery import PasswordResetDelivery
+
+
+class PublicTrialAbuseGate(Protocol):
+    """Atomically decide trial admission across all application replicas."""
+
+    def allow(self, identity: str, now: datetime) -> bool: ...
 
 
 def create_public_trial_router(
     service: GovernedTrialService,
     *,
     allowed_origins: tuple[str, ...],
-    rate_limiter: FixedWindowRateLimiter,
+    rate_limiter: PublicTrialAbuseGate,
     delivery: PasswordResetDelivery,
 ) -> APIRouter:
     """Produce first-party trial ingress without modifying the signed S2S route."""
@@ -42,6 +48,33 @@ def create_public_trial_router(
         raise ValueError("public trial requires explicit HTTPS origins")
 
     router = APIRouter(tags=["public-commercial-trial"])
+
+    @router.options("/v1/public/trials")
+    async def public_trial_preflight(request: Request) -> JSONResponse:
+        origin = request.headers.get("origin", "")
+        if origin not in allowed_origins:
+            return JSONResponse(status_code=403, content={"detail": "origin denied"})
+        requested = {
+            item.strip().lower()
+            for item in request.headers.get("access-control-request-headers", "").split(",")
+            if item.strip()
+        }
+        if request.headers.get("access-control-request-method", "") != "POST" or not (
+            requested <= {"content-type", "idempotency-key"}
+        ):
+            return JSONResponse(status_code=403, content={"detail": "preflight denied"})
+        return JSONResponse(
+            status_code=200,
+            content={},
+            headers={
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Methods": "POST",
+                "Access-Control-Allow-Headers": "Content-Type, Idempotency-Key",
+                "Access-Control-Max-Age": "600",
+                "Cache-Control": "no-store",
+                "Vary": "Origin",
+            },
+        )
 
     @router.post("/v1/public/trials")
     async def public_trial(request: Request) -> JSONResponse:
