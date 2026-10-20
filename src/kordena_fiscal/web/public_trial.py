@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from kordena_fiscal.application.commercial_trial import GovernedTrialService
+from kordena_fiscal.application.commercial_trial import GovernedTrialService, TrialPricingReader
 from kordena_fiscal.product.commercial_fulfillment import CommercialFulfillmentError
 from kordena_fiscal.web.human_recovery import PasswordResetDelivery
 
@@ -29,6 +29,7 @@ class PublicTrialAbuseGate(Protocol):
 def create_public_trial_router(
     service: GovernedTrialService,
     *,
+    pricing: TrialPricingReader,
     allowed_origins: tuple[str, ...],
     rate_limiter: PublicTrialAbuseGate,
     delivery: PasswordResetDelivery,
@@ -48,6 +49,45 @@ def create_public_trial_router(
         raise ValueError("public trial requires explicit HTTPS origins")
 
     router = APIRouter(tags=["public-commercial-trial"])
+
+    @router.get("/v1/public/trial-plans")
+    async def published_trial_plans(request: Request) -> JSONResponse:
+        origin = request.headers.get("origin", "")
+        if origin not in allowed_origins:
+            return JSONResponse(status_code=403, content={"detail": "origin denied"})
+        headers = {
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": origin,
+            "Vary": "Origin",
+        }
+        catalog = pricing.current
+        if catalog is None:
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "trial plans not published"},
+                headers=headers,
+            )
+        entries = []
+        for plan in catalog.plans:
+            if not plan.enabled or plan.trial_days < 1:
+                continue
+            for price_id in plan.price_ids:
+                price = catalog.price(price_id)
+                if price.enabled:
+                    entries.append({
+                        "plan_id": plan.plan_id,
+                        "price_id": price.price_id,
+                        "display_name": plan.display_name,
+                        "trial_days": plan.trial_days,
+                        "currency": price.currency,
+                        "billing_cadence": price.cadence.value,
+                        "base_amount": str(price.base_amount),
+                    })
+        return JSONResponse(
+            status_code=200,
+            content={"plans": entries},
+            headers=headers,
+        )
 
     @router.options("/v1/public/trials")
     async def public_trial_preflight(request: Request) -> JSONResponse:
