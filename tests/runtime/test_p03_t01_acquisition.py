@@ -276,10 +276,19 @@ def test_postgres_runtime_rejects_browser_authority_before_persistence(settings,
 
 def test_postgres_runtime_rate_limit_and_release_revocation_prevent_new_acquisition(settings):
     configured = options()
-    configured["commercial_acquisition_rate_limiter"] = FixedWindowRateLimiter(
-        max_requests=1,
-        window_seconds=60,
-    )
+    # Keep both HTTP requests inside the same logical fixed window. Using the
+    # live clock here made the test occasionally cross a minute boundary.
+    class SameWindowLimiter(FixedWindowRateLimiter):
+        def __init__(self) -> None:
+            super().__init__(max_requests=1, window_seconds=60)
+            self.first: datetime | None = None
+
+        def allow(self, caller_id: str, now: datetime) -> bool:
+            if self.first is None:
+                self.first = now
+            return super().allow(caller_id, self.first)
+
+    configured["commercial_acquisition_rate_limiter"] = SameWindowLimiter()
     app = runtime_api.create_runtime_app(settings, **configured)
     publish(app, receiver=True)
     with TestClient(app, base_url="https://testserver") as client:
@@ -377,3 +386,11 @@ def test_postgres_runtime_failed_persistence_never_starts_checkout(settings, mon
         assert post(client, security()).status_code == 201
         assert len(checkout.references) == 1
         assert_counts(app, 1)
+
+
+def test_acquisition_fixed_window_limiter_renews_at_deterministic_boundary() -> None:
+    limiter = FixedWindowRateLimiter(max_requests=1, window_seconds=60)
+    first = datetime(2026, 10, 20, 12, 0, tzinfo=UTC)
+    assert limiter.allow("acquisition-test", first)
+    assert not limiter.allow("acquisition-test", first + timedelta(seconds=1))
+    assert limiter.allow("acquisition-test", first + timedelta(seconds=60))
