@@ -82,6 +82,11 @@ def build_provider_inutilization_handler(client: FiscalOperationsClient) -> Fisc
             raise FiscalValidationError(
                 "inutilization requires integer model/series/range and justification"
             )
+        # Explicit narrowing after rejecting non-integers and booleans above.
+        assert isinstance(model, int) and not isinstance(model, bool)
+        assert isinstance(series, int) and not isinstance(series, bool)
+        assert isinstance(first, int) and not isinstance(first, bool)
+        assert isinstance(last, int) and not isinstance(last, bool)
         request = InutilizationRequest.build(
             scope=scope,
             model=ElectronicInvoiceModel(model),
