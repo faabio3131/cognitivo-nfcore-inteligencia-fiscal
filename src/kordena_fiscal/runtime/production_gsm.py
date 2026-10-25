@@ -15,7 +15,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from google.cloud import secretmanager_v1
 from google.oauth2.service_account import Credentials as ServiceAccountCredentials
@@ -70,6 +70,8 @@ class ProductionGsmConfig:
     cloud_version: str
 
     def binding(self) -> SecretBinding:
+        if not isinstance(self.reference.version, int):
+            raise RuntimeConfigurationError("production GSM reference version required")
         return SecretBinding(
             reference_id=self.reference.reference_id,
             tenant_id=self.scope.tenant_id,
@@ -240,7 +242,11 @@ def production_credentials(
         now = datetime.now(UTC)
         if not (created <= now < expiry <= created + timedelta(days=90)):
             raise ValueError
-        credentials = ServiceAccountCredentials.from_service_account_info(key)
+        loader = cast(
+            Callable[[dict[str, str]], ServiceAccountCredentials],
+            ServiceAccountCredentials.from_service_account_info,
+        )
+        credentials = loader(key)
         return credentials, expiry
     except Exception:
         raise RuntimeConfigurationError("production GSM workload identity unavailable") from None
