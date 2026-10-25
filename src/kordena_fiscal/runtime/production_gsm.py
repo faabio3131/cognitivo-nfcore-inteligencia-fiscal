@@ -25,7 +25,12 @@ from kordena_fiscal.domain import ExecutionScope, FiscalEnvironment
 from kordena_fiscal.persistence.postgres import PostgresFiscalDatabase
 from kordena_fiscal.security.s2s import WebhookSecurity
 from kordena_fiscal.security.secret_binding import SecretBinding
-from kordena_fiscal.security.secrets import SecretReference, SecretResolver, SecretScope
+from kordena_fiscal.security.secrets import (
+    SecretReference,
+    SecretResolutionError,
+    SecretResolver,
+    SecretScope,
+)
 from kordena_fiscal.vault.google_secret_manager import (
     DurableGsmReader,
     GoogleSdkSecretAccess,
@@ -151,7 +156,7 @@ def production_config(
         )
         cfg.binding()
         return cfg
-    except (KeyError, ValueError, TypeError):
+    except (KeyError, ValueError, TypeError, SecretResolutionError):
         raise RuntimeConfigurationError("production GSM configuration denied") from None
 
 

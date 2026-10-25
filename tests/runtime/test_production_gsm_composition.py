@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -132,11 +133,7 @@ def test_empty_or_wrong_binding_blocks_before_loading_private_identity(
     monkeypatch.setattr(gsm, "production_credentials", lambda *_: pytest.fail("identity opened"))
     for bindings in (
         {},
-        {
-            worker.reference.reference_id: gsm.SecretBinding(
-                **{**worker.binding().__dict__, "runtime_environment": "staging"},
-            )
-        },
+        {worker.reference.reference_id: replace(worker.binding(), runtime_environment="staging")},
     ):
         db = FakeDatabase(bindings)
         with pytest.raises(RuntimeConfigurationError, match="durable binding"):
