@@ -160,7 +160,7 @@ def _scoped_worker(
     binding: SecretBinding,
     destination_id: str,
     namespace: str,
-):
+) -> ProductionWorkerComposition:
     """Build one canonical scoped cycle; no new worker implementation or key cache."""
     if binding.tenant_id is None or binding.unit_id is None:
         raise RuntimeConfigurationError("GSM tenant scope missing")

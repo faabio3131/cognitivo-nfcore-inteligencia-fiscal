@@ -18,6 +18,7 @@ from kordena_fiscal.contingency import FiscalOutboxHandler
 from kordena_fiscal.persistence.postgres import PostgresFiscalDatabase
 
 from .config import RuntimeConfigurationError, RuntimeSettings
+from .production_multi_gsm import MultiTenantGsmWorkerComposition
 from .worker_composition import (
     ScopedWorkerHandlerComposition,
     WorkerWebhookDependencies,
@@ -26,10 +27,12 @@ from .worker_composition import (
 )
 from .worker_health import HEALTH_PATH, WorkerHealthPublisher
 
-WorkerHandlerFactory = Callable[
-    [PostgresFiscalDatabase, RuntimeSettings],
-    Mapping[str, FiscalOutboxHandler] | ScopedWorkerHandlerComposition,
-]
+WorkerHandlers = (
+    Mapping[str, FiscalOutboxHandler]
+    | ScopedWorkerHandlerComposition
+    | MultiTenantGsmWorkerComposition
+)
+WorkerHandlerFactory = Callable[[PostgresFiscalDatabase, RuntimeSettings], WorkerHandlers]
 
 
 def _oneshot_requested() -> bool:
@@ -100,8 +103,6 @@ def run(
             )
             # Opt-in multi-tenant mode owns one process and cycles over dynamic,
             # individually authorized exact partitions using the existing Worker.
-            from .production_multi_gsm import MultiTenantGsmWorkerComposition
-
             if isinstance(handler_composition, MultiTenantGsmWorkerComposition):
                 publisher.attach(handler_composition.health)
                 handler_composition.run_forever(stop)
