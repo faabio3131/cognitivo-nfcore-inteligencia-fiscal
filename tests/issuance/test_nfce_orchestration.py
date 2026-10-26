@@ -58,11 +58,13 @@ from kordena_fiscal.security import (
 )
 from kordena_fiscal.tax import TaxDecision, TaxRuleOutcome
 from kordena_fiscal.xml import (
+    AccessKeyInput,
     NfceXmlPayload,
     NfeAccessKey,
     SchemaResource,
     SchemaSet,
     XmlSchemaValidator,
+    build_access_key,
 )
 
 _NAMESPACE = "http://www.portalfiscal.inf.br/nfe"
@@ -637,3 +639,209 @@ def test_timeout_preserves_signed_request_without_automatic_retry(tmp_path):
     assert response["status"] == "transmitting"
     assert response["recovery_required"] is True
     assert not provider.calls
+
+
+def _pending_recovery(tmp_path):
+    db = SqliteFiscalDatabase(tmp_path / "recovery.sqlite")
+    db.initialize()
+    app = FiscalApplicationService(db)
+    pipeline, provider, _, _ = _system(FakeGatewayMode.PENDING, application=app)
+    command = _command()
+    pipeline.issue(command)
+    return db, app, provider, command
+
+
+@pytest.mark.parametrize("query_status", ["authorized", "pending", "not_found", "cancelled"])
+def test_query_recovers_only_confirmed_authorization_and_archives_evidence(tmp_path, query_status):
+    from kordena_fiscal.operations import (
+        FakeFiscalOperationsGateway,
+        FiscalOperationsClient,
+        FiscalQueryStatus,
+    )
+    from kordena_fiscal.runtime.provider_issuance_handler import (
+        build_provider_reconciliation_handler,
+    )
+
+    db, app, issuance, command = _pending_recovery(tmp_path)
+    provider = FakeFiscalOperationsGateway(query_status=FiscalQueryStatus(query_status))
+    handler = build_provider_reconciliation_handler(
+        app,
+        client=FiscalOperationsClient(provider),
+        archive_retention=RetentionPolicyMetadata("synthetic-recovery", 1),
+    )
+    response = handler(
+        command.document.scope, {"document_id": command.document.document_id}, "http-uuid"
+    )
+    authorized = query_status == "authorized"
+    assert response["status"] == ("authorized" if authorized else "transmitting")
+    assert response["recovery_required"] is not authorized
+    assert response["query_status"] == query_status
+    assert len(issuance.calls) == 1
+    assert len(provider.query_calls) == 1
+    with db() as uow:
+        entries = uow.archive.list_for_document(
+            command.document.scope, command.document.document_id
+        )
+        assert len(entries) == 2
+        assert sum(e.kind.value == "provider_response" for e in entries) == 1
+    if authorized:
+        restarted = FiscalApplicationService(SqliteFiscalDatabase(db.path))
+        replay = restarted.reconcile_prepared_authorization(
+            scope=command.document.scope,
+            document_id=command.document.document_id,
+            client=FiscalOperationsClient(provider),
+            occurred_at=command.document.issued_at,
+            retention=RetentionPolicyMetadata("synthetic-recovery", 1),
+        )
+        assert replay.replay is True
+        assert replay.attempt.result_reference == "SYNTHETIC-AUTH-PROTOCOL"
+        assert len(provider.query_calls) == 1
+
+
+@pytest.mark.parametrize("failure", ["timeout", "wrong_scope", "wrong_key"])
+def test_untrusted_or_failed_query_never_finalizes_issuance(tmp_path, failure):
+    from kordena_fiscal.operations import (
+        FakeFiscalOperationsGateway,
+        FiscalOperationsClient,
+        FiscalOperationsContractError,
+    )
+
+    db, app, _, command = _pending_recovery(tmp_path)
+
+    class InvalidQuery(FakeFiscalOperationsGateway):
+        def query(self, request):
+            if failure == "timeout":
+                raise TimeoutError("synthetic timeout")
+            result = super().query(request)
+            if failure == "wrong_scope":
+                return replace(result, scope=replace(request.scope, tenant_id="other-tenant"))
+            # A distinct valid access key from another prepared document.
+            return replace(
+                result,
+                access_key=build_access_key(
+                    AccessKeyInput(
+                        state_ibge_code="35",
+                        issued_at=command.document.issued_at,
+                        issuer_cnpj=command.document.issuer.cnpj,
+                        model=ElectronicInvoiceModel.NFCE,
+                        series=99,
+                        invoice_number=2,
+                        emission_type=1,
+                        numeric_code=12345678,
+                    )
+                ),
+            )
+
+    with pytest.raises((TimeoutError, FiscalOperationsContractError)):
+        app.reconcile_prepared_authorization(
+            scope=command.document.scope,
+            document_id=command.document.document_id,
+            client=FiscalOperationsClient(InvalidQuery()),
+            occurred_at=command.document.issued_at,
+            retention=RetentionPolicyMetadata("synthetic-recovery", 1),
+        )
+    with db() as uow:
+        assert (
+            uow.lifecycle.get(command.document.document_id).state
+            is FiscalDocumentState.TRANSMITTING
+        )
+        assert (
+            len(uow.archive.list_for_document(command.document.scope, command.document.document_id))
+            == 1
+        )
+
+
+def test_recovery_evidence_failure_rolls_back_authorization(tmp_path, monkeypatch):
+    from kordena_fiscal.operations import FakeFiscalOperationsGateway, FiscalOperationsClient
+    from kordena_fiscal.persistence.sqlite_outbox_archive import SqliteFiscalArchiveStore
+
+    db, app, _, command = _pending_recovery(tmp_path)
+    request = app.load_prepared_authorization(command.document.scope, command.document.document_id)
+
+    def fail_append(self, entry):
+        raise RuntimeError("synthetic archive failure")
+
+    monkeypatch.setattr(SqliteFiscalArchiveStore, "append", fail_append)
+    with pytest.raises(RuntimeError, match="synthetic archive"):
+        app.reconcile_prepared_authorization(
+            scope=command.document.scope,
+            document_id=command.document.document_id,
+            client=FiscalOperationsClient(FakeFiscalOperationsGateway()),
+            occurred_at=command.document.issued_at,
+            retention=RetentionPolicyMetadata("synthetic-recovery", 1),
+        )
+    with db() as uow:
+        assert (
+            uow.lifecycle.get(command.document.document_id).state
+            is FiscalDocumentState.TRANSMITTING
+        )
+        assert (
+            uow.idempotency.attempts(request.idempotency_key)[-1].status
+            is IssuanceAttemptStatus.RESERVED
+        )
+
+
+@pytest.mark.parametrize("same_protocol", [True, False])
+def test_recovery_does_not_overwrite_concurrent_terminal_result(tmp_path, same_protocol):
+    from kordena_fiscal.operations import FakeFiscalOperationsGateway, FiscalOperationsClient
+
+    db, app, _, command = _pending_recovery(tmp_path)
+    request = app.load_prepared_authorization(command.document.scope, command.document.document_id)
+
+    class ConcurrentQuery(FakeFiscalOperationsGateway):
+        def query(self, query):
+            result = super().query(query)
+            app.finalize_authorized(
+                key=request.idempotency_key,
+                generation=1,
+                document_id=command.document.document_id,
+                result_reference=result.protocol_reference
+                if same_protocol
+                else "different-protocol",
+                occurred_at=command.document.issued_at,
+                reason="synthetic concurrent result",
+                correlation_id=command.document.scope.correlation_id,
+            )
+            return result
+
+    def recover():
+        return app.reconcile_prepared_authorization(
+            scope=command.document.scope,
+            document_id=command.document.document_id,
+            client=FiscalOperationsClient(ConcurrentQuery()),
+            occurred_at=command.document.issued_at,
+            retention=RetentionPolicyMetadata("synthetic-recovery", 1),
+        )
+
+    if same_protocol:
+        assert recover().replay is True
+    else:
+        with pytest.raises(PersistenceConflictError, match="conflicts"):
+            recover()
+    with db() as uow:
+        assert (
+            len(uow.archive.list_for_document(command.document.scope, command.document.document_id))
+            == 1
+        )
+
+
+def test_reconciliation_rejects_browser_outcome_before_provider_io(tmp_path):
+    from kordena_fiscal.operations import FakeFiscalOperationsGateway, FiscalOperationsClient
+    from kordena_fiscal.runtime.provider_issuance_handler import (
+        build_provider_reconciliation_handler,
+    )
+
+    _, app, _, command = _pending_recovery(tmp_path)
+    provider = FakeFiscalOperationsGateway()
+    handler = build_provider_reconciliation_handler(
+        app,
+        client=FiscalOperationsClient(provider),
+        archive_retention=RetentionPolicyMetadata("synthetic-recovery", 1),
+    )
+    with pytest.raises(FiscalValidationError, match="only a prepared"):
+        handler(
+            command.document.scope,
+            {"document_id": command.document.document_id, "status": "authorized"},
+            "http-uuid",
+        )
+    assert not provider.query_calls

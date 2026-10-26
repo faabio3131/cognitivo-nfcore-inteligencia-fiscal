@@ -10,9 +10,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 from kordena_fiscal.application.service import FiscalApplicationService
+from kordena_fiscal.archive import RetentionPolicyMetadata
 from kordena_fiscal.domain import ExecutionScope, FiscalValidationError
 from kordena_fiscal.gateway import AuthorizationRequest, FiscalGatewayClient
 from kordena_fiscal.issuance.nfe_nfse import NfseAuthorizationRequest, NfseGatewayClient
+from kordena_fiscal.operations import FiscalOperationsClient
 
 from .fiscal_runtime import FiscalOperationHandler
 
@@ -66,3 +68,42 @@ def build_provider_issuance_handler(
         }
 
     return issue
+
+
+def build_provider_reconciliation_handler(
+    application: FiscalApplicationService,
+    *,
+    client: FiscalOperationsClient,
+    archive_retention: RetentionPolicyMetadata,
+) -> FiscalOperationHandler:
+    """Resolve uncertainty through the configured provider; browser supplies no outcome."""
+
+    def reconcile(
+        scope: ExecutionScope,
+        payload: Mapping[str, Any],
+        idempotency_key: str | None,
+    ) -> Mapping[str, Any]:
+        if set(payload) - {"document_id", "unit_id", "environment"}:
+            raise FiscalValidationError("reconciliation accepts only a prepared document reference")
+        document_id = payload.get("document_id")
+        if not isinstance(document_id, str) or not document_id.strip():
+            raise FiscalValidationError("document_id is required")
+        if not isinstance(idempotency_key, str) or not idempotency_key.strip():
+            raise FiscalValidationError("HTTP idempotency key is required")
+        outcome = application.reconcile_prepared_authorization(
+            scope=scope,
+            document_id=document_id,
+            client=client,
+            occurred_at=datetime.now(UTC),
+            retention=archive_retention,
+        )
+        return {
+            "document_id": outcome.attempt.document_id,
+            "status": outcome.lifecycle.state.value,
+            "replay": outcome.replay,
+            "recovery_required": outcome.recovery_required,
+            "result_reference": outcome.attempt.result_reference,
+            "query_status": outcome.query_result.status.value if outcome.query_result else None,
+        }
+
+    return reconcile

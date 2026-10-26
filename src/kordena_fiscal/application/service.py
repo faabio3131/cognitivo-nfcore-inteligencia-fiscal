@@ -48,7 +48,13 @@ from kordena_fiscal.numbering import (
     FiscalSequenceKey,
     FiscalSequencePolicy,
 )
-from kordena_fiscal.operations import FiscalOperationSnapshot
+from kordena_fiscal.operations import (
+    FiscalOperationsClient,
+    FiscalOperationSnapshot,
+    FiscalQueryRequest,
+    FiscalQueryResult,
+    FiscalQueryStatus,
+)
 from kordena_fiscal.persistence.ports import (
     FiscalUnitOfWorkFactory,
     PersistenceConflictError,
@@ -98,6 +104,17 @@ class DurableAuthorizationOutcome:
     replay: bool
     recovery_required: bool
     provider_result: AuthorizationResult | NfseAuthorizationResult | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DurableRecoveryOutcome:
+    """Durable result of a read-only provider query, never a new issuance."""
+
+    attempt: IssuanceAttempt
+    lifecycle: FiscalStateSnapshot
+    replay: bool
+    recovery_required: bool
+    query_result: FiscalQueryResult | None = None
 
 
 class FiscalApplicationService:
@@ -570,6 +587,110 @@ class FiscalApplicationService:
             return DurableAuthorizationOutcome(
                 latest,
                 lifecycle,
+                False,
+                latest.status is IssuanceAttemptStatus.RESERVED,
+                result,
+            )
+
+    def reconcile_prepared_authorization(
+        self,
+        *,
+        scope: ExecutionScope,
+        document_id: str,
+        client: FiscalOperationsClient,
+        occurred_at: datetime,
+        retention: RetentionPolicyMetadata,
+    ) -> DurableRecoveryOutcome:
+        """Recover an uncertain XML authorization from a validated provider query.
+
+        A missing/pending/cancelled result cannot authorize, reject or resend.
+        The normalized query evidence and confirmed authorization commit together.
+        """
+        if not isinstance(client, FiscalOperationsClient):
+            raise FiscalValidationError("recovery requires FiscalOperationsClient")
+        request = self.load_prepared_authorization(scope, document_id)
+        with self._uow_factory() as uow:
+            uow.lifecycle.assert_scope(document_id, scope)
+            attempt = uow.idempotency.attempts(request.idempotency_key)[-1]
+            if (
+                attempt.document_id != document_id
+                or attempt.request_fingerprint != request.request_fingerprint
+            ):
+                raise PersistenceConflictError("prepared issuance changed before provider query")
+            current = uow.lifecycle.get(document_id)
+            if current is None:
+                raise PersistenceStateError("fiscal lifecycle does not exist")
+            if attempt.status is not IssuanceAttemptStatus.RESERVED:
+                return DurableRecoveryOutcome(attempt, current, True, False)
+            if current.state is not FiscalDocumentState.TRANSMITTING:
+                raise PersistenceStateError("recovery requires an uncertain transmission")
+
+        result = client.query(FiscalQueryRequest(scope=scope, access_key=request.access_key))
+        evidence = FiscalArchiveEntry.build(
+            scope=scope,
+            document_reference=document_id,
+            kind=FiscalArchiveKind.PROVIDER_RESPONSE,
+            content=json.dumps(
+                {
+                    "operation": "authorization_recovery_query",
+                    "access_key": result.access_key.value,
+                    "status": result.status.value,
+                    "protocol_reference": result.protocol_reference,
+                    "provider_request_id": result.provider_request_id,
+                    "provider_name": result.provider.provider_name,
+                    "adapter_version": result.provider.adapter_version,
+                    "observed_at": occurred_at.isoformat(),
+                    "idempotency_key": attempt.key.value,
+                    "generation": attempt.generation,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode(),
+            media_type="application/vnd.nfcore.authorization-recovery.v1+json",
+            archived_at=occurred_at,
+            retention=retention,
+        )
+        with self._uow_factory() as uow:
+            uow.lifecycle.assert_scope(document_id, scope)
+            latest = uow.idempotency.attempts(attempt.key)[-1]
+            current = uow.lifecycle.get(document_id)
+            if (
+                current is None
+                or latest.document_id != document_id
+                or latest.generation != attempt.generation
+                or latest.request_fingerprint != attempt.request_fingerprint
+            ):
+                raise PersistenceConflictError("issuance changed during provider query")
+            if latest.status is not IssuanceAttemptStatus.RESERVED:
+                if result.status is FiscalQueryStatus.AUTHORIZED and (
+                    latest.status is not IssuanceAttemptStatus.AUTHORIZED
+                    or latest.result_reference != result.protocol_reference
+                ):
+                    raise PersistenceConflictError(
+                        "provider query conflicts with terminal issuance"
+                    )
+                return DurableRecoveryOutcome(latest, current, True, False, result)
+            if current.state is not FiscalDocumentState.TRANSMITTING:
+                raise PersistenceConflictError("transmission changed during provider query")
+            if result.status is FiscalQueryStatus.AUTHORIZED:
+                assert result.protocol_reference is not None
+                updated = self._state_machine.transition(
+                    current,
+                    FiscalDocumentState.AUTHORIZED,
+                    occurred_at=occurred_at,
+                    reason="provider query confirmed authorization",
+                    correlation_id=scope.correlation_id,
+                )
+                latest = uow.idempotency.mark_authorized(
+                    attempt.key, attempt.generation, result.protocol_reference
+                )
+                uow.lifecycle.save(updated, expected_version=current.version)
+                current = updated
+            uow.archive.append(evidence)
+            uow.commit()
+            return DurableRecoveryOutcome(
+                latest,
+                current,
                 False,
                 latest.status is IssuanceAttemptStatus.RESERVED,
                 result,
