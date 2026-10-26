@@ -241,7 +241,7 @@ class NfseCanonicalDocument:
             raise FiscalValidationError("competence_date must be date")
         if not isinstance(self.issuer, FiscalProfile):
             raise FiscalValidationError("issuer must be FiscalProfile")
-        if self.issuer.scope.partition_key != self.scope.partition_key:
+        if self.issuer.scope.identity_partition_key != self.scope.identity_partition_key:
             raise FiscalValidationError("issuer and NFS-e document must share the same scope")
         if not self.issuer.is_effective_at(self.issued_at):
             raise FiscalValidationError("issuer fiscal profile is not effective at issued_at")
@@ -294,6 +294,8 @@ def build_nfse_issuance_key(document: NfseCanonicalDocument) -> IdempotencyKey:
         "document_kind": FiscalDocumentKind.NFSE.value,
         "operation": "issue",
     }
+    if document.scope.host_namespace is not None:
+        material["host_namespace"] = document.scope.host_namespace
     encoded = json.dumps(material, sort_keys=True, separators=(",", ":")).encode()
     return IdempotencyKey(hashlib.sha256(encoded).hexdigest())
 
@@ -301,12 +303,15 @@ def build_nfse_issuance_key(document: NfseCanonicalDocument) -> IdempotencyKey:
 def build_nfse_request_fingerprint(document: NfseCanonicalDocument) -> str:
     if not isinstance(document, NfseCanonicalDocument):
         raise FiscalValidationError("document must be NfseCanonicalDocument")
+    scope_payload = {
+        "tenant_id": document.scope.tenant_id,
+        "unit_id": document.scope.unit_id,
+        "environment": document.scope.environment.value,
+    }
+    if document.scope.host_namespace is not None:
+        scope_payload["host_namespace"] = document.scope.host_namespace
     payload = {
-        "scope": {
-            "tenant_id": document.scope.tenant_id,
-            "unit_id": document.scope.unit_id,
-            "environment": document.scope.environment.value,
-        },
+        "scope": scope_payload,
         "source": document.source.canonical_tuple,
         "issued_at": document.issued_at.isoformat(),
         "competence_date": document.competence_date.isoformat(),

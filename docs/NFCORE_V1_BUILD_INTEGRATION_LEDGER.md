@@ -200,3 +200,31 @@ Teste HTTP local executado com sucesso até lifecycle autorizado. Testes fronten
 18 PASS, lint/typecheck/build e Ruff/validadores PASS. Chromium local indisponível
 por download inválido; E2E completo obrigatório na CI, sem desabilitação de testes.
 BLD-02 continua IN_PROGRESS e integração exige gates das predecessoras e do HEAD.
+
+### BLD-02 — preparação compartilhada NF-e/NFC-e e identidade NFS-e (26/10/2026)
+
+Gate da #246 confirmado: merge `4bb9616ad6b03415f47ff6b8f456a7e740d67f2c`, CI
+pós-merge #1165/Gov #588 SUCCESS. PR #247 integrada após CI #1166/Gov #589
+SUCCESS, merge `f262ecade6b45da3267a3b4742bca3a1714f8acd`; pós-merge #1168 em
+execução e Gov #591 SUCCESS. Portal #248, HEAD
+`2b7af5ac827f0518b9e96209f7c097225a70a6dc`, CI #1167 em execução/Gov #590 SUCCESS.
+
+Incremento na mesma autoridade de preparação: NF-e/modelo55 e NFC-e/modelo65
+usam uma sequência comum de validação, numeração, assinatura e persistência,
+com comandos e entradas que rejeitam família incompatível antes de efeitos.
+Nomes públicos NFC-e preservados; numeração continua particionada por modelo.
+NF-e usa propósito de assinatura nfe_xml e o pedido recuperado passa no envelope
+NF-e existente. Nenhum XML builder/schema/provider fictício foi ligado ao runtime.
+
+Lacuna concreta corrigida em NFS-e: identidade/fingerprint e vínculo do emitente
+passam a incluir host_namespace, conforme contrato existente das outras famílias.
+Hashes legados sem namespace preservados por regressão com valores conhecidos.
+Identidades NFS-e com namespace mudam; não há migração automática de registros.
+Isso não implementa nem certifica transporte/preparação municipal NFS-e.
+
+Testes dirigidos issuance/XML/autorização durável: 79 PASS/1 SKIP PostgreSQL local;
+37 casos de orquestração, incluindo modelo55 e isolamento de família/numeração.
+Ruff global, Mypy 225 fontes e validadores plano/BUILD PASS. CI completa pendente.
+BLD-02 IN_PROGRESS; merge exige gates anteriores e do HEAD. Próximos deltas:
+preparação/recuperação NFS-e e composição explicitamente configurada; nenhuma
+homologação, emissão oficial, deploy ou migration produtiva foi autorizada aqui.
