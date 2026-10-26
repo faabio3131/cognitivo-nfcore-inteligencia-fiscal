@@ -87,7 +87,7 @@ test("governed mutation sends csrf and idempotency proof", async ({ page, contex
   await page.getByRole("button", { name: "Emissões" }).click();
   await page.getByRole("button", { name: "Executar operação governada" }).click();
   await page.locator("#operation-unit").fill("unit-a");
-  await page.locator("#operation-payload").fill('{"document":{"model":"55"}}');
+  await page.locator("#operation-document-id").fill("DOC-E2E-PREPARED");
   await page.getByRole("button", { name: "Executar", exact: true }).click();
 
   await expect.poll(() => seenCsrf).toBe("csrf-e2e");

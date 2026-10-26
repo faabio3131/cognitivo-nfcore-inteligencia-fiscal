@@ -73,6 +73,25 @@ const operationForm = /** @type {HTMLFormElement} */ (document.getElementById("o
 const operationId = /** @type {HTMLSelectElement} */ (document.getElementById("operation-id"));
 const operationUnit = /** @type {HTMLInputElement} */ (document.getElementById("operation-unit"));
 const operationPayload = /** @type {HTMLTextAreaElement} */ (document.getElementById("operation-payload"));
+const operationDocument = /** @type {HTMLInputElement} */ (document.getElementById("operation-document-id"));
+const operationDocumentField = /** @type {HTMLElement} */ (document.getElementById("operation-document-field"));
+const operationDocumentHelp = /** @type {HTMLElement} */ (document.getElementById("operation-document-help"));
+const operationPayloadField = /** @type {HTMLElement} */ (document.getElementById("operation-payload-field"));
+
+function usesPreparedReference() {
+  return ["issueFiscalDocument", "reconcileFiscalOperation"].includes(operationId.value);
+}
+
+function configureOperationForm() {
+  const prepared = usesPreparedReference();
+  operationDocumentField.hidden = !prepared;
+  operationDocumentHelp.hidden = !prepared;
+  operationDocument.disabled = !prepared;
+  operationDocument.required = prepared;
+  operationPayloadField.hidden = prepared;
+  operationPayload.disabled = prepared;
+}
+
 const operationError = /** @type {HTMLElement} */ (document.getElementById("operation-error"));
 const operationCancel = /** @type {HTMLButtonElement} */ (document.getElementById("operation-cancel"));
 
@@ -174,12 +193,14 @@ function appendFiscalActions(article) {
     article.append(blocked);
     return;
   }
-  operationId.value = allowed[0].value;
+  const preferred = currentView === "reconciliation" ? "reconcileFiscalOperation" : "issueFiscalDocument";
+  operationId.value = allowed.some((option) => option.value === preferred) ? preferred : allowed[0].value;
   const action = document.createElement("button");
   action.className = "primary"; action.type = "button";
   action.textContent = "Executar operação governada";
   action.addEventListener("click", () => {
     operationUnit.value = selectedFiscalUnit;
+    configureOperationForm();
     operationDialog.showModal();
   });
   article.append(action);
@@ -1658,6 +1679,7 @@ logoutAction.addEventListener("click", async () => {
   }
 });
 
+operationId.addEventListener("change", configureOperationForm);
 operationCancel.addEventListener("click", () => operationDialog.close());
 operationForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -1668,7 +1690,11 @@ operationForm.addEventListener("submit", async (event) => {
   try {
     const selected = operationId.value;
     const unitId = operationUnit.value.trim();
-    const parsed = JSON.parse(operationPayload.value);
+    const prepared = usesPreparedReference();
+    if (prepared && !operationDocument.value.trim()) {
+      throw new Error("Informe a referência do documento preparado.");
+    }
+    const parsed = prepared ? {document_id: operationDocument.value.trim()} : JSON.parse(operationPayload.value);
     const payload = { ...parsed, unit_id: unitId, environment: selectedFiscalEnvironment };
     const fingerprint = `${selected}:${JSON.stringify(payload)}`;
     const mutation = selected !== "queryFiscalDocument";
@@ -1687,6 +1713,12 @@ operationForm.addEventListener("submit", async (event) => {
     });
     operationDialog.close();
     await renderSurface(currentView);
+    if (prepared) {
+      const status = document.createElement("p");
+      status.id = "prepared-document-result"; status.setAttribute("role", "status");
+      status.textContent = "Resposta registrada. O recibo do pedido não confirma autorização fiscal. Confira o estado do documento em Emissões.";
+      workspace.prepend(status);
+    }
   } catch (error) {
     operationError.textContent = error instanceof Error ? error.message : "Operação rejeitada";
   } finally {

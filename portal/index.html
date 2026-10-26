@@ -140,7 +140,9 @@
         <option value="reconcileFiscalOperation">Reconciliar</option>
       </select></label>
       <label>Unidade<input id="operation-unit" name="unit_id" required></label>
-      <label>Payload JSON<textarea id="operation-payload" rows="8" spellcheck="false">{}</textarea></label>
+      <label id="operation-document-field" hidden>Referência do documento preparado<input id="operation-document-id" maxlength="256" autocomplete="off" disabled></label>
+      <p id="operation-document-help" hidden>A referência identifica um documento já preparado no sistema. A reconciliação consulta o resultado sem reenviar a emissão.</p>
+      <label id="operation-payload-field">Payload JSON<textarea id="operation-payload" rows="8" spellcheck="false">{}</textarea></label>
       <p id="operation-error" class="form-error" role="alert"></p>
       <div class="dialog-actions">
         <button type="button" class="ghost" id="operation-cancel">Cancelar</button>
