@@ -470,3 +470,33 @@ def test_http_uuid_does_not_replace_domain_issuance_identity(tmp_path):
     second = handler(request.scope, {"document_id": "doc-test"}, str(uuid4()))
     assert first["status"] == second["status"] == "authorized"
     assert second["replay"] and provider.calls == 1
+
+
+def test_unified_wiring_issues_and_recovers_through_same_durable_authority(tmp_path):
+    from kordena_fiscal.operations import FakeFiscalOperationsGateway, FiscalOperationsClient
+    from kordena_fiscal.runtime.provider_operation_wiring import build_provider_operation_handlers
+
+    _, app, request = prepared(tmp_path, archive=True)
+    provider = Provider(AuthorizationStatus.PENDING)
+    query = FakeFiscalOperationsGateway()
+    handlers = build_provider_operation_handlers(
+        FiscalOperationsClient(query),
+        application=app,
+        prepared_xml_gateway=FiscalGatewayClient(provider),
+        archive_retention=RetentionPolicyMetadata("synthetic-unified-wiring", 1),
+    )
+    path = CanonicalFiscalOperationPath(app, handlers=handlers)
+
+    def execute(operation):
+        return path.execute(
+            operation_id=operation,
+            scope=request.scope,
+            payload={"document_id": "doc-test"},
+            idempotency_key="http-uuid",
+        )
+
+    assert execute("issueFiscalDocument")["recovery_required"] is True
+    assert execute("reconcileFiscalOperation")["status"] == "authorized"
+    assert execute("issueFiscalDocument")["replay"] is True
+    assert provider.calls == 1
+    assert len(query.query_calls) == 1

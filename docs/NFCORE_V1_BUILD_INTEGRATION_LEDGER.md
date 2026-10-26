@@ -228,3 +228,17 @@ Ruff global, Mypy 225 fontes e validadores plano/BUILD PASS. CI completa pendent
 BLD-02 IN_PROGRESS; merge exige gates anteriores e do HEAD. Próximos deltas:
 preparação/recuperação NFS-e e composição explicitamente configurada; nenhuma
 homologação, emissão oficial, deploy ou migration produtiva foi autorizada aqui.
+
+Complemento do incremento compartilhado: `build_provider_operation_handlers`
+reutiliza os handlers de emissão preparada e reconciliação quando recebe
+explicitamente aplicação durável, gateway XML e retenção. Configuração parcial
+falha fechada; uso antigo somente com cliente mantém consulta/cancelamento/
+inutilização. Teste atravessa o mesmo OperationPath e a mesma persistência para
+emitir pendente, reconciliar e repetir sem novo envio. Suite dirigida ampliada:
+86 PASS/1 SKIP local; Ruff/Mypy PASS. A CI #1169 anterior ficou SUCCESS, mas este
+acréscimo exige nova CI no novo HEAD antes de merge.
+
+Gate #247 confirmado: pós-merge #1168/Gov #591 SUCCESS no merge
+`f262ecade6b45da3267a3b4742bca3a1714f8acd`. #248 integrada após CI #1167/Gov #590
+SUCCESS; merge `2f60be6d8ba6c9496e1cb1316c3cb047019acd42`, pós-merge pendente.
+Estado continua IN_PROGRESS; nenhuma promoção fictícia do BLD-02 ou BLD-08.
