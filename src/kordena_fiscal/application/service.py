@@ -21,12 +21,24 @@ from kordena_fiscal.events import (
     FiscalInboxReceiveResult,
     FiscalInboxService,
 )
+from kordena_fiscal.gateway import (
+    AuthorizationRequest,
+    AuthorizationResult,
+    AuthorizationStatus,
+    FiscalGatewayClient,
+)
+from kordena_fiscal.issuance.nfe_nfse import (
+    NfseAuthorizationRequest,
+    NfseAuthorizationResult,
+    NfseGatewayClient,
+)
 from kordena_fiscal.lifecycle import (
     FiscalDocumentState,
     FiscalStateMachine,
     FiscalStateSnapshot,
     IdempotencyKey,
     IdempotencyReservation,
+    IssuanceAttempt,
     IssuanceAttemptStatus,
 )
 from kordena_fiscal.numbering import (
@@ -72,6 +84,17 @@ class DurableIssuanceReservation:
             raise FiscalValidationError("disposition must be IssuanceResumeDisposition")
         if self.lifecycle.document_id != self.reservation.attempt.document_id:
             raise FiscalValidationError("lifecycle and idempotency attempt must share document_id")
+
+
+@dataclass(frozen=True, slots=True)
+class DurableAuthorizationOutcome:
+    """Persisted issuance state; absent provider result never means authorization."""
+
+    attempt: IssuanceAttempt
+    lifecycle: FiscalStateSnapshot
+    replay: bool
+    recovery_required: bool
+    provider_result: AuthorizationResult | NfseAuthorizationResult | None = None
 
 
 class FiscalApplicationService:
@@ -291,6 +314,13 @@ class FiscalApplicationService:
         """Atomically couple terminal lifecycle authority and idempotency result."""
 
         with self._uow_factory() as uow:
+            attempts = uow.idempotency.attempts(key)
+            if (
+                not attempts
+                or attempts[-1].document_id != document_id
+                or attempts[-1].generation != generation
+            ):
+                raise PersistenceStateError("finalization does not match durable issuance")
             current = uow.lifecycle.get(document_id)
             if current is None:
                 raise PersistenceStateError("fiscal lifecycle does not exist")
@@ -319,6 +349,13 @@ class FiscalApplicationService:
         """Atomically couple terminal rejection and idempotency result."""
 
         with self._uow_factory() as uow:
+            attempts = uow.idempotency.attempts(key)
+            if (
+                not attempts
+                or attempts[-1].document_id != document_id
+                or attempts[-1].generation != generation
+            ):
+                raise PersistenceStateError("finalization does not match durable issuance")
             current = uow.lifecycle.get(document_id)
             if current is None:
                 raise PersistenceStateError("fiscal lifecycle does not exist")
@@ -333,6 +370,108 @@ class FiscalApplicationService:
             uow.lifecycle.save(updated, expected_version=current.version)
             uow.commit()
             return updated
+
+    def authorize_prepared_document(
+        self,
+        *,
+        document_id: str,
+        request: AuthorizationRequest | NfseAuthorizationRequest,
+        gateway: FiscalGatewayClient | NfseGatewayClient,
+        occurred_at: datetime,
+    ) -> DurableAuthorizationOutcome:
+        """Claim one prepared attempt durably, then call the validated gateway once.
+
+        Preparation/numbering/signing must already have persisted READY_TO_TRANSMIT.
+        A timeout, incompatible response, crash or failed final commit leaves the
+        claim TRANSMITTING: subsequent calls require reconciliation, never resend.
+        External I/O runs outside the database transaction.
+        """
+        if isinstance(request, AuthorizationRequest):
+            if not isinstance(gateway, FiscalGatewayClient):
+                raise FiscalValidationError("XML authorization requires FiscalGatewayClient")
+            scope = request.scope
+        elif isinstance(request, NfseAuthorizationRequest):
+            if not isinstance(gateway, NfseGatewayClient):
+                raise FiscalValidationError("NFS-e authorization requires NfseGatewayClient")
+            if document_id != request.document.document_id:
+                raise FiscalValidationError("NFS-e document identity does not match")
+            scope = request.document.scope
+        else:
+            raise FiscalValidationError("a validated authorization request is required")
+
+        with self._uow_factory() as uow:
+            uow.lifecycle.assert_scope(document_id, scope)
+            attempts = uow.idempotency.attempts(request.idempotency_key)
+            if not attempts:
+                raise PersistenceStateError("durable issuance reservation is required")
+            attempt = attempts[-1]
+            if (
+                attempt.document_id != document_id
+                or attempt.request_fingerprint != request.request_fingerprint
+            ):
+                raise PersistenceStateError("authorization does not match durable issuance")
+            current = uow.lifecycle.get(document_id)
+            if current is None:
+                raise PersistenceStateError("fiscal lifecycle does not exist")
+            if attempt.status is not IssuanceAttemptStatus.RESERVED:
+                return DurableAuthorizationOutcome(attempt, current, True, False)
+            if current.state is FiscalDocumentState.TRANSMITTING:
+                return DurableAuthorizationOutcome(attempt, current, True, True)
+            if current.state is not FiscalDocumentState.READY_TO_TRANSMIT:
+                raise PersistenceStateError("issuance is not ready to transmit")
+            transmitting = self._state_machine.transition(
+                current,
+                FiscalDocumentState.TRANSMITTING,
+                occurred_at=occurred_at,
+                reason="durable provider dispatch claim",
+                correlation_id=scope.correlation_id,
+            )
+            uow.lifecycle.save(transmitting, expected_version=current.version)
+            uow.commit()
+
+        if isinstance(request, AuthorizationRequest) and isinstance(gateway, FiscalGatewayClient):
+            result: AuthorizationResult | NfseAuthorizationResult = gateway.authorize(request)
+        else:
+            assert isinstance(request, NfseAuthorizationRequest)
+            assert isinstance(gateway, NfseGatewayClient)
+            result = gateway.authorize(request)
+        if result.status is AuthorizationStatus.AUTHORIZED:
+            reference = (
+                result.protocol_reference
+                if isinstance(result, AuthorizationResult)
+                else result.invoice_reference
+            )
+            assert reference is not None  # Validated by the canonical gateway boundary.
+            self.finalize_authorized(
+                key=attempt.key,
+                generation=attempt.generation,
+                document_id=document_id,
+                result_reference=reference,
+                occurred_at=occurred_at,
+                reason="provider authorization confirmed",
+                correlation_id=scope.correlation_id,
+            )
+        elif result.status is AuthorizationStatus.REJECTED:
+            assert result.rejection_code is not None
+            self.finalize_rejected(
+                key=attempt.key,
+                generation=attempt.generation,
+                document_id=document_id,
+                rejection_reason=result.rejection_code,
+                occurred_at=occurred_at,
+                correlation_id=scope.correlation_id,
+            )
+        with self._uow_factory() as uow:
+            latest = uow.idempotency.attempts(attempt.key)[-1]
+            lifecycle = uow.lifecycle.get(document_id)
+            assert lifecycle is not None
+            return DurableAuthorizationOutcome(
+                latest,
+                lifecycle,
+                False,
+                latest.status is IssuanceAttemptStatus.RESERVED,
+                result,
+            )
 
     def reserve_number(
         self,

@@ -118,3 +118,22 @@ Próximo bloco:
 ## Backlog de homologação e produção: preservado, não confundido
 
 P05-T03/T04/T05 **provas operacionais adicionais**, P08 canal de pagamento real, P09-T04 rotina periódica/retention/RPO/RTO de produção, P09-T05 runbooks finais, P10 homologação oficial, P11 infra definitiva, P12 certificação/Go-No-Go. Backup/restauração isolados **já realizados** em 12/10/2026; não reexecutar só para satisfazer checklist. Nenhum cliente real ou produção comercial ativa neste estágio.
+
+### BLD-02 — emissão preparada com autoridade durável (26/10/2026)
+
+Base confirmada: `364bd2822222db596173e822aadc62bb4c2733b4`, CI #1158 e
+Governança #579 SUCCESS. Escopo BUILD-ONLY: ligar requests já preparados de
+NF-e/NFC-e/NFS-e aos gateways existentes com claim transacional antes do I/O,
+resultado terminal acoplado à tentativa correta e recuperação sem reenvio
+após timeout/crash. `FiscalApplicationService` e `CanonicalFiscalOperationPath`
+continuam sendo autoridades únicas. Handler opt-in exige resolver confiável
+para documento preparado; payload Web não fornece XML/resultado/credencial.
+A chave HTTP/UUID do intent permanece distinta da chave fiscal canônica.
+
+Estado: IMPLEMENTED_NOT_CERTIFIED; BLD-02 permanece IN_PROGRESS. Testes dirigidos
+iniciais: 21 PASS; teste PostgreSQL depende do serviço descartável de CI.
+Ruff e Mypy de 225 fontes PASS no levantamento local. PR #245 aberta em Draft; CI do HEAD final pendente.
+Sem migration, deploy, mudança de production ou provider real. Permanecem
+pendentes a composição da preparação/assinatura por família, UI de emissão,
+reconciliação de evidência externa confiável e certificação integral BLD-02.
+Não confundir este caminho de emissão preparada com a jornada V1 concluída.
