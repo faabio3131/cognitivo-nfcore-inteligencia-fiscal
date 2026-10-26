@@ -7,9 +7,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from kordena_fiscal.runtime import production_first_admin as bootstrap
 from kordena_fiscal.runtime.commercial_provisioning import CommercialCustomerProvisioningService
 from kordena_fiscal.security.human_identity import PortalRole
-from scripts.admin import bootstrap_production_platform_admin as bootstrap
 
 MAIL = "primary-admin@nfcore.example"
 

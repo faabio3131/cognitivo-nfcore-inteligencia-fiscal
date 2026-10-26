@@ -9,8 +9,8 @@ import pytest
 
 from kordena_fiscal.control_plane.models import ControlPlaneAuditAction
 from kordena_fiscal.persistence.postgres import PostgresFiscalDatabase
+from kordena_fiscal.runtime import production_first_admin as bootstrap
 from kordena_fiscal.runtime.commercial_provisioning import CommercialCustomerProvisioningService
-from scripts.admin import bootstrap_production_platform_admin as bootstrap
 
 MAIL = "platform-bootstrap@nfcore.example"
 TENANT = "fm-platform"
