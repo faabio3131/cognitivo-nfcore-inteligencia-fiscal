@@ -45,8 +45,11 @@ def build_provider_issuance_handler(
         )
         if request_scope.identity_partition_key != scope.identity_partition_key:
             raise FiscalValidationError("prepared issuance does not match execution scope")
-        if idempotency_key != request.idempotency_key.value:
-            raise FiscalValidationError("issuance key must match prepared document")
+        # HTTP intent identity and canonical issuance identity are distinct.
+        # Portal already binds its UUID to the payload; the domain request key
+        # protects the same fiscal document even across different HTTP attempts.
+        if not isinstance(idempotency_key, str) or not idempotency_key.strip():
+            raise FiscalValidationError("HTTP idempotency key is required")
         outcome = application.authorize_prepared_document(
             document_id=document_id,
             request=request,

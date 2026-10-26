@@ -353,7 +353,7 @@ def test_concurrent_dispatch_calls_provider_only_once(tmp_path):
     "payload,key",
     [
         ({"document_id": "doc-test", "signed_xml": "injected"}, "a" * 64),
-        ({"document_id": "doc-test"}, "c" * 64),
+        ({"document_id": "doc-test"}, ""),
         ({}, "a" * 64),
     ],
 )
@@ -426,3 +426,17 @@ def test_postgres_concurrent_claim_and_restart(tmp_path):
         database.close()
         with psycopg.connect(dsn, autocommit=True) as connection:
             connection.execute(SQL("DROP SCHEMA {} CASCADE").format(Identifier(schema)))
+
+
+def test_http_uuid_does_not_replace_domain_issuance_identity(tmp_path):
+    from uuid import uuid4
+
+    db, app, request = prepared(tmp_path)
+    provider = Provider()
+    handler = build_provider_issuance_handler(
+        app, resolve_prepared=lambda s, d: request, gateway=FiscalGatewayClient(provider)
+    )
+    first = handler(request.scope, {"document_id": "doc-test"}, str(uuid4()))
+    second = handler(request.scope, {"document_id": "doc-test"}, str(uuid4()))
+    assert first["status"] == second["status"] == "authorized"
+    assert second["replay"] and provider.calls == 1

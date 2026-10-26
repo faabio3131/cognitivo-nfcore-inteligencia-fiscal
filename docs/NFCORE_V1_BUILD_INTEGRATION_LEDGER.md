@@ -128,10 +128,11 @@ resultado terminal acoplado à tentativa correta e recuperação sem reenvio
 após timeout/crash. `FiscalApplicationService` e `CanonicalFiscalOperationPath`
 continuam sendo autoridades únicas. Handler opt-in exige resolver confiável
 para documento preparado; payload Web não fornece XML/resultado/credencial.
+A chave HTTP/UUID do intent permanece distinta da chave fiscal canônica.
 
 Estado: IMPLEMENTED_NOT_CERTIFIED; BLD-02 permanece IN_PROGRESS. Testes dirigidos
-iniciais: 20 PASS; teste PostgreSQL depende do serviço descartável de CI.
-Ruff e Mypy de 225 fontes PASS no levantamento local. CI do novo HEAD pendente.
+iniciais: 21 PASS; teste PostgreSQL depende do serviço descartável de CI.
+Ruff e Mypy de 225 fontes PASS no levantamento local. PR #245 aberta em Draft; CI do HEAD final pendente.
 Sem migration, deploy, mudança de production ou provider real. Permanecem
 pendentes a composição da preparação/assinatura por família, UI de emissão,
 reconciliação de evidência externa confiável e certificação integral BLD-02.
