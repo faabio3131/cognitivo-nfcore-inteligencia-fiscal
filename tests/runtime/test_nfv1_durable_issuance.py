@@ -374,7 +374,7 @@ def test_postgres_concurrent_claim_and_restart(tmp_path):
     import os
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
-    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+    from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
     from uuid import uuid4
 
     import psycopg
@@ -391,7 +391,7 @@ def test_postgres_concurrent_claim_and_restart(tmp_path):
     uri = urlsplit(dsn)
     query = dict(parse_qsl(uri.query))
     query["options"] = f"-c search_path={schema}"
-    isolated_dsn = urlunsplit(uri._replace(query=urlencode(query)))
+    isolated_dsn = urlunsplit(uri._replace(query=urlencode(query, quote_via=quote)))
     database = None
     try:
         database = PostgresFiscalDatabase(isolated_dsn, min_pool_size=1, max_pool_size=8)
