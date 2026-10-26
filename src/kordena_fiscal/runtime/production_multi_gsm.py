@@ -40,7 +40,11 @@ from .observability import (
     WorkerHealth,
     WorkerObservability,
 )
-from .production_gsm import production_config, production_credentials
+from .production_gsm import (
+    ProductionWorkloadIdentity,
+    production_config,
+    production_credentials,
+)
 from .secret_manager import build_gsm_worker_webhook_dependencies
 from .worker_composition import (
     DELIVER_WEBHOOK_OPERATION,
@@ -328,6 +332,17 @@ def production_multi_worker_handler_factory(
             or settings.secret_backend != "external"
         ):
             raise RuntimeConfigurationError("multi-tenant GSM Worker requires production/external")
+        project, _ = platform_project(source)
+        # Read and validate the single Worker service account even before the
+        # first tenant exists. No simulated key or fake tenant identity.
+        production_credentials(
+            source,
+            ProductionWorkloadIdentity(
+                role="WORKER",
+                project=project,
+                service_account=source["NFCORE_GSM_WORKER_SERVICE_ACCOUNT"],
+            ),
+        )
         return MultiTenantGsmWorkerComposition(database, source, namespace)
 
     return build

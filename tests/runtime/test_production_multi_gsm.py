@@ -180,6 +180,18 @@ def test_worker_factory_denies_staging_and_weak_project_identity() -> None:
         )
 
 
+def test_worker_continuous_bootstrap_requires_real_platform_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = env()
+    factory = production_multi_worker_handler_factory(source)
+    with pytest.raises(RuntimeConfigurationError, match="workload identity unavailable"):
+        factory(
+            FakeDatabase([]),
+            SimpleNamespace(environment=RuntimeEnvironment.PRODUCTION, secret_backend="external"),
+        )
+
+
 def test_single_worker_process_accepts_new_tenant_without_restart(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
