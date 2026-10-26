@@ -181,3 +181,22 @@ prova efetiva depende da CI. Ruff e Mypy global/validadores de plano e BUILD PAS
 Estado IMPLEMENTED_NOT_CERTIFIED; BLD-02 IN_PROGRESS. Sem deploy/migration real,
 credencial, decisão de provider ou emissão oficial. Próximo delta interno:
 formulários de emissão preparada/reconciliação no Portal e composição explícita.
+
+### BLD-02 — Portal para documentos preparados (26/10/2026)
+
+PR #246 integrada: HEAD `30fae0e760002217744ba5a605dbd7d21c984ecc`, CI #1164/Gov
+#586 SUCCESS; 2483 Python PASS/3 SKIP e 31 E2E PASS. Merge
+`4bb9616ad6b03415f47ff6b8f456a7e740d67f2c`, pós-merge #1165 iniciado. Suíte
+completa local também terminou sem falhas. PR #247 de reconciliação em Draft,
+HEAD `e1bda2cb4c909d5cafdc28c094c1c8bcba098df8`, CI #1166 em execução;
+Governança #589 SUCCESS. Nenhum deploy.
+
+Incremento Portal dependente da #247: emissão preparada/reconciliação recebem
+campo document_id e ocultam JSON; mantêm escopo autorizado, CSRF, intent e chave
+HTTP originais. Recibo continua distinto de confirmação fiscal; resultado deve
+ser consultado na projeção durável de Emissões. Teste browser adiciona jornada
+real local HTTP/auth/intent/SQLite/reconciliação; só fronteira provider é sintética.
+Teste HTTP local executado com sucesso até lifecycle autorizado. Testes frontend
+18 PASS, lint/typecheck/build e Ruff/validadores PASS. Chromium local indisponível
+por download inválido; E2E completo obrigatório na CI, sem desabilitação de testes.
+BLD-02 continua IN_PROGRESS e integração exige gates das predecessoras e do HEAD.

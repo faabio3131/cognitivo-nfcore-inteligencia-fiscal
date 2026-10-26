@@ -91,7 +91,7 @@ test("an in-flight submit is locked and a read cannot erase a pending mutation k
   await page.goto(origin);
   await page.getByRole("button", {name: "Emissões", exact: true}).click();
   await page.getByRole("button", {name: "Executar operação governada"}).click();
-  await page.locator("#operation-payload").fill('{"synthetic_intent":"same-content"}');
+  await page.locator("#operation-document-id").fill("synthetic-prepared-document");
   await page.locator("#operation-form").evaluate((form) => {form.requestSubmit(); form.requestSubmit();});
   await expect(page.locator('#operation-form button[type="submit"]')).toBeDisabled();
   await expect(page.locator("#operation-error")).toContainText("Synthetic outcome unknown");
