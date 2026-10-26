@@ -161,3 +161,23 @@ Sem migration/deploy/provedor real. Faltam preparação completa das outras fam�
 composição/UI e reconciliação confiável de resultados; números reservados antes de
 falha de preparação não são reutilizados automaticamente. Próximo delta: recuperar
 resultado por consulta validada ao provedor, sem retransmissão.
+
+### BLD-02 — reconciliação de autorização por consulta validada (26/10/2026)
+
+Incremento dependente da preparação da PR #246, mantido em branch isolada
+`feat/nfv1-bld02-provider-reconciliation-20261026`; integração condicionada aos
+gates pré/pós-merge da predecessora e aos gates deste HEAD.
+`FiscalApplicationService` recupera o pedido arquivado, consulta exclusivamente
+`FiscalOperationsClient` configurado e grava evidência normalizada + autorização
++ tentativa na mesma UOW. Pendente/não encontrado/cancelado sem protocolo de
+cancelamento não concluem nem reenviam emissão. Resultado terminal concorrente
+não é sobrescrito. Handler canônico de reconciliação aceita somente referência;
+nenhum resultado, XML ou seleção de provedor vem do navegador.
+
+Testes dirigidos: 52 PASS/1 SKIP local (PostgreSQL), incluindo resposta incompatível,
+timeout, rollback de evidência e concorrência de resultado terminal. Teste
+PostgreSQL isolado existente ampliado para arquivo e recuperação por consulta;
+prova efetiva depende da CI. Ruff e Mypy global/validadores de plano e BUILD PASS.
+Estado IMPLEMENTED_NOT_CERTIFIED; BLD-02 IN_PROGRESS. Sem deploy/migration real,
+credencial, decisão de provider ou emissão oficial. Próximo delta interno:
+formulários de emissão preparada/reconciliação no Portal e composição explícita.

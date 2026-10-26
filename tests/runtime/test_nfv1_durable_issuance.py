@@ -7,6 +7,7 @@ from decimal import Decimal
 import pytest
 
 from kordena_fiscal.application.service import FiscalApplicationService
+from kordena_fiscal.archive import RetentionPolicyMetadata
 from kordena_fiscal.domain import Cnpj, ElectronicInvoiceModel, ExecutionScope, FiscalEnvironment
 from kordena_fiscal.gateway import (
     AuthorizationRequest,
@@ -29,7 +30,7 @@ from kordena_fiscal.xml import AccessKeyInput, build_access_key
 NOW = datetime(2026, 10, 26, tzinfo=UTC)
 
 
-def prepared(tmp_path, model=ElectronicInvoiceModel.NFE, db=None):
+def prepared(tmp_path, model=ElectronicInvoiceModel.NFE, db=None, archive=False):
     db = db or SqliteFiscalDatabase(tmp_path / "issuance.sqlite")
     db.initialize()
     app = FiscalApplicationService(db)
@@ -65,6 +66,14 @@ def prepared(tmp_path, model=ElectronicInvoiceModel.NFE, db=None):
         FiscalDocumentState.SIGNING,
         FiscalDocumentState.READY_TO_TRANSMIT,
     ):
+        if archive and state is FiscalDocumentState.READY_TO_TRANSMIT:
+            app.persist_prepared_authorization(
+                document_id="doc-test",
+                request=request,
+                occurred_at=NOW,
+                retention=RetentionPolicyMetadata("synthetic-test", 1),
+            )
+            continue
         app.transition_lifecycle(
             "doc-test",
             state,
@@ -395,7 +404,7 @@ def test_postgres_concurrent_claim_and_restart(tmp_path):
     database = None
     try:
         database = PostgresFiscalDatabase(isolated_dsn, min_pool_size=1, max_pool_size=8)
-        db, app, request = prepared(tmp_path, db=database)
+        db, app, request = prepared(tmp_path, db=database, archive=True)
         provider = Provider(AuthorizationStatus.PENDING)
         barrier = Barrier(4)
 
@@ -423,6 +432,25 @@ def test_postgres_concurrent_claim_and_restart(tmp_path):
         )
         assert replay.recovery_required and replay.replay
         assert provider.calls == 1
+        from kordena_fiscal.operations import FakeFiscalOperationsGateway, FiscalOperationsClient
+
+        query_provider = FakeFiscalOperationsGateway()
+        recovered = FiscalApplicationService(database).reconcile_prepared_authorization(
+            scope=request.scope,
+            document_id="doc-test",
+            client=FiscalOperationsClient(query_provider),
+            occurred_at=NOW,
+            retention=RetentionPolicyMetadata("synthetic-test", 1),
+        )
+        assert recovered.lifecycle.state is FiscalDocumentState.AUTHORIZED
+        assert recovered.attempt.status is IssuanceAttemptStatus.AUTHORIZED
+        assert recovered.recovery_required is False
+        assert len(query_provider.query_calls) == 1
+        assert provider.calls == 1
+        with database() as uow:
+            artifacts = uow.archive.list_for_document(request.scope, "doc-test")
+            assert len(artifacts) == 2
+            assert sum(e.kind.value == "provider_response" for e in artifacts) == 1
     finally:
         if database is not None:
             database.close()
