@@ -137,3 +137,27 @@ Sem migration, deploy, mudança de production ou provider real. Permanecem
 pendentes a composição da preparação/assinatura por família, UI de emissão,
 reconciliação de evidência externa confiável e certificação integral BLD-02.
 Não confundir este caminho de emissão preparada com a jornada V1 concluída.
+
+
+### BLD-02 — preparação NFC-e durável e pedido recuperável (26/10/2026)
+
+Gate da PR #245 confirmado: HEAD `4d1c7ab0f701bfc4af6fa21501983b0f526eedb5`,
+CI #1162/Gov #584 SUCCESS; merge `cf1896c07b3be952678f5ced34988133513467a7`,
+CI pós-merge [#1163](https://github.com/faabio3131/nf-core-v001/actions/runs/40371609336)
+e Gov #585 SUCCESS. Substitui o estado provisório do checkpoint anterior.
+
+Incremento em `feat/nfv1-bld02-preparation-recovery-20261026`: o orquestrador NFC-e
+existente aceita a autoridade persistente, reserva numeração nela e conserva as
+transições de validação/assinatura. Pedido XML assinado e READY_TO_TRANSMIT são
+gravados atomicamente no arquivo fiscal existente; o resolver recupera o pedido
+por escopo após reinício. Retenção vem da composição, sem política legal inventada.
+Artefato preparado usa OTHER, nunca AUTHORIZED_XML antes de autorização.
+
+20 testes de orquestração PASS, incluindo reinício em autorizado/rejeitado/pendente,
+crash antes do envio, timeout sem reenvio, isolamento e rollback de arquivo+lifecycle.
+Ruff global e Mypy de 225 fontes PASS; validadores de plano/BUILD PASS.
+CI remota deste incremento ainda pendente; BLD-02 permanece IN_PROGRESS.
+Sem migration/deploy/provedor real. Faltam preparação completa das outras famílias,
+composição/UI e reconciliação confiável de resultados; números reservados antes de
+falha de preparação não são reutilizados automaticamente. Próximo delta: recuperar
+resultado por consulta validada ao provedor, sem retransmissão.

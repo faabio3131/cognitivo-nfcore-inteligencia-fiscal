@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import base64
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
-from kordena_fiscal.archive import FiscalArchiveEntry
+from kordena_fiscal.archive import FiscalArchiveEntry, FiscalArchiveKind, RetentionPolicyMetadata
 from kordena_fiscal.contingency import FiscalOutboxEnqueueResult, FiscalOutboxEntry
 from kordena_fiscal.domain import (
     ExecutionScope,
@@ -58,6 +60,7 @@ from kordena_fiscal.reconciliation import (
     FiscalReconciliationResult,
 )
 from kordena_fiscal.runtime.observability import MetricsRegistry
+from kordena_fiscal.xml import NfeAccessKey
 
 
 class IssuanceResumeDisposition(StrEnum):
@@ -370,6 +373,105 @@ class FiscalApplicationService:
             uow.lifecycle.save(updated, expected_version=current.version)
             uow.commit()
             return updated
+
+    def persist_prepared_authorization(
+        self,
+        *,
+        document_id: str,
+        request: AuthorizationRequest,
+        occurred_at: datetime,
+        retention: RetentionPolicyMetadata,
+    ) -> FiscalArchiveEntry:
+        """Atomically preserve the signed transport request and mark it ready.
+
+        Called only by trusted preparation after schema/signature validation.
+        This artifact is not an authorized XML and contains no private key.
+        """
+        content = json.dumps(
+            {
+                "access_key": request.access_key.value,
+                "idempotency_key": request.idempotency_key.value,
+                "request_fingerprint": request.request_fingerprint,
+                "signed_xml": base64.b64encode(request.signed_xml).decode("ascii"),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        entry = FiscalArchiveEntry.build(
+            scope=request.scope,
+            document_reference=document_id,
+            kind=FiscalArchiveKind.OTHER,
+            content=content,
+            media_type="application/vnd.nfcore.prepared-xml.v1+json",
+            archived_at=occurred_at,
+            retention=retention,
+        )
+        with self._uow_factory() as uow:
+            uow.lifecycle.assert_scope(document_id, request.scope)
+            attempts = uow.idempotency.attempts(request.idempotency_key)
+            if (
+                not attempts
+                or attempts[-1].document_id != document_id
+                or attempts[-1].request_fingerprint != request.request_fingerprint
+                or attempts[-1].status is not IssuanceAttemptStatus.RESERVED
+            ):
+                raise PersistenceStateError("prepared request does not match durable issuance")
+            current = uow.lifecycle.get(document_id)
+            if current is None or current.state is not FiscalDocumentState.SIGNING:
+                raise PersistenceStateError("preparation requires signing lifecycle")
+            ready = self._state_machine.transition(
+                current,
+                FiscalDocumentState.READY_TO_TRANSMIT,
+                occurred_at=occurred_at,
+                reason="signed transport request archived",
+                correlation_id=request.scope.correlation_id,
+            )
+            persisted = uow.archive.append(entry)
+            uow.lifecycle.save(ready, expected_version=current.version)
+            uow.commit()
+            return persisted
+
+    def load_prepared_authorization(
+        self, scope: ExecutionScope, document_id: str
+    ) -> AuthorizationRequest:
+        """Resolve a current prepared XML request from the scoped durable archive."""
+        with self._uow_factory() as uow:
+            uow.lifecycle.assert_scope(document_id, scope)
+            matches: list[AuthorizationRequest] = []
+            for entry in uow.archive.list_for_document(scope, document_id):
+                if (
+                    entry.kind is not FiscalArchiveKind.OTHER
+                    or entry.media_type != "application/vnd.nfcore.prepared-xml.v1+json"
+                ):
+                    continue
+                try:
+                    data = json.loads(entry.content)
+                    if (
+                        not isinstance(data, dict)
+                        or set(data)
+                        != {"access_key", "idempotency_key", "request_fingerprint", "signed_xml"}
+                        or not all(isinstance(value, str) for value in data.values())
+                    ):
+                        raise ValueError("invalid prepared request shape")
+                    request = AuthorizationRequest(
+                        scope=scope,
+                        access_key=NfeAccessKey(data["access_key"]),
+                        idempotency_key=IdempotencyKey(data["idempotency_key"]),
+                        request_fingerprint=data["request_fingerprint"],
+                        signed_xml=base64.b64decode(data["signed_xml"], validate=True),
+                    )
+                except (ValueError, TypeError, FiscalValidationError) as exc:
+                    raise PersistenceStateError("invalid archived prepared request") from exc
+                attempts = uow.idempotency.attempts(request.idempotency_key)
+                if (
+                    attempts
+                    and attempts[-1].document_id == document_id
+                    and attempts[-1].request_fingerprint == request.request_fingerprint
+                ):
+                    matches.append(request)
+            if len(matches) != 1:
+                raise PersistenceStateError("one current prepared request is required")
+            return matches[0]
 
     def authorize_prepared_document(
         self,

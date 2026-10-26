@@ -5,6 +5,8 @@ from decimal import Decimal
 
 import pytest
 
+from kordena_fiscal.application.service import FiscalApplicationService
+from kordena_fiscal.archive import RetentionPolicyMetadata
 from kordena_fiscal.documents import CanonicalFiscalDocument, FiscalLineSnapshot
 from kordena_fiscal.domain import (
     BrazilianJurisdiction,
@@ -40,7 +42,13 @@ from kordena_fiscal.lifecycle import (
     IssuanceAttemptStatus,
 )
 from kordena_fiscal.numbering import FiscalSequenceManager, InMemoryFiscalSequenceStore
+from kordena_fiscal.persistence import (
+    PersistenceConflictError,
+    PersistenceStateError,
+    SqliteFiscalDatabase,
+)
 from kordena_fiscal.runtime.observability import MetricsRegistry
+from kordena_fiscal.runtime.provider_issuance_handler import build_provider_issuance_handler
 from kordena_fiscal.security import (
     CertificateReference,
     FiscalSignerKind,
@@ -262,6 +270,7 @@ def _system(
     *,
     assembler=None,  # type: ignore[no-untyped-def]
     metrics: MetricsRegistry | None = None,
+    application: FiscalApplicationService | None = None,
 ):
     idempotency_store = InMemoryIdempotencyStore()
     numbering_store = InMemoryFiscalSequenceStore()
@@ -269,8 +278,10 @@ def _system(
     gateway_adapter = FakeFiscalGateway(mode)
     numeric_code_provider = _FixedNumericCodeProvider()
     orchestrator = NfceIssuanceOrchestrator(
-        idempotency=IdempotencyCoordinator(idempotency_store),
-        numbering=numbering,
+        idempotency=IdempotencyCoordinator(idempotency_store) if application is None else None,
+        numbering=numbering if application is None else None,
+        application=application,
+        archive_retention=RetentionPolicyMetadata("synthetic-test", 1) if application else None,
         numeric_code_provider=numeric_code_provider,
         xml_builder=_SyntheticXmlBuilder(),
         xml_validator=_validator(),
@@ -460,3 +471,169 @@ def test_nfce_gateway_exception_records_provider_error_without_changing_exceptio
         {"name": "nfcore_provider_errors_total", "value": 1.0,
          "labels": {"outcome": "error"}}
     ]
+
+
+@pytest.mark.parametrize("mode", list(FakeGatewayMode))
+def test_durable_pipeline_archives_signed_request_and_restarts_without_resend(tmp_path, mode):
+    db = SqliteFiscalDatabase(tmp_path / "pipeline.sqlite")
+    db.initialize()
+    app = FiscalApplicationService(db)
+    pipeline, provider, _, numeric = _system(mode, application=app)
+    command = _command()
+    result = pipeline.issue(command)
+    restarted = FiscalApplicationService(SqliteFiscalDatabase(db.path))
+    request = restarted.load_prepared_authorization(
+        command.document.scope, command.document.document_id
+    )
+    assert request == provider.calls[0]
+    assert hashlib.sha256(request.signed_xml).hexdigest() == result.signed_xml_sha256
+    handler = build_provider_issuance_handler(
+        restarted,
+        resolve_prepared=restarted.load_prepared_authorization,
+        gateway=FiscalGatewayClient(provider),
+    )
+    response = handler(
+        command.document.scope, {"document_id": command.document.document_id}, "http-uuid"
+    )
+    assert response["replay"] is True
+    assert response["recovery_required"] is (mode is FakeGatewayMode.PENDING)
+    retry, _, _, retry_numeric = _system(mode, application=restarted)
+    assert retry.issue(command).replay is True
+    assert retry_numeric.calls == 0
+    assert numeric.calls == 1
+    assert len(provider.calls) == 1
+    with db() as uow:
+        entries = uow.archive.list_for_document(
+            command.document.scope, command.document.document_id
+        )
+        assert len(entries) == 1
+        assert entries[0].kind.value == "other"
+        assert uow.lifecycle.get(command.document.document_id) == result.lifecycle
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("tenant_id", "other-tenant"),
+        ("unit_id", "other-unit"),
+        ("environment", FiscalEnvironment.PRODUCTION),
+        ("host_namespace", "other-host"),
+    ],
+)
+def test_prepared_archive_resolver_rejects_cross_scope(tmp_path, field, value):
+    db = SqliteFiscalDatabase(tmp_path / "scope.sqlite")
+    db.initialize()
+    app = FiscalApplicationService(db)
+    pipeline, _, _, _ = _system(FakeGatewayMode.AUTHORIZE, application=app)
+    command = _command()
+    pipeline.issue(command)
+    with pytest.raises(PersistenceConflictError, match="scope"):
+        app.load_prepared_authorization(
+            replace(command.document.scope, **{field: value}), command.document.document_id
+        )
+
+
+def test_durable_preparation_failure_never_dispatches_or_reallocates_on_retry(tmp_path):
+    db = SqliteFiscalDatabase(tmp_path / "failure.sqlite")
+    db.initialize()
+    app = FiscalApplicationService(db)
+    pipeline, provider, _, numeric = _system(
+        FakeGatewayMode.AUTHORIZE, application=app, assembler=_UnsafePassthroughAssembler()
+    )
+    command = _command()
+    with pytest.raises(NfceIssuanceContractError, match="unsigned"):
+        pipeline.issue(command)
+    assert pipeline.issue(command).replay is True
+    assert len(provider.calls) == 0
+    assert numeric.calls == 1
+    with db() as uow:
+        assert uow.lifecycle.get(command.document.document_id).state is FiscalDocumentState.SIGNING
+        assert (
+            uow.archive.list_for_document(command.document.scope, command.document.document_id)
+            == ()
+        )
+    with pytest.raises(PersistenceStateError, match="one current"):
+        app.load_prepared_authorization(command.document.scope, command.document.document_id)
+
+
+def test_archive_and_ready_transition_rollback_together(tmp_path, monkeypatch):
+    from kordena_fiscal.persistence.sqlite_core import SqliteLifecycleRepository
+
+    db = SqliteFiscalDatabase(tmp_path / "atomic.sqlite")
+    db.initialize()
+    app = FiscalApplicationService(db)
+    pipeline, provider, _, _ = _system(FakeGatewayMode.AUTHORIZE, application=app)
+    original_save = SqliteLifecycleRepository.save
+
+    def fail_ready(self, snapshot, *, expected_version):
+        if snapshot.state is FiscalDocumentState.READY_TO_TRANSMIT:
+            raise RuntimeError("synthetic commit boundary failure")
+        return original_save(self, snapshot, expected_version=expected_version)
+
+    monkeypatch.setattr(SqliteLifecycleRepository, "save", fail_ready)
+    command = _command()
+    with pytest.raises(RuntimeError, match="synthetic commit"):
+        pipeline.issue(command)
+    with db() as uow:
+        assert uow.lifecycle.get(command.document.document_id).state is FiscalDocumentState.SIGNING
+        assert (
+            uow.archive.list_for_document(command.document.scope, command.document.document_id)
+            == ()
+        )
+    assert not provider.calls
+
+
+def test_prepared_request_survives_crash_before_dispatch(tmp_path, monkeypatch):
+    db = SqliteFiscalDatabase(tmp_path / "before-dispatch.sqlite")
+    db.initialize()
+    app = FiscalApplicationService(db)
+    pipeline, provider, _, _ = _system(FakeGatewayMode.AUTHORIZE, application=app)
+    command = _command()
+
+    def crash(**kwargs):
+        raise RuntimeError("synthetic process exit")
+
+    monkeypatch.setattr(app, "authorize_prepared_document", crash)
+    with pytest.raises(RuntimeError, match="synthetic process exit"):
+        pipeline.issue(command)
+    assert not provider.calls
+    restarted = FiscalApplicationService(SqliteFiscalDatabase(db.path))
+    handler = build_provider_issuance_handler(
+        restarted,
+        resolve_prepared=restarted.load_prepared_authorization,
+        gateway=FiscalGatewayClient(provider),
+    )
+    response = handler(
+        command.document.scope, {"document_id": command.document.document_id}, "http-uuid"
+    )
+    assert response["status"] == "authorized"
+    assert response["replay"] is False
+    assert len(provider.calls) == 1
+
+
+def test_timeout_preserves_signed_request_without_automatic_retry(tmp_path):
+    db = SqliteFiscalDatabase(tmp_path / "timeout.sqlite")
+    db.initialize()
+    app = FiscalApplicationService(db)
+    pipeline, provider, _, _ = _system(FakeGatewayMode.AUTHORIZE, application=app)
+    command = _command()
+
+    class TimeoutProvider:
+        def authorize(self, request):
+            raise TimeoutError("synthetic timeout")
+
+    pipeline._gateway = FiscalGatewayClient(TimeoutProvider())
+    with pytest.raises(TimeoutError):
+        pipeline.issue(command)
+    restarted = FiscalApplicationService(SqliteFiscalDatabase(db.path))
+    handler = build_provider_issuance_handler(
+        restarted,
+        resolve_prepared=restarted.load_prepared_authorization,
+        gateway=FiscalGatewayClient(provider),
+    )
+    response = handler(
+        command.document.scope, {"document_id": command.document.document_id}, "http-uuid"
+    )
+    assert response["status"] == "transmitting"
+    assert response["recovery_required"] is True
+    assert not provider.calls
