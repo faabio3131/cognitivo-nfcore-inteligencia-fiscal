@@ -374,10 +374,10 @@ def test_postgres_concurrent_claim_and_restart(tmp_path):
     import os
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
     from uuid import uuid4
 
     import psycopg
-    from psycopg.conninfo import make_conninfo
     from psycopg.sql import SQL, Identifier
 
     from kordena_fiscal.persistence.postgres import PostgresFiscalDatabase
@@ -388,12 +388,13 @@ def test_postgres_concurrent_claim_and_restart(tmp_path):
     schema = "issuance_test_" + uuid4().hex
     with psycopg.connect(dsn, autocommit=True) as connection:
         connection.execute(SQL("CREATE SCHEMA {}").format(Identifier(schema)))
-    database = PostgresFiscalDatabase(
-        make_conninfo(dsn, options=f"-c search_path={schema}"),
-        min_pool_size=1,
-        max_pool_size=8,
-    )
+    uri = urlsplit(dsn)
+    query = dict(parse_qsl(uri.query))
+    query["options"] = f"-c search_path={schema}"
+    isolated_dsn = urlunsplit(uri._replace(query=urlencode(query)))
+    database = None
     try:
+        database = PostgresFiscalDatabase(isolated_dsn, min_pool_size=1, max_pool_size=8)
         db, app, request = prepared(tmp_path, db=database)
         provider = Provider(AuthorizationStatus.PENDING)
         barrier = Barrier(4)
@@ -423,7 +424,8 @@ def test_postgres_concurrent_claim_and_restart(tmp_path):
         assert replay.recovery_required and replay.replay
         assert provider.calls == 1
     finally:
-        database.close()
+        if database is not None:
+            database.close()
         with psycopg.connect(dsn, autocommit=True) as connection:
             connection.execute(SQL("DROP SCHEMA {} CASCADE").format(Identifier(schema)))
 
