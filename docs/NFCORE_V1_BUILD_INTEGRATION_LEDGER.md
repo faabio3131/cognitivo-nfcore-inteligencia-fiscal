@@ -257,3 +257,56 @@ lint/typecheck/build e Ruff/Mypy globais PASS. E2E de reconciliação ampliado c
 referência inválida seguida da correção. HEAD anterior não certifica este delta;
 exige nova CI completa antes de merge. Pós-merge #248 confirmado: #1170/Gov #593
 SUCCESS no SHA `2f60be6d8ba6c9496e1cb1316c3cb047019acd42`. BLD-02 segue aberto.
+
+### BLD-02 — preparação e recuperação durável NFS-e (27/10/2026)
+
+Base `9d33e531b1885b42c817720d1786616cebd1b722`, com PR #249 integrada e
+CI pós-merge #1179/Gov #602 SUCCESS. Incremento em construção na branch
+`feat/nfv1-bld02-nfse-preparation-20261027`: pedido canônico NFS-e passa a ser
+reservado, validado, arquivado e levado a READY_TO_TRANSMIT na mesma UOW, antes
+de qualquer I/O externo. O artefato usa codec JSON estrito, conteúdo endereçado,
+recalcula idempotência/fingerprint ao recuperar e não inclui segredo, resposta
+de provedor nem falsa autorização.
+
+`FiscalApplicationService` recupera exatamente um pedido preparado após reinício,
+preserva namespace/tenant/unidade/ambiente e rejeita escopo divergente. A factory
+canônica aceita gateway NFS-e explicitamente configurado e seleciona o transporte
+pelo tipo validado do pedido; configuração parcial permanece fail-closed. Retry
+de autorização pendente não reenvia o pedido. Nenhum município/provider foi
+selecionado e nenhuma emissão externa, credencial, migration ou deploy ocorreu.
+
+O mesmo incremento adiciona contrato `NfseQueryClient` estritamente read-only.
+Após timeout/pending, a reconciliação consulta o pedido arquivado, valida escopo,
+documento, idempotência e fingerprint e grava a evidência normalizada junto da
+transição terminal. AUTHORIZED e REJECTED finalizam lifecycle e tentativa na
+mesma UOW; PENDING permanece TRANSMITTING e nunca provoca reenvio. Resposta
+incompatível ou resultado terminal concorrente falham fechado.
+
+Testes dirigidos de NFS-e, emissão durável e wiring passaram com um SKIP PostgreSQL
+local esperado; Ruff PASS, Mypy PASS em 224 fontes e validadores plano/BUILD PASS.
+CI/Governança do HEAD remoto ainda obrigatórias. BLD-02 permanece IN_PROGRESS:
+um adapter municipal/nacional concreto continua dependendo de decisão humana e
+homologação futura; cancelamento/inutilização/consulta genéricos continuam
+disponíveis somente quando `FiscalOperationsClient` real é explicitamente composto.
+
+### BLD-02 — fechamento Web das operações fiscais internas (27/10/2026)
+
+O diálogo governado do Portal deixou de exigir edição de payload JSON para as
+operações fiscais do launch scope. Consulta e cancelamento agora coletam chave de
+acesso em formato fiscal; cancelamento também exige protocolo de autorização e
+justificativa. Inutilização recebe modelo, série, faixa e justificativa tipados,
+além do formulário dedicado já existente. Emissão e reconciliação continuam
+aceitando somente a referência de um documento preparado pelo backend.
+
+O navegador segue sem autoridade de tenant, papel ou resultado fiscal: unidade e
+ambiente vêm do escopo autorizado, mutações preservam CSRF, intent durável e chave
+de idempotência, e o backend continua validando todos os contratos. A interface
+não habilita operação sem permissão e executor compostos, nem interpreta recibo
+HTTP/fila como protocolo oficial. Não houve provider, credencial, deploy ou
+ativação de produção.
+
+Provas locais deste delta: contrato frontend 18 PASS; handlers de consulta,
+cancelamento, inutilização, wiring e NFS-e 20 PASS; Node syntax, Ruff global,
+Mypy em 226 fontes e diff check PASS. Lint/typecheck/build/E2E frontend completos
+dependem da instalação Node feita pela CI; nenhuma ausência local será tratada
+como aprovação. O HEAD remoto atualizado ainda precisa de CI e Governança verdes.

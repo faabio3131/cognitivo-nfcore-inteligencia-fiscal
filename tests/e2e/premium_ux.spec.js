@@ -97,6 +97,7 @@ test("an in-flight submit is locked and a read cannot erase a pending mutation k
   await expect(page.locator("#operation-error")).toContainText("Synthetic outcome unknown");
   expect(keys).toHaveLength(1);
   await page.locator("#operation-id").selectOption("queryFiscalDocument");
+  await page.locator("#operation-access-key").fill("35191111111111111111550010000000011000000010");
   await page.getByRole("button", {name: "Executar", exact: true}).click();
   await expect(page.locator("#operation-dialog")).not.toBeVisible();
   await page.getByRole("button", {name: "Executar operação governada"}).click();
