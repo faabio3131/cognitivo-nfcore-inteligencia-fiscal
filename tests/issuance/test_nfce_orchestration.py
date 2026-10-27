@@ -34,6 +34,9 @@ from kordena_fiscal.issuance import (
     NfceIssuanceCommand,
     NfceIssuanceContractError,
     NfceIssuanceOrchestrator,
+    NfeIssuanceCommand,
+    NfeIssuanceEnvelope,
+    NfeIssuanceOrchestrator,
 )
 from kordena_fiscal.lifecycle import (
     FiscalDocumentState,
@@ -273,13 +276,17 @@ def _system(
     assembler=None,  # type: ignore[no-untyped-def]
     metrics: MetricsRegistry | None = None,
     application: FiscalApplicationService | None = None,
+    family: FiscalDocumentKind = FiscalDocumentKind.NFCE,
 ):
     idempotency_store = InMemoryIdempotencyStore()
     numbering_store = InMemoryFiscalSequenceStore()
     numbering = FiscalSequenceManager(numbering_store)
     gateway_adapter = FakeFiscalGateway(mode)
     numeric_code_provider = _FixedNumericCodeProvider()
-    orchestrator = NfceIssuanceOrchestrator(
+    orchestrator_type = (
+        NfeIssuanceOrchestrator if family is FiscalDocumentKind.NFE else NfceIssuanceOrchestrator
+    )
+    orchestrator = orchestrator_type(
         idempotency=IdempotencyCoordinator(idempotency_store) if application is None else None,
         numbering=numbering if application is None else None,
         application=application,
@@ -845,3 +852,90 @@ def test_reconciliation_rejects_browser_outcome_before_provider_io(tmp_path):
             "http-uuid",
         )
     assert not provider.query_calls
+
+
+@pytest.mark.parametrize("mode", list(FakeGatewayMode))
+def test_nfe_reuses_durable_preparation_and_model55_envelope(tmp_path, mode):
+    db = SqliteFiscalDatabase(tmp_path / "nfe-preparation.sqlite")
+    db.initialize()
+    app = FiscalApplicationService(db)
+    document = replace(_document(), document_kind=FiscalDocumentKind.NFE, document_id="doc-nfe-1")
+    command = NfeIssuanceCommand(
+        document=document,
+        series=3,
+        certificate=_certificate(document.scope),
+        signing_algorithm="synthetic-signature-v1",
+    )
+    pipeline, provider, _, numeric = _system(mode, application=app, family=FiscalDocumentKind.NFE)
+    purposes = []
+
+    class RecordingSigner(_FakeSigner):
+        def sign(self, request):
+            purposes.append(request.purpose)
+            return super().sign(request)
+
+    pipeline._signing = FiscalSigningService(RecordingSigner())
+    result = pipeline.issue(command)
+    assert result.access_key.model is ElectronicInvoiceModel.NFE
+    assert result.access_key.invoice_number == 1
+    assert purposes == ["nfe_xml"]
+    request = FiscalApplicationService(SqliteFiscalDatabase(db.path)).load_prepared_authorization(
+        document.scope, document.document_id
+    )
+    envelope = NfeIssuanceEnvelope.build(document, result.access_key, request.signed_xml)
+    assert envelope.to_gateway_request() == request == provider.calls[0]
+    restarted, _, _, _ = _system(
+        mode, application=FiscalApplicationService(db), family=FiscalDocumentKind.NFE
+    )
+    assert restarted.issue(command).replay is True
+    assert numeric.calls == len(provider.calls) == 1
+
+
+def test_shared_pipeline_keeps_model_numbering_separate(tmp_path):
+    db = SqliteFiscalDatabase(tmp_path / "model-numbering.sqlite")
+    db.initialize()
+    app = FiscalApplicationService(db)
+    nfce, _, _, _ = _system(FakeGatewayMode.AUTHORIZE, application=app)
+    nfe, _, _, _ = _system(
+        FakeGatewayMode.AUTHORIZE, application=app, family=FiscalDocumentKind.NFE
+    )
+    nfce_result = nfce.issue(_command())
+    doc = replace(_document(), document_kind=FiscalDocumentKind.NFE, document_id="doc-nfe-1")
+    nfe_result = nfe.issue(
+        NfeIssuanceCommand(
+            document=doc,
+            series=3,
+            certificate=_certificate(doc.scope),
+            signing_algorithm="synthetic-signature-v1",
+        )
+    )
+    assert nfe_result.number_reservation.number == nfce_result.number_reservation.number == 1
+    assert nfe_result.access_key.model is ElectronicInvoiceModel.NFE
+    assert nfce_result.access_key.model is ElectronicInvoiceModel.NFCE
+    assert nfe_result.attempt.key != nfce_result.attempt.key
+
+
+@pytest.mark.parametrize("family", [FiscalDocumentKind.NFE, FiscalDocumentKind.NFCE])
+def test_family_entry_points_reject_mismatched_command_before_effects(tmp_path, family):
+    db = SqliteFiscalDatabase(tmp_path / "family.sqlite")
+    db.initialize()
+    app = FiscalApplicationService(db)
+    pipeline, provider, _, numeric = _system(
+        FakeGatewayMode.AUTHORIZE, application=app, family=family
+    )
+    if family is FiscalDocumentKind.NFE:
+        command = _command()
+    else:
+        doc = replace(_document(), document_kind=FiscalDocumentKind.NFE)
+        command = NfeIssuanceCommand(
+            document=doc,
+            series=3,
+            certificate=_certificate(doc.scope),
+            signing_algorithm="synthetic-signature-v1",
+        )
+    with pytest.raises(FiscalValidationError, match="family"):
+        pipeline.issue(command)
+    assert not provider.calls
+    assert numeric.calls == 0
+    with db() as uow:
+        assert uow.lifecycle.get(command.document.document_id) is None

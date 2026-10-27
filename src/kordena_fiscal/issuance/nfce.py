@@ -1,10 +1,10 @@
-"""Safe composition of the public NFC-e issuance building blocks."""
+"""Shared NF-e/NFC-e preparation; existing NFC-e public entry points stay compatible."""
 
 from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, ClassVar, Protocol
 
 from kordena_fiscal.archive import RetentionPolicyMetadata
 from kordena_fiscal.documents import CanonicalFiscalDocument
@@ -96,8 +96,10 @@ class NfceSignedXmlAssembler(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
-class NfceIssuanceCommand:
-    """Explicit configuration needed to issue one canonical NFC-e."""
+class _XmlInvoiceIssuanceCommand:
+    """Common validated preparation inputs, specialized by document family."""
+
+    _document_kind: ClassVar[FiscalDocumentKind]
 
     document: CanonicalFiscalDocument
     series: int
@@ -108,8 +110,10 @@ class NfceIssuanceCommand:
     def __post_init__(self) -> None:
         if not isinstance(self.document, CanonicalFiscalDocument):
             raise FiscalValidationError("document must be CanonicalFiscalDocument")
-        if self.document.document_kind is not FiscalDocumentKind.NFCE:
-            raise FiscalValidationError("NFC-e orchestrator accepts only NFCE documents")
+        if self.document.document_kind is not self._document_kind:
+            raise FiscalValidationError(
+                f"issuance command accepts only {self._document_kind.name} documents"
+            )
         if not isinstance(self.series, int) or isinstance(self.series, bool):
             raise FiscalValidationError("series must be an integer")
         if self.series < 0 or self.series > 999:
@@ -127,6 +131,20 @@ class NfceIssuanceCommand:
             raise FiscalValidationError("signing_algorithm exceeds max length 256")
         object.__setattr__(self, "signing_algorithm", algorithm)
         self.certificate.assert_usable(self.document.scope, self.document.issued_at)
+
+
+class NfceIssuanceCommand(_XmlInvoiceIssuanceCommand):
+    """Prepare only a model-65 NFC-e document."""
+
+    __slots__ = ()
+    _document_kind = FiscalDocumentKind.NFCE
+
+
+class NfeIssuanceCommand(_XmlInvoiceIssuanceCommand):
+    """Prepare only a model-55 NF-e document."""
+
+    __slots__ = ()
+    _document_kind = FiscalDocumentKind.NFE
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,8 +202,10 @@ class NfceIssuanceResult:
                 raise FiscalValidationError("pending gateway result must remain TRANSMITTING")
 
 
-class NfceIssuanceOrchestrator:
-    """Compose idempotency, numbering, XML, signing, gateway and lifecycle safely."""
+class _XmlInvoiceIssuanceOrchestrator:
+    """One preparation pipeline for both electronic-invoice models."""
+
+    _document_kind: ClassVar[FiscalDocumentKind]
 
     def __init__(
         self,
@@ -230,10 +250,18 @@ class NfceIssuanceOrchestrator:
             # A telemetry failure cannot alter fiscal authorization authority.
             return
 
-    def issue(self, command: NfceIssuanceCommand) -> NfceIssuanceResult:
-        if not isinstance(command, NfceIssuanceCommand):
-            raise FiscalValidationError("command must be NfceIssuanceCommand")
+    def issue(self, command: NfceIssuanceCommand | NfeIssuanceCommand) -> XmlInvoiceIssuanceResult:
+        if not isinstance(command, (NfceIssuanceCommand, NfeIssuanceCommand)):
+            raise FiscalValidationError("a validated electronic-invoice command is required")
         document = command.document
+        if document.document_kind is not self._document_kind:
+            raise FiscalValidationError("orchestrator does not match document family")
+        model = (
+            ElectronicInvoiceModel.NFE
+            if document.document_kind is FiscalDocumentKind.NFE
+            else ElectronicInvoiceModel.NFCE
+        )
+        family = "NF-e" if model is ElectronicInvoiceModel.NFE else "NFC-e"
         if self._application is not None:
             durable = self._application.reserve_issuance(
                 scope=document.scope,
@@ -247,7 +275,7 @@ class NfceIssuanceOrchestrator:
             assert self._idempotency is not None
             idempotency_reservation = self._idempotency.begin(document)
         if idempotency_reservation.replay:
-            return NfceIssuanceResult(
+            return XmlInvoiceIssuanceResult(
                 attempt=idempotency_reservation.attempt,
                 replay=True,
             )
@@ -258,20 +286,16 @@ class NfceIssuanceOrchestrator:
             lifecycle,
             FiscalDocumentState.VALIDATING,
             document,
-            "NFC-e issuance validation started",
+            f"{family} issuance validation started",
         )
 
         if self._application is not None:
             number = self._application.reserve_number(
-                FiscalSequenceKey.from_scope(
-                    document.scope, model=ElectronicInvoiceModel.NFCE, series=command.series
-                )
+                FiscalSequenceKey.from_scope(document.scope, model=model, series=command.series)
             )
         else:
             assert self._numbering is not None
-            number = self._numbering.reserve(
-                document.scope, model=ElectronicInvoiceModel.NFCE, series=command.series
-            )
+            number = self._numbering.reserve(document.scope, model=model, series=command.series)
         numeric_code = self._numeric_code_provider.code_for(document, attempt, number)
         if not isinstance(numeric_code, int) or isinstance(numeric_code, bool):
             raise NfceIssuanceContractError("numeric-code provider must return an integer")
@@ -284,7 +308,7 @@ class NfceIssuanceOrchestrator:
                 state_ibge_code=municipality_code[:2],
                 issued_at=document.issued_at,
                 issuer_cnpj=document.issuer.cnpj,
-                model=ElectronicInvoiceModel.NFCE,
+                model=model,
                 series=command.series,
                 invoice_number=number.number,
                 emission_type=command.emission_type,
@@ -308,13 +332,13 @@ class NfceIssuanceOrchestrator:
             lifecycle,
             FiscalDocumentState.READY_TO_SIGN,
             document,
-            "NFC-e XML validated",
+            f"{family} XML validated",
         )
         lifecycle = self._transition(
             lifecycle,
             FiscalDocumentState.SIGNING,
             document,
-            "NFC-e XML signing started",
+            f"{family} XML signing started",
         )
         signature = self._signing.sign(
             SigningRequest(
@@ -323,7 +347,7 @@ class NfceIssuanceOrchestrator:
                 payload=payload.xml,
                 algorithm=command.signing_algorithm,
                 signing_time=document.issued_at,
-                purpose="nfce_xml",
+                purpose="nfe_xml" if model is ElectronicInvoiceModel.NFE else "nfce_xml",
             )
         )
         signed_xml = self._signed_xml_assembler.assemble(payload, signature)
@@ -360,7 +384,7 @@ class NfceIssuanceOrchestrator:
                 self._observe("nfcore_provider_errors_total", outcome="error")
                 raise
             if outcome.replay:
-                return NfceIssuanceResult(attempt=outcome.attempt, replay=True)
+                return XmlInvoiceIssuanceResult(attempt=outcome.attempt, replay=True)
             assert isinstance(outcome.provider_result, AuthorizationResult)
             authorization = outcome.provider_result
             attempt, lifecycle = outcome.attempt, outcome.lifecycle
@@ -377,13 +401,13 @@ class NfceIssuanceOrchestrator:
                 lifecycle,
                 FiscalDocumentState.READY_TO_TRANSMIT,
                 document,
-                "signed NFC-e transport artifact prepared",
+                f"signed {family} transport artifact prepared",
             )
             lifecycle = self._transition(
                 lifecycle,
                 FiscalDocumentState.TRANSMITTING,
                 document,
-                "NFC-e authorization requested",
+                f"{family} authorization requested",
             )
             try:
                 authorization = self._gateway.authorize(
@@ -409,7 +433,7 @@ class NfceIssuanceOrchestrator:
                     lifecycle,
                     FiscalDocumentState.AUTHORIZED,
                     document,
-                    "NFC-e authorization confirmed",
+                    f"{family} authorization confirmed",
                 )
                 attempt = self._idempotency.mark_authorized(
                     attempt.key,
@@ -437,7 +461,7 @@ class NfceIssuanceOrchestrator:
                 self._observe("nfcore_fiscal_rejections_total", outcome="rejected")
                 self._observe("nfcore_fiscal_authorizations_finalized_total", outcome="rejected")
 
-        return NfceIssuanceResult(
+        return XmlInvoiceIssuanceResult(
             attempt=attempt,
             replay=False,
             number_reservation=number,
@@ -471,3 +495,20 @@ class NfceIssuanceOrchestrator:
             reason=reason,
             correlation_id=document.scope.correlation_id,
         )
+
+
+class NfceIssuanceOrchestrator(_XmlInvoiceIssuanceOrchestrator):
+    """NFC-e entry point using the shared preparation pipeline."""
+
+    _document_kind = FiscalDocumentKind.NFCE
+
+
+class NfeIssuanceOrchestrator(_XmlInvoiceIssuanceOrchestrator):
+    """NF-e entry point using the same validated and durable preparation pipeline."""
+
+    _document_kind = FiscalDocumentKind.NFE
+
+
+# Backward compatible result name; one result contract for both XML families.
+XmlInvoiceIssuanceResult = NfceIssuanceResult
+NfeIssuanceResult = NfceIssuanceResult

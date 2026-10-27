@@ -9,6 +9,10 @@ from .nfce import (
     NfceSignedXmlAssembler,
     NfceXmlBuilder,
     NfceXmlValidator,
+    NfeIssuanceCommand,
+    NfeIssuanceOrchestrator,
+    NfeIssuanceResult,
+    XmlInvoiceIssuanceResult,
 )
 from .nfe_nfse import (
     NfeIssuanceContractError,
@@ -28,6 +32,10 @@ from .nfe_nfse import (
 __all__ = [
     "NfeIssuanceContractError",
     "NfeIssuanceEnvelope",
+    "NfeIssuanceCommand",
+    "NfeIssuanceOrchestrator",
+    "NfeIssuanceResult",
+    "XmlInvoiceIssuanceResult",
     "NfceIssuanceCommand",
     "NfceIssuanceContractError",
     "NfceIssuanceOrchestrator",
