@@ -200,7 +200,6 @@ Teste HTTP local executado com sucesso até lifecycle autorizado. Testes fronten
 18 PASS, lint/typecheck/build e Ruff/validadores PASS. Chromium local indisponível
 por download inválido; E2E completo obrigatório na CI, sem desabilitação de testes.
 BLD-02 continua IN_PROGRESS e integração exige gates das predecessoras e do HEAD.
-
 ### BLD-02 — preparação compartilhada NF-e/NFC-e e identidade NFS-e (26/10/2026)
 
 Gate da #246 confirmado: merge `4bb9616ad6b03415f47ff6b8f456a7e740d67f2c`, CI
