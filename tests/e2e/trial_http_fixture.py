@@ -80,8 +80,14 @@ def build_trial_app():
         ),
         expected_version=None, correlation_id="synthetic-browser-trial", published_at=now,
     )
+    def activated(account_id, at):
+        composition.commercial_activation.mark_active(account_id=account_id, now=at)
+
     app = create_app(
         human_identity=composition.human_identity,
+        portal_executor=composition.portal_executor,
+        human_login_completed=activated,
+        password_reset_completed=activated,
         password_recovery=composition.password_recovery,
         password_reset_delivery=mailbox,
     )
@@ -108,12 +114,18 @@ def build_trial_app():
                 )
             }
             subscription = connection.execute(
-                "SELECT subscription_id FROM fm_commercial_subscriptions"
+                "SELECT subscription_id, status, period_start, period_end "
+                "FROM fm_commercial_subscriptions"
             ).fetchone()
+        owner = database.human_accounts().by_email("browser-owner@example.test")
         # Synthetic mailbox is visible only in this loopback test harness.
         return {
             "counts": counts, "deliveries": mailbox.deliveries,
             "subscription_id": subscription[0] if subscription else None,
+            "subscription_status": subscription[1] if subscription else None,
+            "period_start": subscription[2] if subscription else None,
+            "period_end": subscription[3] if subscription else None,
+            "owner_role": owner.role.value if owner else None,
             "reset_token": mailbox.reset.reset_token if mailbox.reset else None,
         }
 

@@ -29,6 +29,9 @@ test('browser trial survives committed response loss and provisions one canonica
   const before = await (await page.request.get(`${origin}/__test/trial-proof`)).json();
   expect(Object.values(before.counts)).toEqual([1, 1, 1, 1]);
   expect(before.deliveries).toBe(1);
+  expect(before.owner_role).toBe('owner');
+  expect(before.subscription_status).toBe('trial');
+  expect(Date.parse(before.period_end) - Date.parse(before.period_start)).toBe(7 * 86400000);
   await page.reload();
   await page.getByLabel('Nome da empresa').fill('Empresa Browser Sintética');
   await page.getByLabel('E-mail para ativação').fill('browser-owner@example.test');
@@ -37,17 +40,21 @@ test('browser trial survives committed response loss and provisions one canonica
   const after = await (await page.request.get(`${origin}/__test/trial-proof`)).json();
   expect(after.counts).toEqual(before.counts);
   expect(after.subscription_id).toBe(before.subscription_id);
+  expect(after.period_end).toBe(before.period_end);
   expect(after.deliveries).toBe(2);
   expect(await page.content()).not.toContain(after.reset_token);
   const password = 'Synthetic-Trial-Browser-2026';
-  const activated = await page.request.post(`${origin}/v1/auth/password-reset/complete`, {
-    data: { reset_token: after.reset_token, new_password: password },
-  });
-  expect(activated.status()).toBe(204);
-  const login = await page.request.post(`${origin}/v1/auth/login`, {
-    data: { email: 'browser-owner@example.test', password },
-  });
-  expect(login.status()).toBe(200);
+  await page.goto(`${origin}/index.html#token=${encodeURIComponent(after.reset_token)}`);
+  await expect(page).not.toHaveURL(/token=/);
+  await page.locator('#password-reset-new-password').fill(password);
+  await page.getByRole('button', { name: 'Alterar senha' }).click();
+  await expect(page.locator('#login-error')).toContainText('Senha alterada');
+  await page.locator('#login-email').fill('browser-owner@example.test');
+  await page.locator('#login-password').fill(password);
+  const loggedIn = page.waitForResponse(response => response.url().endsWith('/v1/auth/login'));
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+  expect((await loggedIn).status()).toBe(200);
+  await expect(page.locator('#app-shell')).toBeVisible();
   const final = await (await page.request.get(`${origin}/__test/trial-proof`)).json();
   expect(final.counts).toEqual(before.counts);
 });
