@@ -8,6 +8,6 @@ Reuso: GovernedTrialService, pricing administration, provisioning, HumanIdentity
 
 Validação local inicial: 19 testes dirigidos API/proxy/governança PASS; frontend 18 PASS, lint/typecheck/build PASS. Browser local bloqueado por download incompleto do Chromium e ausência de PostgreSQL; CI remota deve provar cenários completos antes de aceite. Não classificar falha de infraestrutura como teste aprovado.
 
-PR #237 auditada: teste concorrente de admission gate ainda não integrado; exige remover dependência de contagem histórica das migrations e isolar schema antes de aproveitar. Será tratado neste bloco sem merge cego.
+PR #237 auditada e seu teste reaproveitado em tests/runtime/test_nfv1_public_trial_postgres.py: schema UUID descartável próprio, migração canônica sem número histórico fixo, 12 tentativas concorrentes por duas instâncias, limite compartilhado e recusa sem tabela. A PR legada só deve ser encerrada como substituída após integração/CI deste delta. Proxy rejeita Authorization no ingresso público para não convertê-la em chamada anônima ao remover o header.
 
 Pendências externas preservadas: binding administrativo GSM, catálogo/duração/origens aprovados e publicação explícita. Portal acompanha main e auto-deploy permanece habilitado; a autorização pontual da #259 não altera a regra permanente. Site fm-site-novo não foi alterado. BLD-03 não está DONE.

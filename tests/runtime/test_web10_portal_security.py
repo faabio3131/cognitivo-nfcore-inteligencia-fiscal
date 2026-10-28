@@ -215,3 +215,25 @@ def test_portal_static_assets_require_revalidation(tmp_path: Path) -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_public_trial_proxy_does_not_downgrade_authorization(tmp_path, monkeypatch):
+    # Upstream address is valid but must never be contacted for this request.
+    monkeypatch.setenv("NFCORE_PORTAL_API_UPSTREAM", "http://127.0.0.1:1")
+    portal, thread = _start_server(
+        partial(_secure_portal_handler(), directory=str(tmp_path))
+    )
+    try:
+        host, port = portal.server_address
+        request = Request(
+            f"http://{host}:{port}/v1/public/trials", method="POST", data=b"{}",
+            headers={"Authorization": "Bearer synthetic-rejected", "Origin": "https://portal.test"},
+        )
+        with pytest.raises(HTTPError) as error:
+            urlopen(request, timeout=2)  # noqa: S310
+        assert error.value.code == 403
+        assert json.loads(error.value.read()) == {"detail": "anonymous request required"}
+    finally:
+        portal.shutdown()
+        portal.server_close()
+        thread.join(timeout=2)

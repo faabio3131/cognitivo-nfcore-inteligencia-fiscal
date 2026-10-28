@@ -155,6 +155,12 @@ class SecurePortalHandler(SimpleHTTPRequestHandler):
         if parsed_request.query:
             target = f"{target}?{parsed_request.query}"
 
+        # Public trial explicitly rejects authenticated callers; never strip an
+        # Authorization header into an apparently anonymous request upstream.
+        if target.split("?", 1)[0] == "/v1/public/trials" and self.headers.get("Authorization"):
+            self._json_error(403, "anonymous request required")
+            return
+
         headers: dict[str, str] = {}
         for name in _PROXY_REQUEST_HEADERS:
             value = self.headers.get(name)
