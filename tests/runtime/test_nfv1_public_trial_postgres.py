@@ -4,12 +4,13 @@ from __future__ import annotations
 import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 from uuid import uuid4
 
 import psycopg
 import pytest
 from psycopg import sql
-from psycopg.conninfo import conninfo_to_dict, make_conninfo
+from psycopg.conninfo import conninfo_to_dict
 
 from kordena_fiscal.persistence.postgres import PostgresFiscalDatabase
 from kordena_fiscal.runtime.public_trial_abuse import PostgresPublicTrialAbuseGate
@@ -23,11 +24,15 @@ def test_real_postgres_trial_gate_is_atomic_and_denies_missing_schema() -> None:
     schema = "bld03_admission_" + uuid4().hex
     with psycopg.connect(dsn, autocommit=True) as connection:
         connection.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
-    database = PostgresFiscalDatabase(
-        make_conninfo(dsn, options=f"-c search_path={schema}"),
-        min_pool_size=1, max_pool_size=12,
-    )
+    uri = urlsplit(dsn)
+    query = dict(parse_qsl(uri.query, keep_blank_values=True))
+    query["options"] = f"-c search_path={schema}"
+    isolated_dsn = urlunsplit(uri._replace(query=urlencode(query, quote_via=quote)))
+    database = None
     try:
+        database = PostgresFiscalDatabase(
+            isolated_dsn, min_pool_size=1, max_pool_size=12,
+        )
         database.initialize()
         database.require_current_schema()
         gate_a = PostgresPublicTrialAbuseGate(database.connection, max_requests=3)
@@ -54,6 +59,7 @@ def test_real_postgres_trial_gate_is_atomic_and_denies_missing_schema() -> None:
             connection.execute("DROP TABLE fm_public_trial_rate_windows")
         assert not gate_a.allow("198.51.100.24", now)
     finally:
-        database.close()
+        if database is not None:
+            database.close()
         with psycopg.connect(dsn, autocommit=True) as connection:
             connection.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))

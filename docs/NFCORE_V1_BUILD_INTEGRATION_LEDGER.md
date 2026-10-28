@@ -345,3 +345,21 @@ final da matriz BLD-02, antes de promover estado ou iniciar BLD-03.
 Este registro prevalece sobre os checkpoints anteriores em andamento: PR #258 consolidou #256/#257, merge aa04c8b2b63384880e3d6a98f41771b2f0415c8f, CI/Governança pré e pós-merge SUCCESS. Matriz completa em docs/checkpoints/NFV1_BLD02_INTERNAL_CLOSEOUT_2026-10-27.md. Ambas as revisões intermediárias foram encerradas como substituídas, com histórico preservado. BLD-02 DONE interno; primeiro bloco aberto BLD-03. As 59 tarefas globais não foram alteradas. Nenhum deploy, credencial ou operação fiscal oficial foi solicitado.
 
 - **Bloqueio de integração do fechamento:** a Railway confirmou auto-deploy do Portal após #258. Novos merges aguardam resolução autorizada do vínculo main→deploy, conforme AGENTS.md. Detalhes e proposta no checkpoint de fechamento; nenhuma infraestrutura alterada.
+
+
+### BLD-03 — correção do gate PostgreSQL da PR #260 (28/10/2026)
+
+Main `e751ffb368828ea3387b0f49eeab5e467e2ce4ba`: CI #1198/Gov #621 SUCCESS.
+PR #249 já integrada com a correção de preflight; não republicar ou reauditar.
+Na PR #260, CI #1202 (`40609828877`) teve 2570 PASS/3 SKIP e uma falha:
+o teste isolado de concorrência convertia a URI em conninfo textual, rejeitado
+pelo contrato de PostgresFiscalDatabase antes de testar qualquer admissão.
+A correção preserva a URI e codifica search_path na query como os testes
+duráveis existentes; mantém host local, schema único, concorrência 3/12,
+hash do IP e negação por tabela ausente. Cleanup agora cobre falha no
+construtor. Contrato de produção e assertivas não foram relaxados.
+
+Nova CI completa no HEAD corrigido é obrigatória; sem aprovação por SKIP local.
+BLD-03 permanece IN_PROGRESS. Merge retido pelo vínculo main→auto-deploy
+do Portal documentado no fechamento BLD-02; não houve alteração Railway,
+deploy solicitado, credencial, preço, trial_days ou migration persistente.
