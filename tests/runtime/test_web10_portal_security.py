@@ -217,7 +217,10 @@ def test_portal_static_assets_require_revalidation(tmp_path: Path) -> None:
         thread.join(timeout=2)
 
 
-def test_public_trial_proxy_does_not_downgrade_authorization(tmp_path, monkeypatch):
+@pytest.mark.parametrize("path", (
+    "/v1/public/trials", "/v1/public/%74rials", "/v1/%70ublic/trials/",
+))
+def test_public_trial_proxy_does_not_downgrade_authorization(tmp_path, monkeypatch, path):
     # Upstream address is valid but must never be contacted for this request.
     monkeypatch.setenv("NFCORE_PORTAL_API_UPSTREAM", "http://127.0.0.1:1")
     portal, thread = _start_server(
@@ -226,7 +229,7 @@ def test_public_trial_proxy_does_not_downgrade_authorization(tmp_path, monkeypat
     try:
         host, port = portal.server_address
         request = Request(
-            f"http://{host}:{port}/v1/public/trials", method="POST", data=b"{}",
+            f"http://{host}:{port}{path}", method="POST", data=b"{}",
             headers={"Authorization": "Bearer synthetic-rejected", "Origin": "https://portal.test"},
         )
         with pytest.raises(HTTPError) as error:

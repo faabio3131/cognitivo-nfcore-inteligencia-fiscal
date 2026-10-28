@@ -10,7 +10,7 @@ import os
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 _PORTAL_CSP = "; ".join(
     (
@@ -157,7 +157,8 @@ class SecurePortalHandler(SimpleHTTPRequestHandler):
 
         # Public trial explicitly rejects authenticated callers; never strip an
         # Authorization header into an apparently anonymous request upstream.
-        if target.split("?", 1)[0] == "/v1/public/trials" and self.headers.get("Authorization"):
+        public_path = unquote(parsed_request.path).rstrip("/")
+        if public_path == "/v1/public/trials" and self.headers.get("Authorization"):
             self._json_error(403, "anonymous request required")
             return
 
