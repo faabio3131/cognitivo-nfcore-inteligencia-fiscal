@@ -37,6 +37,7 @@ _MAX_PROXY_RESPONSE_BYTES = 2 * 1024 * 1024
 _PROXY_TIMEOUT_SECONDS = 15
 _PROXY_REQUEST_HEADERS = (
     "Accept",
+    "Origin",
     "Content-Type",
     "Cookie",
     "Idempotency-Key",

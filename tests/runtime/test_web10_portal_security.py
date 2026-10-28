@@ -90,6 +90,7 @@ def test_portal_api_proxy_preserves_auth_boundary_and_cookies(
 
         def do_POST(self) -> None:  # noqa: N802
             observed["path"] = self.path
+            observed["origin"] = self.headers.get("Origin", "")
             observed["csrf"] = self.headers.get("X-CSRF-Token", "")
             observed["cookie"] = self.headers.get("Cookie", "")
             length = int(self.headers.get("Content-Length", "0"))
@@ -126,6 +127,7 @@ def test_portal_api_proxy_preserves_auth_boundary_and_cookies(
             headers={
                 "Content-Type": "application/json",
                 "Cookie": "existing=value",
+                "Origin": "https://portal.example.test",
                 "X-CSRF-Token": "csrf-proof",
             },
         )
@@ -140,6 +142,7 @@ def test_portal_api_proxy_preserves_auth_boundary_and_cookies(
         assert observed == {
             "path": "/v1/auth/login?source=portal",
             "csrf": "csrf-proof",
+            "origin": "https://portal.example.test",
             "cookie": "existing=value",
             "body": '{"email":"owner@example.test","password":"secret"}',
         }

@@ -45,7 +45,7 @@ Cada `Evidência` abaixo é levantamento de baseline, **não certificação do b
 - **Pendência / decisão humana:** Provider/jurisdição, credenciais/certificados, transporte oficial e homologação permanecem externos/BLD-05. Publicação autorizada e demonstração do staging pertencem a BLD-08. Timeout/evento pendente exige evidência confiável, nunca reenvio ou protocolo inventado. Contrato legado sem document_id não recebe a certificação de lifecycle da jornada Web.
 
 ### NFV1-BLD-03 — Trial first-party no NFCore e site estático
-- **Estado:** PENDING
+- **Estado:** IN_PROGRESS
 - **Depende de:** BLD-00 e interfaces de identidade BLD-01; código interno pode avançar se sessão admin/config comercial bloquearem operações
 - **CURRENT:** GovernedTrialService, ingresso público protegido, catálogo e antiabuso PostgreSQL já existem no código auditado. Página de cadastro na aplicação NFCore é o próximo delta Web; binding admin, configuração comercial/origens e Web publicada não estão certificados. Auditar PR #237 antes de reaproveitar testes; não reconstruir serviços nem inventar plano/preço/duração.
 - **Target e aceite:** seção `NFV1-BLD-03` do anexo de execução.

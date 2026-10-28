@@ -50,6 +50,8 @@ def create_public_trial_router(
 
     router = APIRouter(tags=["public-commercial-trial"])
 
+    # Same-origin browser POST supplies Origin without weakening the allowlist.
+    @router.post("/v1/public/trial-plans")
     @router.get("/v1/public/trial-plans")
     async def published_trial_plans(request: Request) -> JSONResponse:
         origin = request.headers.get("origin", "")
