@@ -9,12 +9,13 @@ import os
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from decimal import Decimal
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 from uuid import uuid4
 
 import psycopg
 from fastapi import FastAPI
 from psycopg import sql
-from psycopg.conninfo import conninfo_to_dict, make_conninfo
+from psycopg.conninfo import conninfo_to_dict
 
 from kordena_fiscal.control_plane.models import AdminPrincipal, ControlPlanePermission
 from kordena_fiscal.persistence.postgres import PostgresFiscalDatabase
@@ -57,7 +58,11 @@ def build_trial_app():
     schema = "bld03_browser_" + uuid4().hex
     with psycopg.connect(dsn, autocommit=True) as connection:
         connection.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
-    database = PostgresFiscalDatabase(make_conninfo(dsn, options=f"-c search_path={schema}"))
+    uri = urlsplit(dsn)
+    query = dict(parse_qsl(uri.query, keep_blank_values=True))
+    query["options"] = f"-c search_path={schema}"
+    isolated_dsn = urlunsplit(uri._replace(query=urlencode(query, quote_via=quote)))
+    database = PostgresFiscalDatabase(isolated_dsn)
     database.initialize()
     composition = build_postgres_runtime_composition(database)
     mailbox = TestMailbox()

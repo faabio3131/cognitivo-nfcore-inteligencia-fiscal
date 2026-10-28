@@ -363,3 +363,6 @@ Nova CI completa no HEAD corrigido é obrigatória; sem aprovação por SKIP loc
 BLD-03 permanece IN_PROGRESS. Merge retido pelo vínculo main→auto-deploy
 do Portal documentado no fechamento BLD-02; não houve alteração Railway,
 deploy solicitado, credencial, preço, trial_days ou migration persistente.
+
+A mesma montagem de DSN foi corrigida no harness PostgreSQL do E2E de trial,
+que só executa após Pytest na CI; preserva a mesma prova browser e schema único.
