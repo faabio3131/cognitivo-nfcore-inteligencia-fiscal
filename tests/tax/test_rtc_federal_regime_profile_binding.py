@@ -75,7 +75,8 @@ def test_normal_crt_resolves_presumido_and_real_only_from_explicit_evidence() ->
     scope = _scope()
     profile = _profile(scope)
     for regime in (FederalIncomeTaxRegime.LUCRO_PRESUMIDO, FederalIncomeTaxRegime.LUCRO_REAL):
-        assert resolve_federal_regime_for_profile(profile, _declaration(scope, regime), _NOW) is regime
+        result = resolve_federal_regime_for_profile(profile, _declaration(scope, regime), _NOW)
+        assert result is regime
 
 
 def test_cross_tenant_declaration_is_denied() -> None:
