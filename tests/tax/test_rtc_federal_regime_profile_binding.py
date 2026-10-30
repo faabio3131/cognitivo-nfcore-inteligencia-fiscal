@@ -20,6 +20,7 @@ from kordena_fiscal.tax.regimes import (
     FederalIncomeTaxRegime,
     FederalRegimeDeclaration,
     resolve_federal_regime_for_profile,
+    resolve_federal_regime_timeline,
 )
 
 _NOW = datetime(2026, 10, 30, tzinfo=UTC)
@@ -117,3 +118,71 @@ def test_missing_declaration_is_denied() -> None:
             None,  # type: ignore[arg-type]
             _NOW,
         )
+
+
+def test_regime_timeline_uses_explicit_periods_at_boundary() -> None:
+    scope = _scope()
+    profile = _profile(scope)
+    first = FederalRegimeDeclaration(
+        scope=scope,
+        crt=TaxRegimeCode.NORMAL,
+        federal_income_tax_regime=FederalIncomeTaxRegime.LUCRO_PRESUMIDO,
+        effective_from=datetime(2026, 1, 1, tzinfo=UTC),
+        effective_to=datetime(2026, 7, 1, tzinfo=UTC),
+        source_reference="synthetic-presumido",
+    )
+    second = FederalRegimeDeclaration(
+        scope=scope,
+        crt=TaxRegimeCode.NORMAL,
+        federal_income_tax_regime=FederalIncomeTaxRegime.LUCRO_REAL,
+        effective_from=datetime(2026, 7, 1, tzinfo=UTC),
+        source_reference="synthetic-real",
+        version=2,
+    )
+    assert resolve_federal_regime_timeline(
+        profile, (second, first), datetime(2026, 6, 30, tzinfo=UTC)
+    ) is FederalIncomeTaxRegime.LUCRO_PRESUMIDO
+    assert resolve_federal_regime_timeline(
+        profile, (second, first), datetime(2026, 7, 1, tzinfo=UTC)
+    ) is FederalIncomeTaxRegime.LUCRO_REAL
+
+
+def test_regime_timeline_rejects_overlaps_even_if_one_is_not_current() -> None:
+    scope = _scope()
+    a = _declaration(scope, FederalIncomeTaxRegime.LUCRO_REAL)
+    b = _declaration(scope, FederalIncomeTaxRegime.LUCRO_PRESUMIDO)
+    with pytest.raises(FiscalValidationError, match="overlap"):
+        resolve_federal_regime_timeline(_profile(scope), (a, b), _NOW)
+
+
+def test_regime_timeline_rejects_cross_tenant_collection() -> None:
+    scope = _scope()
+    a = _declaration(scope, FederalIncomeTaxRegime.LUCRO_REAL)
+    b = _declaration(_scope("other"), FederalIncomeTaxRegime.LUCRO_REAL)
+    with pytest.raises(FiscalValidationError, match="scope mismatch"):
+        resolve_federal_regime_timeline(_profile(scope), (a, b), _NOW)
+
+
+def test_regime_timeline_fails_closed_on_gap_or_empty_input() -> None:
+    scope = _scope()
+    with pytest.raises(FiscalValidationError, match="no federal regime declarations"):
+        resolve_federal_regime_timeline(_profile(scope), (), _NOW)
+    later = FederalRegimeDeclaration(
+        scope=scope,
+        crt=TaxRegimeCode.NORMAL,
+        federal_income_tax_regime=FederalIncomeTaxRegime.LUCRO_REAL,
+        effective_from=datetime(2026, 11, 1, tzinfo=UTC),
+        source_reference="synthetic-later",
+    )
+    with pytest.raises(FiscalValidationError, match="no unambiguous"):
+        resolve_federal_regime_timeline(_profile(scope), (later,), _NOW)
+
+
+def test_regime_timeline_checks_effective_crt_against_issuer_profile() -> None:
+    scope = _scope()
+    mismatched = _declaration(
+        scope, FederalIncomeTaxRegime.SIMPLES_NACIONAL,
+        crt=TaxRegimeCode.SIMPLES_NACIONAL,
+    )
+    with pytest.raises(FiscalValidationError, match="CRT does not match"):
+        resolve_federal_regime_timeline(_profile(scope), (mismatched,), _NOW)
