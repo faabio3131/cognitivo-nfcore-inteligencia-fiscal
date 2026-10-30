@@ -46,6 +46,10 @@ def _baseline() -> RegulatoryBaseline:
 def test_rtc_official_reference_manifest_uses_existing_compliance_authority() -> None:
     baseline = _baseline()
     assert baseline.artifact("NT-2025.002").version == "1.52"
+    assert baseline.version == 2
+    assert baseline.artifact("IT-2025.002").version == "1.70"
+    assert baseline.artifact("IBSCBS-CCLASSTRIB").version == "IT-2025.002-v1.70"
+    assert baseline.artifact("IBSCBS-CCREDPRES").version == "IT-2025.002-v1.70"
     assert baseline.artifact("LC-214-2025").version == "214/2025"
     assert baseline.artifact("LC-227-2026").version == "227/2026"
 
