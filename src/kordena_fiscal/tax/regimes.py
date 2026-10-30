@@ -10,7 +10,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
-from kordena_fiscal.domain import ExecutionScope, FiscalValidationError, TaxRegimeCode
+from kordena_fiscal.domain import (
+    ExecutionScope,
+    FiscalProfile,
+    FiscalValidationError,
+    TaxRegimeCode,
+)
 
 
 class FederalIncomeTaxRegime(StrEnum):
@@ -67,3 +72,25 @@ class FederalRegimeDeclaration:
             self.effective_to is not None and instant >= self.effective_to
         ):
             raise FiscalValidationError("federal regime declaration is not effective")
+
+
+def resolve_federal_regime_for_profile(
+    profile: FiscalProfile,
+    declaration: FederalRegimeDeclaration,
+    instant: datetime,
+) -> FederalIncomeTaxRegime:
+    """Validate a declaration against the existing issuer fiscal authority.
+
+    This is a pure, fail-closed lookup: it never infers the federal regime
+    from CRT and does not persist or activate the declaration.
+    """
+    if not isinstance(profile, FiscalProfile):
+        raise FiscalValidationError("profile must be FiscalProfile")
+    if not isinstance(declaration, FederalRegimeDeclaration):
+        raise FiscalValidationError("federal regime declaration is required")
+    declaration.assert_effective_in_scope(profile.scope, instant)
+    if not profile.is_effective_at(instant):
+        raise FiscalValidationError("issuer fiscal profile is not effective")
+    if profile.tax_regime != declaration.crt:
+        raise FiscalValidationError("federal regime CRT does not match issuer profile")
+    return declaration.federal_income_tax_regime
