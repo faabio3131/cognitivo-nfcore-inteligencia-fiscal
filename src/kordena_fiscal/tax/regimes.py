@@ -6,6 +6,7 @@ calculate taxes, persist data or grant fiscal production authority.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -94,3 +95,39 @@ def resolve_federal_regime_for_profile(
     if profile.tax_regime != declaration.crt:
         raise FiscalValidationError("federal regime CRT does not match issuer profile")
     return declaration.federal_income_tax_regime
+
+
+def resolve_federal_regime_timeline(
+    profile: FiscalProfile,
+    declarations: Iterable[FederalRegimeDeclaration],
+    instant: datetime,
+) -> FederalIncomeTaxRegime:
+    """Select one effective corporate regime, rejecting overlaps and foreign scopes.
+
+    The caller must supply the authoritative declarations for one fiscal scope.
+    Gaps, overlap and scope leakage never receive a default classification.
+    """
+    if not isinstance(profile, FiscalProfile):
+        raise FiscalValidationError("profile must be FiscalProfile")
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise FiscalValidationError("instant must be timezone-aware")
+    items = tuple(declarations)
+    if not items:
+        raise FiscalValidationError("no federal regime declarations were supplied")
+    for declaration in items:
+        if not isinstance(declaration, FederalRegimeDeclaration):
+            raise FiscalValidationError("invalid federal regime declaration in timeline")
+        if declaration.scope.partition_key != profile.scope.partition_key:
+            raise FiscalValidationError("federal regime timeline scope mismatch")
+    ordered = sorted(items, key=lambda item: item.effective_from)
+    for previous, current in zip(ordered, ordered[1:], strict=False):
+        if previous.effective_to is None or previous.effective_to > current.effective_from:
+            raise FiscalValidationError("federal regime effective periods overlap")
+    effective = [
+        item for item in ordered
+        if item.effective_from <= instant
+        and (item.effective_to is None or instant < item.effective_to)
+    ]
+    if len(effective) != 1:
+        raise FiscalValidationError("no unambiguous federal regime effective at instant")
+    return resolve_federal_regime_for_profile(profile, effective[0], instant)
