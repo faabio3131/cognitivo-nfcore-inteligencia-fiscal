@@ -120,7 +120,7 @@ def resolve_federal_regime_timeline(
         if declaration.scope.partition_key != profile.scope.partition_key:
             raise FiscalValidationError("federal regime timeline scope mismatch")
     ordered = sorted(items, key=lambda item: item.effective_from)
-    for previous, current in zip(ordered, ordered[1:]):
+    for previous, current in zip(ordered, ordered[1:], strict=False):
         if previous.effective_to is None or previous.effective_to > current.effective_from:
             raise FiscalValidationError("federal regime effective periods overlap")
     effective = [
