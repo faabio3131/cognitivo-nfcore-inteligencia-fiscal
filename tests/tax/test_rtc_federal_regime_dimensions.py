@@ -4,7 +4,12 @@ from datetime import UTC, datetime
 
 import pytest
 
-from kordena_fiscal.domain import ExecutionScope, FiscalEnvironment, FiscalValidationError, TaxRegimeCode
+from kordena_fiscal.domain import (
+    ExecutionScope,
+    FiscalEnvironment,
+    FiscalValidationError,
+    TaxRegimeCode,
+)
 from kordena_fiscal.tax.regimes import FederalIncomeTaxRegime, FederalRegimeDeclaration
 
 
