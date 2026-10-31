@@ -61,7 +61,7 @@
 
 | ID | Frente | Ação/aceite | Dependência | Estado |
 |---|---|---|---|---|
-| NFC-EXEC-20 | Contabo, PR #284 | Auditar driver/cron e revisão atualmente implantada, backup/restauração, health/ready, rollback, Docker API/Portal/Worker, segredos e deploy sem migration implícita; corrigir com PR e CI | main verde + acesso operacional seguro | IN_PROGRESS (PR #284 OPEN, sem deploy comprovado) |
+| NFC-EXEC-20 | Contabo, PR #284 | Auditar driver/cron e revisão atualmente implantada, backup/restauração, health/ready, rollback, Docker API/Portal/Worker, segredos e deploy sem migration implícita; corrigir com PR e CI | main verde + acesso operacional seguro | IN_PROGRESS: #284 MERGED em `1e1115cc2f3dee63d169edfca71a0644a7d540c6`, Gov e deploy-config pós-merge SUCCESS; CI completa pós-merge #41247712430 aguardava conclusão. PR #291 propõe gate de schema somente leitura/code-only; sem instalação/deploy/worker certificado |
 | NFC-EXEC-21 | Promoção controlada | Reconciliar branch `production` vs `main`; conferir gates, migrations pendentes, backup e rollback; staging primeiro se disponível; promover somente revisão aprovada | 20 + gates e autorizações específicas | BLOCKED_HUMAN_ACTION para ações de schema/produção além da autorização de deploy |
 | NFC-EXEC-22 | Fiscal externo | Homologação SEFAZ/NFS-e por célula e evidência; certificado/CSC/UF/município/provedor, habilitação real | RTC-11 + recursos externos | BLOCKED_EXTERNAL |
 | NFC-EXEC-23 | Comercial externo | Definir oferta trial/preço/duração, prestador de cobrança, conta/segredos e transações reais, aprovar publicação | BUILD-03/04 internos | BLOCKED_HUMAN_ACTION |
@@ -100,3 +100,10 @@ Novo estado (somente com evidência):
 ```
 
 **Regra de manutenção:** atualize a linha na **mesma entrega** que satisfaz seu critério de aceite ou na PR imediatamente vinculada; não deixe o progresso só no chat. Se falhar CI, tarefa permanece `IN_PROGRESS`. Se não houver trabalho ativo entre conversas, este plano continua sendo um snapshot versionado, não um monitor automático.
+
+### Checkpoint da implantação segura — 31/10/2026
+
+- PR #284 (configuração Contabo, incluindo hardening da PR #290) MERGED em `main=1e1115cc2f3dee63d169edfca71a0644a7d540c6`. Governança e workflow de teste do deploy pós-merge: SUCCESS. CI completa #41247712430 ainda em execução no último levantamento da PR #291.
+- PR #291, branch `fix/nfcore-contabo-codeonly-schema-gate-20261031`: amplia `migration_guard.py` com `--assert-current-production` exclusivamente SELECT-only; deploy automático passa a executar apenas quando versões fiscal e Cakto estão integralmente atuais, sem `--apply` ou aprovação embutida de migration; falha fechada com schema pendente/ilegível. Testes de build e compose-up falhos preservam rollback seguro de código.
+- Esta atualização documental é **IN_PROGRESS**, não fecha NFC-EXEC-20 ou 21. CI/Gov e validação deploy da PR #291 precisam terminar SUCCESS no HEAD final; comparar scripts realmente instalados na Contabo e validar o SHA publicado antes de qualquer operação no servidor.
+- `production=a3a2b3c97d26780b1e2b7581b4c93b6f07e86a70` no último auditado (reconsultar antes de promover); nenhuma migration/deploy/credencial/alteração de DB executada aqui. Worker continua fora do compose Contabo versionado; cobertura operacional BLD-06/08 ainda pendente.
