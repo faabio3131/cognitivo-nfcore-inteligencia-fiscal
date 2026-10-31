@@ -29,7 +29,7 @@ class Delivery:
         raise AssertionError("no activation reset was issued")
 
 
-def client(service: Trial, *, commercially_authorized=None) -> TestClient:
+def client(service: Trial, *, commercially_authorized=lambda: True) -> TestClient:
     app = FastAPI()
     app.include_router(create_public_trial_router(
         service,  # type: ignore[arg-type]
@@ -78,6 +78,7 @@ def test_public_trial_requires_explicit_https_origin() -> None:
             allowed_origins=("http://fmtecnologia.com.br",),
             rate_limiter=FixedWindowRateLimiter(max_requests=1, window_seconds=60),
             delivery=Delivery(),  # type: ignore[arg-type]
+            commercially_authorized=lambda: True,
         )
 
 
@@ -156,3 +157,20 @@ def test_approved_release_preserves_public_trial_submission_contract() -> None:
     response = c.post("/v1/public/trials", json=body, headers={"Origin": "https://fmtecnologia.com.br", "Idempotency-Key": "trial-approved-0001"})
     assert response.status_code == 201
     assert len(service.calls) == 1
+
+
+def test_missing_release_reader_fails_closed() -> None:
+    service = Trial()
+    app = FastAPI()
+    app.include_router(create_public_trial_router(
+        service,  # type: ignore[arg-type]
+        pricing=SimpleNamespace(current=None),  # type: ignore[arg-type]
+        allowed_origins=("https://fmtecnologia.com.br",),
+        rate_limiter=FixedWindowRateLimiter(max_requests=3, window_seconds=3600),
+        delivery=Delivery(),  # type: ignore[arg-type]
+    ))
+    c = TestClient(app)
+    origin = {"Origin": "https://fmtecnologia.com.br"}
+    assert c.post("/v1/public/trial-plans", headers=origin).status_code == 503
+    assert c.post("/v1/public/trials", json={"plan_id": "p", "price_id": "price", "buyer_email": "a@example.com", "legal_name": "ACME"}, headers={**origin, "Idempotency-Key": "trial-missing-release"}).status_code == 503
+    assert service.calls == []
