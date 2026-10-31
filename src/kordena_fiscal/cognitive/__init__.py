@@ -1,6 +1,7 @@
 """NFCore fiscal cognitive core: advisory, grounded, tenant-isolated and fail-open."""
 
 from .baseline import BASELINE_VERSION, Baseline, RejectionBaseline
+from .classification import ClassificationBaseline
 from .context import ContextPack, ContextPackBuilder, ScopeViolationError
 from .contracts import (
     SCHEMA_VERSION,
@@ -18,6 +19,7 @@ from .contracts import (
 from .guardrails import GuardResult, OutputGuard
 from .knowledge import RejectionKnowledgeBase, default_rejection_knowledge_base
 from .redaction import Redactor
+from .registry import default_baselines
 from .resilience import Bulkhead, CircuitBreaker
 from .service import CognitiveAdviceService
 
@@ -32,6 +34,7 @@ __all__ = [
     "Bulkhead",
     "Capability",
     "CircuitBreaker",
+    "ClassificationBaseline",
     "CognitiveAdviceService",
     "ContextPack",
     "ContextPackBuilder",
@@ -46,5 +49,6 @@ __all__ = [
     "RejectionKnowledgeBase",
     "ScopeViolationError",
     "SectionKind",
+    "default_baselines",
     "default_rejection_knowledge_base",
 ]

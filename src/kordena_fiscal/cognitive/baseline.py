@@ -23,6 +23,8 @@ class Baseline:
     status: AdviceStatus
     sections: tuple[AdviceSection, ...]
     model_eligible: bool = False
+    no_model_reason: str = "insufficient_basis"
+    error: str | None = None
     extra_evidence: tuple[Evidence, ...] = ()
 
 

@@ -114,6 +114,8 @@ class CognitiveAdviceService:
             status = baseline.status
 
         findings = list(outcome.findings)
+        if baseline.error:
+            findings.append(f"baseline_error:{baseline.error}")
         if pack.injection_markers:
             findings.append(f"injection_markers_in_input:{pack.injection_markers}")
         if outcome.provider_id and self._ledger is not None:
@@ -148,8 +150,9 @@ class CognitiveAdviceService:
             )
         try:
             return fn(request)
-        except Exception:  # deterministic baseline must never take the caller down
-            return insufficient("Não foi possível montar a base determinística desta consulta.")
+        except Exception as exc:  # deterministic baseline must never take the caller down
+            failed = insufficient("Não foi possível montar a base determinística desta consulta.")
+            return replace(failed, error=type(exc).__name__)
 
     def _maybe_call_model(
         self, request: AdviceRequest, baseline: Baseline, prompt: ModelPrompt, context_hash: str
@@ -157,7 +160,7 @@ class CognitiveAdviceService:
         if self._model is None:
             return _ModelOutcome(degraded_reason="ai_disabled")
         if not baseline.model_eligible:
-            return _ModelOutcome(degraded_reason="insufficient_basis")
+            return _ModelOutcome(degraded_reason=baseline.no_model_reason)
         if self._entitlements is not None:
             try:
                 decision = self._entitlements.check(

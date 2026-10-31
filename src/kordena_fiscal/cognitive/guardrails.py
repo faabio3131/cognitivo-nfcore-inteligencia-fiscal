@@ -13,6 +13,10 @@ from .redaction import Redactor
 MAX_MODEL_SECTIONS = 6
 _MODEL_KINDS = frozenset({SectionKind.HYPOTHESIS, SectionKind.ACTION})
 _CODE_TOKEN = re.compile(r"(?<![\w.])\d{3,}(?![\w])")
+_CLASSIFICATION_REF = re.compile(
+    r"(?i)\b(cst|csosn|cfop|ncm|cclasstrib|cclass)\b[^\d\n]{0,12}(\d{2,8})"
+)
+_DIGIT_RUN = re.compile(r"\d+")
 _EXECUTION_CLAIM = re.compile(
     r"(?i)\b(eu\s+)?(emiti|cancelei|inutilizei|transmiti|assinei|alterei|corrigi|apliquei|"
     r"reenviei|autorizei|salvei|atualizei|reprocessei)\b"
@@ -93,4 +97,8 @@ class OutputGuard:
         for token in _CODE_TOKEN.findall(text):
             if token not in corpus:
                 return "ungrounded_code"
+        corpus_numbers = set(_DIGIT_RUN.findall(corpus))
+        for match in _CLASSIFICATION_REF.finditer(text):
+            if match.group(2) not in corpus_numbers:
+                return "ungrounded_classification_code"
         return None
