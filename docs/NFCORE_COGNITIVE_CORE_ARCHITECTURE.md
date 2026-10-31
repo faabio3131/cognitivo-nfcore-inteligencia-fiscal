@@ -93,7 +93,8 @@ Status: `ADVISED` (modelo validado) · `BASELINE_ONLY` (determinístico; IA indi
 | Quota/plano/métricas (T07) | implementado (quota branda, em memória) | política de preço aprovada por Fábio; ledger persistente |
 | Rota do Portal e painel (T04) | implementado; ligado só com `NFCORE_COGNITIVE_ENABLED=true`, sem modelo (determinístico) | ligar o adaptador central na composição após contrato + cofre |
 | Bateria de avaliação golden/adversarial (T08) | implementada (`tests/cognitive/test_evaluation.py`) | ampliar com casos reais revisados por contador |
-| Catálogos (rejeição, CST/CSOSN, conciliação) | sementes `PENDING_NORMATIVE_REVIEW` | revisão normativa humana; tabelas oficiais NCM/cClassTrib com SHA-256 |
+| Tabelas oficiais NCM (Siscomex, vigente 31/10/2026, Res. Gecex 926/2026, 10.516 NCMs de 8 dígitos) e cClassTrib CBS/IBS (Calculadora RTC, base V0066 de 28/10/2026, **ambiente piloto**, 170 códigos) | carregadas em `knowledge/official/` com manifesto e SHA-256 verificado na carga; ligadas na rota do Portal | revisão normativa humana; reatualizar quando o Gecex/Receita publicarem nova versão (o cClassTrib ainda é piloto) |
+| Catálogos de rejeição, CST/CSOSN, PIS/COFINS e conciliação | sementes `PENDING_NORMATIVE_REVIEW` | revisão normativa humana por contador |
 
 Limitações conhecidas: a projeção `errors` do Portal não expõe o `rejection_code` de emissão; não há projeção de leitura de decisão tributária (classificação fica sem evidência do Portal até existir); quota é process-local.
 
