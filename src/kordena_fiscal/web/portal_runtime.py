@@ -101,6 +101,7 @@ class DurableHumanPortalExecutor:
             "errors",
             "reconciliation",
             "capabilities",
+            "tax-reform",
             "onboarding",
             "companies",
             "units",
@@ -229,6 +230,7 @@ class DurableHumanPortalExecutor:
             "errors",
             "reconciliation",
             "capabilities",
+            "tax-reform",
             "certificates",
             "providers",
             "webhooks",
@@ -425,6 +427,39 @@ class DurableHumanPortalExecutor:
         base = {"unit_id": scope.unit_id, "environment": scope.environment.value}
         if surface_id == "capabilities":
             return self._capability_rows(authority, scope)[offset : offset + limit]
+        if surface_id == "tax-reform":
+            # The only issuer authority is the existing versioned Control Plane
+            # profile. The federal IRPJ regime is NOT inferred from NF-e CRT.
+            with self._unit_of_work_factory() as uow:
+                issuer = uow.control_plane.resolve_profile(
+                    host_namespace=scope.host_namespace or "fm-nfcore",
+                    tenant_id=scope.tenant_id,
+                    unit_id=scope.unit_id,
+                    environment=scope.environment,
+                    instant=datetime.now(UTC),
+                )
+            if issuer is None:
+                return ({**base, "record_type": "rtc_issuer",
+                         "status": "fiscal_profile_not_configured",
+                         "federal_regime_status": "declaration_not_configured",
+                         "calculation_status": "not_certified"},)[offset : offset + limit]
+            return ({
+                **base,
+                "record_type": "rtc_issuer",
+                "status": "profile_effective",
+                "profile_id": issuer.profile_id,
+                "profile_version": issuer.version,
+                "legal_name": issuer.legal_name,
+                "crt": int(issuer.tax_regime),
+                "primary_cnae": issuer.primary_cnae.value,
+                "state_code": issuer.address.jurisdiction.state_code,
+                "municipality_ibge_code": issuer.address.jurisdiction.municipality_ibge_code,
+                "effective_from": issuer.effective_from.isoformat(),
+                "effective_to": (issuer.effective_to.isoformat()
+                                 if issuer.effective_to is not None else None),
+                "federal_regime_status": "declaration_not_configured",
+                "calculation_status": "not_certified",
+            },)[offset : offset + limit]
         rows: list[Mapping[str, Any]] = []
         with self._unit_of_work_factory() as uow:
             if surface_id in {"inutilizations", "errors", "reconciliation"}:

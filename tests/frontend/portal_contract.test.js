@@ -181,3 +181,14 @@ test("fiscal actions require current authorized unit and environment", () => {
   assert.match(script, /unit\.unit_id === selectedFiscalUnit && unit\.environments\.includes\(selectedFiscalEnvironment\)/);
   assert.match(script, /option\.disabled = !authorizedScope \|\| !configured\.includes\(option\.value\)/);
 });
+
+
+test("RTC screen uses the existing authenticated scoped portal and does not invent tax results", () => {
+  assert.match(script, /\["tax-reform", "Reforma Tributária"\]/);
+  assert.match(script, /appendRtcIssuerSummary\(article, rows\)/);
+  assert.match(script, /issuer\.status === "profile_effective"/);
+  assert.match(script, /Lucro Real \/ Presumido \/ Simples/);
+  assert.match(script, /O CRT não define sozinho o regime de IRPJ\/CSLL/);
+  assert.match(script, /Esta tela é somente consulta/);
+  assert.doesNotMatch(script, /\/v1\/rtc\/calculate/);
+});

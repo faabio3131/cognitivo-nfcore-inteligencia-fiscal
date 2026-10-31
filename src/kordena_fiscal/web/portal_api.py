@@ -65,6 +65,7 @@ _SURFACE_PERMISSIONS: dict[str, PortalPermission] = {
     "units": PortalPermission.CONFIGURATION_WRITE,
     "environments": PortalPermission.CONFIGURATION_WRITE,
     "capabilities": PortalPermission.PORTAL_READ,
+    "tax-reform": PortalPermission.PORTAL_READ,
     "certificates": PortalPermission.CERTIFICATE_MANAGE,
     "providers": PortalPermission.INTEGRATION_MANAGE,
     "webhooks": PortalPermission.INTEGRATION_MANAGE,
