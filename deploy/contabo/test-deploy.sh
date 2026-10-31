@@ -62,7 +62,7 @@ rc=$(run); chk "commit que falhou nao repete" '[ "$rc" = 0 ] && [ ! -s "$CTL/cal
 rm -f "$CTL/schema-pending" "$T/root/.failed-sha"
 
 V4=$(newcommit c4); touch "$CTL/mig-policy-fail"
-rc=$(run); chk "politica bloqueia migracao destrutiva => recusado, sem tocar no banco" '[ "$rc" = 1 ] && grep -q "politica de migracao bloqueou" "$T/out" && [ ! -f "$CTL/restored" ]'
+rc=$(run); chk "politica bloqueia migracao destrutiva => recusado, sem tocar no banco" '[ "$rc" = 1 ] && grep -q "politica de migration bloqueou" "$T/out" && [ ! -f "$CTL/restored" ]'
 rm -f "$CTL/mig-policy-fail" "$T/root/.failed-sha"
 
 touch "$CTL/unhealthy"
