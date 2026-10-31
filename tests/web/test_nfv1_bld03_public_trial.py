@@ -111,3 +111,23 @@ def test_unpublished_pricing_does_not_invent_trial_offers() -> None:
     assert response.status_code == 503
     assert "plans" not in response.json()
     assert service.calls == []
+
+
+@pytest.mark.parametrize("origin", (None, "null", "https://attacker.example"))
+def test_browser_catalog_post_preserves_origin_gate(origin) -> None:
+    service = Trial()
+    response = client(service).post(
+        "/v1/public/trial-plans", headers={"Origin": origin} if origin else {},
+    )
+    assert response.status_code == 403
+    assert service.calls == []
+
+
+def test_browser_catalog_post_uses_same_publication_authority() -> None:
+    service = Trial()
+    response = client(service).post(
+        "/v1/public/trial-plans", headers={"Origin": "https://fmtecnologia.com.br"},
+    )
+    assert response.status_code == 503
+    assert response.headers["cache-control"] == "no-store"
+    assert service.calls == []
