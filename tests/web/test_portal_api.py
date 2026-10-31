@@ -258,3 +258,19 @@ def test_archive_reference_query_uses_existing_portal_role_and_scope() -> None:
     assert executor.operation_authority is not None
     assert executor.operation_authority.account.tenant_id == "tenant-authoritative"
     assert other_unit.status_code == 403
+
+
+def test_tax_reform_surface_uses_existing_session_rbac_and_unit_isolation() -> None:
+    executor = RecordingPortalExecutor()
+    owner = logged_client(executor, role=PortalRole.OWNER)
+    permitted = owner.get(
+        "/v1/portal/surfaces/tax-reform?unit_id=unit-a&environment=homologation",
+        headers={"X-FM-Tenant-Id": "spoofed-tenant"},
+    )
+    assert permitted.status_code == 200
+    assert executor.surface_authority is not None
+    assert executor.surface_authority.tenant_id == "tenant-authoritative"
+    assert owner.get("/v1/portal/surfaces/tax-reform?unit_id=unit-b").status_code == 403
+    assert owner.get(
+        "/v1/portal/surfaces/tax-reform?unit_id=unit-a&environment=invalid"
+    ).status_code == 400
