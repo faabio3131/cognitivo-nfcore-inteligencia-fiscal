@@ -249,3 +249,68 @@ def test_browser_cannot_mass_assign_tenant_during_self_service_onboarding(
 
     assert response.status_code == 400
     assert response.json()["detail"]["code"] == "BROWSER_AUTHORITY_REJECTED"
+
+
+def test_rtc_portal_reads_only_canonical_issuer_profile_in_authorized_scope(
+    tmp_path: Path,
+) -> None:
+    from kordena_fiscal.domain import (
+        BrazilianJurisdiction, CnaeCode, Cnpj, ExecutionScope, FiscalAddress,
+        FiscalEnvironment, FiscalProfile, StateRegistration, TaxRegimeCode,
+    )
+
+    web, database = _onboarding_client(tmp_path)
+    csrf = web.cookies.get(CSRF_COOKIE)
+    assert csrf
+    response = web.post(
+        "/v1/portal/operations/onboardUnit",
+        headers={CSRF_HEADER: csrf, "Idempotency-Key": "rtc-onboard-matriz"},
+        json={"unit_id": "matriz", "display_name": "Matriz"},
+    )
+    assert response.status_code == 200
+    assert "tax-reform" in web.get("/v1/portal/bootstrap").json()["projection"]["available_surfaces"]
+
+    endpoint = "/v1/portal/surfaces/tax-reform?unit_id=matriz&environment=homologation"
+    missing = web.get(endpoint)
+    assert missing.status_code == 200
+    assert missing.json()["rows"][0]["status"] == "fiscal_profile_not_configured"
+    assert missing.json()["rows"][0]["calculation_status"] == "not_certified"
+    assert web.get(endpoint.replace("matriz", "outra")).status_code == 409
+
+    profile = FiscalProfile(
+        profile_id="rtc-issuer-matriz",
+        scope=ExecutionScope(
+            host_namespace="fm-nfcore", tenant_id=TENANT_ID,
+            unit_id="matriz", environment=FiscalEnvironment.HOMOLOGATION,
+            correlation_id="rtc-synthetic-test",
+        ),
+        cnpj=Cnpj("11222333000181"),
+        legal_name="RTC Test Company",
+        tax_regime=TaxRegimeCode.NORMAL,
+        state_registration=StateRegistration(state_code="SP", number="110042490114"),
+        primary_cnae=CnaeCode("6202300"),
+        address=FiscalAddress(
+            street="Praca da Se", number="100", district="Se",
+            municipality_name="Sao Paulo",
+            jurisdiction=BrazilianJurisdiction(
+                state_code="SP", municipality_ibge_code="3550308",
+            ),
+            postal_code="01001000",
+        ),
+        effective_from=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    with database.unit_of_work() as uow:
+        uow.control_plane.add_profile(profile)
+        uow.commit()
+    visible = web.get(endpoint)
+    assert visible.status_code == 200
+    issuer = visible.json()["rows"][0]
+    assert issuer["status"] == "profile_effective"
+    assert issuer["crt"] == 3
+    assert issuer["primary_cnae"] == "6202300"
+    assert issuer["legal_name"] == "RTC Test Company"
+    assert issuer["federal_regime_status"] == "declaration_not_configured"
+    assert issuer["calculation_status"] == "not_certified"
+    assert "federal_income_tax_regime" not in issuer
+    assert "cnpj" not in issuer
+    assert "tenant_id" not in issuer
