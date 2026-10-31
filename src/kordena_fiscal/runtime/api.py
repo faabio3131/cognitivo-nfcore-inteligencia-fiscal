@@ -809,7 +809,10 @@ def create_runtime_app(
             cakto_checkout_administration=cakto_checkout_administration,
             runtime_metrics=runtime_metrics,
             cognitive_router=build_cognitive_router(
-                human_identity, portal_executor, os.environ
+                human_identity,
+                portal_executor,
+                os.environ,
+                audit_uow_factory=runtime.database,
             ),
         ),
     )

@@ -143,3 +143,28 @@ class PolicyEntitlement:
         if quota.max_tokens is not None and tokens >= quota.max_tokens:
             return EntitlementDecision(False, "quota_tokens_exhausted")
         return EntitlementDecision(True)
+
+
+class StaticPlanResolver:
+    """Maps every tenant to one plan (pilot). Replace with the commercial authority later."""
+
+    def __init__(self, plan_id: str) -> None:
+        self._plan_id = plan_id
+
+    def plan_for(self, *, tenant_id: str, unit_id: str) -> str | None:
+        return self._plan_id
+
+
+PILOT_PLAN_ID = "pilot"
+DEFAULT_PILOT_DAILY_LIMIT = 100
+
+
+def pilot_entitlement(
+    ledger: InMemoryUsageLedger, *, daily_limit: int = DEFAULT_PILOT_DAILY_LIMIT
+) -> PolicyEntitlement:
+    """Conservative per-tenant/unit daily cap on model calls, protecting AI spend."""
+    quota = CapabilityQuota(max_requests=daily_limit, window_seconds=86400)
+    policy = PlanPolicy(PILOT_PLAN_ID, {capability: quota for capability in Capability})
+    return PolicyEntitlement(
+        plans=StaticPlanResolver(PILOT_PLAN_ID), policies={PILOT_PLAN_ID: policy}, ledger=ledger
+    )
