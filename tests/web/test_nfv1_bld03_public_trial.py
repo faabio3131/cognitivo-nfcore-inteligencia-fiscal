@@ -280,3 +280,28 @@ def test_trial_intake_tracks_governed_release_approval_and_revocation() -> None:
     )
     assert c.post("/v1/public/trials", json=body, headers=headers).status_code == 503
     assert len(service.calls) == 1
+
+
+@pytest.mark.parametrize(
+    "raw",
+    (
+        b'{"plan_id":"p","plan_id":"forged","price_id":"price","buyer_email":"a@example.com","legal_name":"ACME"}',
+        b'{"plan_id":"p","price_id":"price","buyer_email":"a@example.com","legal_name":"ACME","legal_name":"forged"}',
+        b'{"plan_id":"p","price_id":"price","buyer_email":"a@example.com","legal_name":"ACME","extra":{"key":1,"key":2}}',
+    ),
+)
+def test_public_trial_rejects_duplicate_json_fields_before_service(raw: bytes) -> None:
+    service = Trial()
+    response = client(service).post(
+        "/v1/public/trials",
+        content=raw,
+        headers={
+            "Origin": "https://fmtecnologia.com.br",
+            "Content-Type": "application/json",
+            "Idempotency-Key": "trial-duplicate-rejection",
+        },
+    )
+    assert response.status_code == 400
+    assert response.json() == {"detail": "invalid JSON"}
+    assert service.calls == []
+
