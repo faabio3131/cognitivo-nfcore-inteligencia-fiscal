@@ -359,3 +359,19 @@ def test_public_trial_rejects_key_shorter_than_canonical_minimum(key: str) -> No
     assert response.status_code == 400
     assert response.json() == {"detail": "invalid idempotency key"}
     assert service.calls == []
+
+
+def test_public_trial_streamed_payload_is_bounded_before_parsing() -> None:
+    service = Trial()
+    response = client(service).post(
+        "/v1/public/trials",
+        content=iter((b'{"plan_id":"p","padding":"', b"x" * 4096, b'"}')),
+        headers={
+            "Origin": "https://fmtecnologia.com.br",
+            "Content-Type": "application/json",
+            "Idempotency-Key": "trial-stream-overflow-key",
+        },
+    )
+    assert response.status_code == 413
+    assert response.json() == {"detail": "payload too large"}
+    assert service.calls == []
