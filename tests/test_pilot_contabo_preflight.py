@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from scripts.pilot_contabo_preflight import _https_origin, assess_pilot, run_preflight
+_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "pilot_contabo_preflight.py"
+_SPEC = spec_from_file_location("nfcore_pilot_preflight", _SCRIPT)
+assert _SPEC is not None and _SPEC.loader is not None
+pilot_preflight = module_from_spec(_SPEC)
+_SPEC.loader.exec_module(pilot_preflight)
+_https_origin = pilot_preflight._https_origin
+assess_pilot = pilot_preflight.assess_pilot
+run_preflight = pilot_preflight.run_preflight
 
 
 def _profile() -> dict[str, object]:
@@ -129,7 +138,7 @@ def test_endpoint_probe_uses_expected_read_only_routes_and_never_posts() -> None
                 return results[path]
         raise AssertionError(url)
 
-    with patch("scripts.pilot_contabo_preflight._probe", side_effect=fake_probe):
+    with patch.object(pilot_preflight, "_probe", side_effect=fake_probe):
         result = run_preflight("https://app.nfcore.com.br", "https://api.nfcore.com.br")
     assert result["web_pilot_ready"] is True
     assert len(calls) == 6
