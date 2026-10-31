@@ -1509,8 +1509,10 @@ function appendInutilizationForm(article) {
   article.append(form);
 }
 
-/** @param {string} viewId */
-/** Read-only RTC view: display only server-owned issuer data and explicit blockers. */
+/** Read-only RTC view: display only server-owned issuer data and explicit blockers.
+ * @param {HTMLElement} article
+ * @param {Array<Record<string, string|number|null>>} rows
+ */
 function appendRtcIssuerSummary(article, rows) {
   const section = document.createElement("section");
   section.className = "rtc-overview";
@@ -1535,6 +1537,7 @@ function appendRtcIssuerSummary(article, rows) {
   if (configured) {
     const grid = document.createElement("div");
     grid.className = "grid-list";
+    /** @type {Record<string,string>} */
     const crtLabels = {"1":"Simples Nacional", "2":"Simples — excesso de sublimite",
       "3":"Regime normal (CRT)", "4":"MEI"};
     grid.append(
@@ -1558,6 +1561,7 @@ function appendRtcIssuerSummary(article, rows) {
   article.append(section);
 }
 
+/** @param {string} viewId */
 async function renderSurface(viewId) {
   const generation = ++surfaceGeneration;
   workspace.setAttribute("aria-busy", "false");
