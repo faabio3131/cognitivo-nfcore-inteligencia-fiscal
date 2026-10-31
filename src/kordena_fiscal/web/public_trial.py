@@ -56,7 +56,7 @@ def create_public_trial_router(
         # The production composition binds the existing human-approved release.
         # A failed/absent release reader is never interpreted as approval.
         if commercially_authorized is None:
-            return True  # Legacy isolated router callers; runtime always binds authority.
+            return False
         try:
             return commercially_authorized() is True
         except Exception:
