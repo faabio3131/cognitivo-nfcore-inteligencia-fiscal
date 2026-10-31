@@ -1,6 +1,7 @@
 """RTC-03: synthetic rows test trust and integrity, never tax correctness."""
 
 import json
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from hashlib import sha256
 
@@ -164,3 +165,18 @@ def test_catalog_requires_pinned_loader_not_direct_construction() -> None:
     )
     with pytest.raises(RegulatoryBaselineError, match="pinned artifact"):
         fabricated.require_classification(_snapshot())
+
+
+@pytest.mark.parametrize("alteration", ["pairs", "version"])
+def test_catalog_invalidates_provenance_when_verified_object_is_replaced(
+    alteration: str,
+) -> None:
+    payload = _payload()
+    verified = load_verified_rtc_classification_catalog(_baseline(payload), payload)
+    changed = (
+        replace(verified, allowed_pairs=frozenset({("999", "999999")}))
+        if alteration == "pairs"
+        else replace(verified, artifact_version="FORGED-v2")
+    )
+    with pytest.raises(RegulatoryBaselineError, match="pinned artifact"):
+        changed.require_classification(_snapshot())
