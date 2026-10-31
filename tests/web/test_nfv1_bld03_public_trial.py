@@ -340,3 +340,22 @@ def test_public_trial_catalog_failure_is_503_without_offer_leak(failure: str) ->
     assert "plans" not in response.json()
     assert response.headers["cache-control"] == "no-store"
     assert service.calls == []
+
+
+@pytest.mark.parametrize("key", ("short-key", " " * 7 + "abcdefgh", " " * 16))
+def test_public_trial_rejects_key_shorter_than_canonical_minimum(key: str) -> None:
+    service = Trial()
+    response = client(service).post(
+        "/v1/public/trials",
+        json={
+            "plan_id": "p", "price_id": "price",
+            "buyer_email": "a@example.com", "legal_name": "ACME",
+        },
+        headers={
+            "Origin": "https://fmtecnologia.com.br",
+            "Idempotency-Key": key,
+        },
+    )
+    assert response.status_code == 400
+    assert response.json() == {"detail": "invalid idempotency key"}
+    assert service.calls == []
