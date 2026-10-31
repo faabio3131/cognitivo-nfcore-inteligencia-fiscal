@@ -116,3 +116,38 @@ def test_catalog_rejects_invalid_metadata_even_when_sha_matches() -> None:
     changed = json.dumps(raw).encode("utf-8")
     with pytest.raises(RegulatoryBaselineError, match="version mismatch"):
         load_verified_rtc_classification_catalog(_baseline(changed), changed)
+
+
+def test_catalog_denies_credit_code_without_separate_verified_credit_evidence() -> None:
+    payload = _payload()
+    catalog = load_verified_rtc_classification_catalog(_baseline(payload), payload)
+    with pytest.raises(RegulatoryBaselineError, match="cCredPres"):
+        catalog.require_classification(
+            ReformTaxClassificationSnapshot(
+                cst_code="000",
+                classification_code="000001",
+                classification_table_version="SYNTHETIC-v1",
+                presumed_credit_code="000001",
+            )
+        )
+
+
+def test_catalog_denies_duplicate_json_keys_even_with_matching_digest() -> None:
+    payload = (
+        b'{"schema_version":1,"schema_version":1,'
+        b'"artifact_id":"IBSCBS-CCLASSTRIB",'
+        b'"artifact_version":"SYNTHETIC-v1",'
+        b'"records":[{"cst":"000","cst":"000",'
+        b'"cclass_trib":"000001"}]}'
+    )
+    with pytest.raises(RegulatoryBaselineError, match="duplicate"):
+        load_verified_rtc_classification_catalog(_baseline(payload), payload)
+
+
+def test_catalog_rejects_boolean_schema_version() -> None:
+    payload = _payload()
+    obj = json.loads(payload)
+    obj["schema_version"] = True
+    malformed = json.dumps(obj).encode("utf-8")
+    with pytest.raises(RegulatoryBaselineError, match="schema version"):
+        load_verified_rtc_classification_catalog(_baseline(malformed), malformed)
