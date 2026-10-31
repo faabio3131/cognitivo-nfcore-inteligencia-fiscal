@@ -281,6 +281,7 @@ def _synthetic_rtc_catalog() -> VerifiedRtcClassificationCatalog:
     )
     return load_verified_rtc_classification_catalog(baseline, payload)
 
+
 def _rtc_rule(
     *, cst: str | None = "000", version: str | None = "SYNTHETIC-v1"
 ) -> TaxRule:
@@ -339,6 +340,20 @@ def test_rtc_rule_rejects_unverified_catalog_input() -> None:
             context=_context(),
             rules=[_rtc_rule()],
             catalog=None,  # type: ignore[arg-type]
+        )
+
+
+def test_rtc_rule_denies_fabricated_unpinned_catalog() -> None:
+    fabricated = VerifiedRtcClassificationCatalog(
+        artifact_version="SYNTHETIC-v1",
+        allowed_pairs=frozenset({("000", "000001")}),
+    )
+    with pytest.raises(RegulatoryBaselineError, match="verified RTC"):
+        resolve_rule_with_verified_rtc_catalog(
+            engine=TaxRuleEngine(),
+            context=_context(),
+            rules=[_rtc_rule()],
+            catalog=fabricated,
         )
 
 
