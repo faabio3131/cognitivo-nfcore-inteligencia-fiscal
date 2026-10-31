@@ -23,6 +23,14 @@ if [ "$MODE" = "--check" ]; then echo "MUDARIA: ${SHA:0:7} -> ${N:0:7}"; exit 0;
 # Não repete um deploy que já falhou para este mesmo commit.
 [ "$(cat "$FAILED" 2>/dev/null)" = "$N" ] && exit 0
 
+# A promoção do código nunca concede autorização implícita de migration produtiva.
+# Exigir aprovação específica fornecida pelo operador em ambiente efêmero.
+if [ "${NFCORE_SCHEMA_MIGRATION_APPROVED:-}" != "true" ] || [ "${NFCORE_PRODUCTION_APPROVAL:-}" != "PRODUCTION_APPROVED" ]; then
+  log "BLOCKED: production schema migration requires separate explicit approval"
+  exit 42
+fi
+export NFCORE_SCHEMA_MIGRATION_APPROVED NFCORE_PRODUCTION_APPROVAL
+
 cd "$ROOT" || exit 1
 MIGRATED=0
 log "== DEPLOY inicio ${SHA:0:7}->${N:0:7}"
@@ -36,9 +44,10 @@ rollback(){
   log "ROLLBACK: $1"
   echo "$N" > "$FAILED"
   if [ "$MIGRATED" = 1 ]; then
-    log "migracao ja aplicada: restaurando o banco do backup verificado"
-    docker compose stop nfcore-api >/dev/null 2>&1
-    nf_restore_db "$BKFILE" || log "ALERTA: restauracao automatica FALHOU; intervencao manual com o backup $BKFILE"
+    log "HARD_STOP: migration applied and health failed; automatic live database restore forbidden"
+    log "Operator must perform governed recovery using verified backup: $BKFILE"
+    docker compose stop nfcore-api nfcore-portal >/dev/null 2>&1 || true
+    exit 40
   fi
   for s in api portal; do docker image inspect "nfcore-$s:prev" >/dev/null 2>&1 && docker tag "nfcore-$s:prev" "nfcore-$s:current"; done
   (cd "$SRC" && git checkout -q "$SHA")
@@ -53,7 +62,7 @@ for s in api portal; do docker image inspect "nfcore-$s:current" >/dev/null 2>&1
 log "build"; docker compose build 2>&1 | tail -n 3
 for s in api portal; do docker image inspect "nfcore-$s:current" >/dev/null 2>&1 || rollback "build de $s nao gerou imagem"; done
 
-MG="docker compose run --rm --no-deps -T -e NFCORE_SCHEMA_MIGRATION_APPROVED=true -e NFCORE_PRODUCTION_APPROVAL=PRODUCTION_APPROVED nfcore-api python scripts/ci/migration_guard.py"
+MG="docker compose run --rm --no-deps -T -e NFCORE_SCHEMA_MIGRATION_APPROVED -e NFCORE_PRODUCTION_APPROVAL nfcore-api python scripts/ci/migration_guard.py"
 log "migracao: checando politica (bloqueia migracao destrutiva)"
 $MG --check-policy < /dev/null > /tmp/nfcore-mig.log 2>&1 || rollback "politica de migracao bloqueou este commit (ver /tmp/nfcore-mig.log); exige aprovacao manual"
 log "migracao: aplicando (transacao unica; falha = nada alterado)"

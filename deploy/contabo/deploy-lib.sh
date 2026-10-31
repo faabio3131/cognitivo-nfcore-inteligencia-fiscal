@@ -12,6 +12,15 @@ nf_verify_dump(){
 # Restaura o banco a partir de um dump verificado. Uso: nf_restore_db ARQUIVO.dump
 nf_restore_db(){
   local f="$1" DBC=${NFCORE_DBCONT:-nfcore-db} DBN=${NFCORE_DBNAME:-nfcore} DBU=${NFCORE_DBUSER:-nfcore}
+  # Proibido DROP SCHEMA em banco vivo. O restore automatizado só pode atuar
+  # em banco descartável explicitamente identificado para ensaio.
+  if [ "${NFCORE_RESTORE_DISPOSABLE_DB:-}" != "true" ]; then
+    echo "restore: BLOCKED live database; manual recovery required"; return 42
+  fi
+  case "$DBN" in
+    nfcore_restore_*) ;;
+    *) echo "restore: BLOCKED non-disposable database name"; return 42 ;;
+  esac
   nf_verify_dump "$f" || { echo "dump ou sha256 ausente/nao confere"; return 1; }
   docker exec "$DBC" psql -U "$DBU" -d "$DBN" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" >/dev/null || return 1
   docker exec -i "$DBC" pg_restore -U "$DBU" -d "$DBN" --no-owner --no-privileges --exit-on-error < "$f" || return 1
