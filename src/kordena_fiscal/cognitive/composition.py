@@ -13,6 +13,8 @@ from fastapi import APIRouter
 
 from kordena_fiscal.security.human_identity import HumanIdentityService
 
+from .adapters.logging_audit import LoggingAuditSink
+from .adapters.openai_compatible import build_model_from_environ
 from .api import create_cognitive_router
 from .knowledge.official import OfficialTablesError, cached_official_catalog
 from .portal_evidence import PortalSurfaceEvidenceProvider, SurfaceReader
@@ -36,12 +38,15 @@ def build_cognitive_router(
     except OfficialTablesError:
         # Fail-open: without the official tables the advice says "não verificado".
         catalog = None
+    model = build_model_from_environ(environ)
     service = CognitiveAdviceService(
-        baselines=default_baselines(classification_catalog=catalog), model=None
+        baselines=default_baselines(classification_catalog=catalog),
+        model=model,
+        audit=LoggingAuditSink() if model is not None else None,
     )
     return create_cognitive_router(
         identity,
         service,
         PortalSurfaceEvidenceProvider(portal_executor),
-        ai_enabled=False,
+        ai_enabled=model is not None,
     )
