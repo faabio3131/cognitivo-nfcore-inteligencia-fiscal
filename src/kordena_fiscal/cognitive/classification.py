@@ -89,9 +89,7 @@ class ClassificationBaseline:
         sections.append(
             AdviceSection(
                 SectionKind.SOURCE,
-                f"Catálogos internos {self._catalog.version}; revisão normativa pendente "
-                "para os catálogos de semente. Tabelas oficiais de NCM e cClassTrib só "
-                "valem quando carregadas por processo revisado.",
+                f"Catálogos internos {self._catalog.version}; " + self._source_note(),
                 kb_ids or (decision.evidence_id,),
             )
         )
@@ -193,6 +191,20 @@ class ClassificationBaseline:
             elif self._catalog.lookup(CatalogKind.CCLASSTRIB, cclass) is None:
                 out.append(_Finding(f"cClassTrib {cclass} não consta do catálogo carregado.", True))
         return out
+
+    def _source_note(self) -> str:
+        if self._catalog.is_loaded(CatalogKind.NCM) and self._catalog.is_loaded(
+            CatalogKind.CCLASSTRIB
+        ):
+            return (
+                "NCM e cClassTrib vêm de tabelas oficiais com integridade verificada "
+                "(SHA-256), sem revisão normativa humana; os demais catálogos são sementes "
+                "com revisão normativa pendente."
+            )
+        return (
+            "revisão normativa pendente para os catálogos de semente. Tabelas oficiais de "
+            "NCM e cClassTrib só valem quando carregadas por processo revisado."
+        )
 
     def _catalog_evidence(self, decision: Evidence) -> tuple[Evidence, ...]:
         crt = decision.data.get("crt", "").strip()
