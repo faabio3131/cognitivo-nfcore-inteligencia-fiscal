@@ -102,6 +102,7 @@ def build_trial_app():
         allowed_origins=("https://127.0.0.1:4176",),
         rate_limiter=PostgresPublicTrialAbuseGate(database.connection),
         delivery=mailbox,
+        commercially_authorized=lambda: True,  # Synthetic browser harness only.
     ))
 
     @app.get("/__test/health")
