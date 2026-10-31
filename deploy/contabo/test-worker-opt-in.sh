@@ -6,6 +6,7 @@ T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 cp "$HERE/compose.prod.yml" "$HERE/compose.worker.opt-in.yml" "$T/"
 mkdir -p "$T/src"
+printf '%s\n' 'POSTGRES_PASSWORD=synthetic-only' > "$T/.env"
 printf '%s\n' 'NFCORE_WORKER_GSM_MODE=scoped-production-sa-v1' > "$T/.env.worker"
 printf '%s\n' 'not-a-real-key' > "$T/identity.json"
 export POSTGRES_PASSWORD=synthetic-only
