@@ -21,7 +21,6 @@ from kordena_fiscal.compliance.rtc import (
 from kordena_fiscal.compliance.rtc_evidence import verify_regulatory_artifact_bytes
 from kordena_fiscal.tax import TaxDecision, TaxRule, TaxRuleContext, TaxRuleEngine
 
-
 # Local construction witness: a catalog object is not verified merely by its type.
 # This protects the canonical code path against accidental unpinned synthetic data.
 _VERIFIED_CATALOG_WITNESS = object()
