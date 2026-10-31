@@ -3,7 +3,7 @@
 # Autorização = merge/push em `production` (decisão do Diretor). Cron */5 com flock (ver install.sh).
 # Uso: deploy.sh [run] | --check | status
 # Deploy de código SEM migration; schema pendente bloqueia. Falha volta à aplicação anterior.
-set -u
+set -uo pipefail
 ROOT=${NFCORE_ROOT:-/opt/fm/nfcore}; SRC="$ROOT/src"; STATE="$ROOT/.deployed"; FAILED="$ROOT/.failed-sha"
 BRANCH=${NFCORE_DEPLOY_BRANCH:-production}
 MODE=${1:-run}
@@ -47,7 +47,7 @@ rollback(){
 # Guarda as imagens atuais como :prev para o rollback.
 for s in api portal; do docker image inspect "nfcore-$s:current" >/dev/null 2>&1 && docker tag "nfcore-$s:current" "nfcore-$s:prev"; done
 (cd "$SRC" && git checkout -q "$N") || rollback "checkout falhou"
-log "build"; docker compose build 2>&1 | tail -n 3
+log "build"; docker compose build 2>&1 | tail -n 3 || rollback "docker compose build failed"
 for s in api portal; do docker image inspect "nfcore-$s:current" >/dev/null 2>&1 || rollback "build de $s nao gerou imagem"; done
 
 MG="docker compose run --rm --no-deps -T nfcore-api python scripts/ci/migration_guard.py"
@@ -56,7 +56,7 @@ $MG --check-policy < /dev/null > /tmp/nfcore-mig.log 2>&1 || rollback "politica 
 log "schema: exigindo versoes atuais sem aplicar migrations"
 $MG --assert-current-production < /dev/null >> /tmp/nfcore-mig.log 2>&1 || rollback "schema pendente/divergente; migration exige fluxo humano separado"
 
-log "subindo"; docker compose up -d nfcore-api nfcore-portal 2>&1 | tail -n 3
+log "subindo"; docker compose up -d nfcore-api nfcore-portal 2>&1 | tail -n 3 || rollback "docker compose up failed"
 ok=0
 for _ in $(seq 1 "${NFCORE_HEALTH_TRIES:-24}"); do
   sleep "${NFCORE_HEALTH_WAIT:-5}"
