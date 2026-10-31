@@ -255,8 +255,15 @@ def test_rtc_portal_reads_only_canonical_issuer_profile_in_authorized_scope(
     tmp_path: Path,
 ) -> None:
     from kordena_fiscal.domain import (
-        BrazilianJurisdiction, CnaeCode, Cnpj, ExecutionScope, FiscalAddress,
-        FiscalEnvironment, FiscalProfile, StateRegistration, TaxRegimeCode,
+        BrazilianJurisdiction,
+        CnaeCode,
+        Cnpj,
+        ExecutionScope,
+        FiscalAddress,
+        FiscalEnvironment,
+        FiscalProfile,
+        StateRegistration,
+        TaxRegimeCode,
     )
 
     web, database = _onboarding_client(tmp_path)
@@ -268,7 +275,8 @@ def test_rtc_portal_reads_only_canonical_issuer_profile_in_authorized_scope(
         json={"unit_id": "matriz", "display_name": "Matriz"},
     )
     assert response.status_code == 200
-    assert "tax-reform" in web.get("/v1/portal/bootstrap").json()["projection"]["available_surfaces"]
+    available = web.get("/v1/portal/bootstrap").json()["projection"]["available_surfaces"]
+    assert "tax-reform" in available
 
     endpoint = "/v1/portal/surfaces/tax-reform?unit_id=matriz&environment=homologation"
     missing = web.get(endpoint)
