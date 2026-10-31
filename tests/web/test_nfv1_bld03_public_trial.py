@@ -7,6 +7,15 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from kordena_fiscal.control_plane.commercial_release import (
+    CommercialReleaseAdministrationService,
+    InMemoryCommercialReleaseCatalog,
+)
+from kordena_fiscal.control_plane.models import AdminPrincipal, ControlPlanePermission
+from kordena_fiscal.product.commercial_release import (
+    CommercialReleaseDecision,
+    CommercialReleaseStatus,
+)
 from kordena_fiscal.security.s2s import FixedWindowRateLimiter
 from kordena_fiscal.web.public_trial import create_public_trial_router
 
@@ -174,3 +183,40 @@ def test_missing_release_reader_fails_closed() -> None:
     assert c.post("/v1/public/trial-plans", headers=origin).status_code == 503
     assert c.post("/v1/public/trials", json={"plan_id": "p", "price_id": "price", "buyer_email": "a@example.com", "legal_name": "ACME"}, headers={**origin, "Idempotency-Key": "trial-missing-release"}).status_code == 503
     assert service.calls == []
+
+
+def test_trial_intake_tracks_governed_release_approval_and_revocation() -> None:
+    release = CommercialReleaseAdministrationService(InMemoryCommercialReleaseCatalog())
+    actor = AdminPrincipal(
+        actor_id="synthetic-platform-admin", global_scope=True,
+        permissions=frozenset({ControlPlanePermission.COMMERCIAL_CONFIG_WRITE}),
+    )
+    service = Trial()
+    c = client(
+        service,
+        commercially_authorized=lambda: (
+            release.current is not None and release.current.commercially_approved
+        ),
+    )
+    headers = {"Origin": "https://fmtecnologia.com.br", "Idempotency-Key": "governed-release-0001"}
+    body = {"plan_id": "p", "price_id": "price", "buyer_email": "a@example.com", "legal_name": "ACME"}
+    assert c.post("/v1/public/trials", json=body, headers=headers).status_code == 503
+    release.publish(
+        actor=actor, expected_version=None,
+        decision=CommercialReleaseDecision(version=1, status=CommercialReleaseStatus.INTERNAL_ONLY),
+    )
+    assert c.post("/v1/public/trials", json=body, headers=headers).status_code == 503
+    release.publish(
+        actor=actor, expected_version=1,
+        decision=CommercialReleaseDecision(
+            version=2, status=CommercialReleaseStatus.COMMERCIAL_APPROVED,
+            human_decision_reference="synthetic-approval-reference",
+        ),
+    )
+    assert c.post("/v1/public/trials", json=body, headers=headers).status_code == 201
+    release.publish(
+        actor=actor, expected_version=2,
+        decision=CommercialReleaseDecision(version=3, status=CommercialReleaseStatus.INTERNAL_ONLY),
+    )
+    assert c.post("/v1/public/trials", json=body, headers=headers).status_code == 503
+    assert len(service.calls) == 1
