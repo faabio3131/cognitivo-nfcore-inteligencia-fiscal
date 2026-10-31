@@ -11,25 +11,25 @@ autorização do deploy** (decisão do Diretor, 26/10/2026). Nenhum agente entra
 ## Arquivos
 | Arquivo | Função |
 |---|---|
-| `deploy.sh` | Detecta commit novo em `production`, faz backup, build, checa/aplica migrações, sobe e confere a saúde; falhou, volta |
+| `deploy.sh` | Detecta commit novo em `production`, faz backup, build, exige schema atual sem DDL, sobe e confere a saúde; falhou, volta somente código |
 | `deploy-lib.sh` | Verificação (sha256) e restauração de dump do banco |
 | `backup.sh` | `pg_dump` custom + sha256, retenção de 7 dias (`OK <arquivo> itens <N>`) |
 | `compose.prod.yml` | Composição de produção (`nfcore-db`, `nfcore-api`, `nfcore-portal`; redes `internal` e `proxy-net`); worker fora até a composição GSM ser aprovada |
 | `.env.example` | Nomes das variáveis do `/opt/fm/nfcore/.env` (sem valores; o `.env` real nunca é versionado) |
 | `install.sh` | Copia os scripts para `/opt/fm/nfcore` (com cópia `.pre-install-*`); com `--cron` liga o cron do deploy (*/5, flock) e o backup diário 03:45 |
-| `test-deploy.sh` | Testa o `deploy.sh` com `docker` simulado (12 cenários); roda no CI |
+| `test-deploy.sh` | Testa o `deploy.sh` com `docker` simulado (code-only, schema pendente, rollback, integridade); roda no CI |
 
 ## Fluxo do deploy
 1. Compara `origin/production` com o SHA em `.deployed`; sem mudança, não faz nada.
 2. Recusa histórico reescrito (só aceita avanço).
 3. Backup do banco verificado por sha256; sem backup verificado, **aborta**.
 4. Guarda as imagens atuais como `:prev` e faz o build da versão nova.
-5. `migration_guard --check-policy`: bloqueia migração destrutiva (DROP/TRUNCATE/DELETE FROM, alteração de migração antiga). Bloqueou = deploy recusado, exige aprovação manual.
-6. `migration_guard --apply` em transação única: falhou = banco intacto.
+5. `migration_guard --check-policy` e `--assert-current-production` **somente leitura**: exigem versões fiscais e Cakto atuais. Se houver schema pendente, divergente ou inacessível, **bloqueia**.
+6. **Nunca executa `--apply`**, DDL ou restauração do banco no fluxo automático. Migration precisa de autorização específica, backup/rollback governados e execução separada.
 7. Sobe API e Portal; exige `/health/ready` (API) e Portal respondendo por até 2 min.
-8. Qualquer falha: volta as imagens `:prev` e o SHA anterior; se já migrou, **restaura o banco do backup verificado**. O commit que falhou vai para `.failed-sha` e não é repetido.
+8. Falha depois do gate de schema: rollback **somente de imagens/commit**. Não restaura o banco produtivo. O commit que falhou vai para `.failed-sha`.
 
-Limite: gravações feitas entre o backup e uma restauração automática se perdem.
+**Atenção:** o fluxo contém apenas API e Portal. Worker/GSM não está nesse compose; não declarar publicação completa por este deploy. A restauração do banco exige runbook manual com ensaio isolado, sem `DROP SCHEMA public CASCADE` automático.
 
 ## Como publicar (agentes)
 1. PR para `main`, CI verde.
