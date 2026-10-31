@@ -2,7 +2,7 @@
 # NFCore — deploy automático no Contabo (modelo "pull"): o servidor puxa a branch `production`.
 # Autorização = merge/push em `production` (decisão do Diretor). Cron */5 com flock (ver install.sh).
 # Uso: deploy.sh [run] | --check | status
-# Falha em qualquer etapa => volta à versão anterior (e ao banco do backup, se já migrou).
+# Deploy de código SEM migration; schema pendente bloqueia. Falha volta à aplicação anterior.
 set -u
 ROOT=${NFCORE_ROOT:-/opt/fm/nfcore}; SRC="$ROOT/src"; STATE="$ROOT/.deployed"; FAILED="$ROOT/.failed-sha"
 BRANCH=${NFCORE_DEPLOY_BRANCH:-production}
@@ -23,16 +23,9 @@ if [ "$MODE" = "--check" ]; then echo "MUDARIA: ${SHA:0:7} -> ${N:0:7}"; exit 0;
 # Não repete um deploy que já falhou para este mesmo commit.
 [ "$(cat "$FAILED" 2>/dev/null)" = "$N" ] && exit 0
 
-# A promoção do código nunca concede autorização implícita de migration produtiva.
-# Exigir aprovação específica fornecida pelo operador em ambiente efêmero.
-if [ "${NFCORE_SCHEMA_MIGRATION_APPROVED:-}" != "true" ] || [ "${NFCORE_PRODUCTION_APPROVAL:-}" != "PRODUCTION_APPROVED" ]; then
-  log "BLOCKED: production schema migration requires separate explicit approval"
-  exit 42
-fi
-export NFCORE_SCHEMA_MIGRATION_APPROVED NFCORE_PRODUCTION_APPROVAL
+# Deploys automáticos são code-only; migration exige procedimento separado e aprovado.
 
 cd "$ROOT" || exit 1
-MIGRATED=0
 log "== DEPLOY inicio ${SHA:0:7}->${N:0:7}"
 log "backup do banco"
 BKOUT=$("$ROOT/backup.sh") || { log "FALHA no backup, abortando"; exit 3; }
@@ -43,12 +36,7 @@ log "backup verificado: $BKFILE"
 rollback(){
   log "ROLLBACK: $1"
   echo "$N" > "$FAILED"
-  if [ "$MIGRATED" = 1 ]; then
-    log "HARD_STOP: migration applied and health failed; automatic live database restore forbidden"
-    log "Operator must perform governed recovery using verified backup: $BKFILE"
-    docker compose stop nfcore-api nfcore-portal >/dev/null 2>&1 || true
-    exit 40
-  fi
+  # Não houve mudança de schema: rollback apenas dos containers/commit.
   for s in api portal; do docker image inspect "nfcore-$s:prev" >/dev/null 2>&1 && docker tag "nfcore-$s:prev" "nfcore-$s:current"; done
   (cd "$SRC" && git checkout -q "$SHA")
   docker compose up -d --no-build nfcore-api nfcore-portal 2>&1 | tail -n 3
@@ -62,13 +50,11 @@ for s in api portal; do docker image inspect "nfcore-$s:current" >/dev/null 2>&1
 log "build"; docker compose build 2>&1 | tail -n 3
 for s in api portal; do docker image inspect "nfcore-$s:current" >/dev/null 2>&1 || rollback "build de $s nao gerou imagem"; done
 
-MG="docker compose run --rm --no-deps -T -e NFCORE_SCHEMA_MIGRATION_APPROVED -e NFCORE_PRODUCTION_APPROVAL nfcore-api python scripts/ci/migration_guard.py"
-log "migracao: checando politica (bloqueia migracao destrutiva)"
-$MG --check-policy < /dev/null > /tmp/nfcore-mig.log 2>&1 || rollback "politica de migracao bloqueou este commit (ver /tmp/nfcore-mig.log); exige aprovacao manual"
-log "migracao: aplicando (transacao unica; falha = nada alterado)"
-MOUT=$($MG --apply < /dev/null 2>&1) || { echo "$MOUT" >> /tmp/nfcore-mig.log; rollback "migracao falhou (nada foi alterado no banco; ver /tmp/nfcore-mig.log)"; }
-log "migracao: $(echo "$MOUT" | tail -n 1 | cut -c1-200)"
-echo "$MOUT" | grep -q "applied=()" || MIGRATED=1
+MG="docker compose run --rm --no-deps -T nfcore-api python scripts/ci/migration_guard.py"
+log "schema: checando politica (somente leitura)"
+$MG --check-policy < /dev/null > /tmp/nfcore-mig.log 2>&1 || rollback "politica de migration bloqueou release"
+log "schema: exigindo versoes atuais sem aplicar migrations"
+$MG --assert-current-production < /dev/null >> /tmp/nfcore-mig.log 2>&1 || rollback "schema pendente/divergente; migration exige fluxo humano separado"
 
 log "subindo"; docker compose up -d nfcore-api nfcore-portal 2>&1 | tail -n 3
 ok=0
