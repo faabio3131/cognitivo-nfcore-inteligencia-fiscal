@@ -1620,7 +1620,7 @@ function appendRtcProfileRegistration(section) {
   section.append(form);
 }
 
-/** Read-only RTC view: display only server-owned issuer data and explicit blockers.
+/** RTC projection: display server-owned issuer data and explicit blockers.
  * @param {HTMLElement} article
  * @param {Array<Record<string, string|number|null>>} rows
  */
@@ -1668,7 +1668,7 @@ function appendRtcIssuerSummary(article, rows) {
   pending.textContent = "Regime federal (Lucro Real / Presumido / Simples): sem declaração validada e persistida. O CRT não define sozinho o regime de IRPJ/CSLL.";
   const calc = document.createElement("p");
   calc.className = "empty-state";
-  calc.textContent = "IBS, CBS, IS e classificação CST/cClassTrib: cálculo e tabelas oficiais ainda não certificados para operação. Esta tela é somente consulta; nenhuma emissão ou alteração fiscal é executada.";
+  calc.textContent = "IBS, CBS, IS e classificação CST/cClassTrib: cálculo e tabelas oficiais ainda não certificados para operação. O cadastro inicial exige permissão administrativa; nenhuma emissão ou cálculo fiscal é executado nesta tela.";
   section.append(pending, calc);
   article.append(section);
 }
