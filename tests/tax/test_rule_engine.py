@@ -1,11 +1,19 @@
+import json
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from hashlib import sha256
 
 import pytest
 
-from kordena_fiscal.compliance.rtc import RegulatoryBaselineError
+from kordena_fiscal.compliance.rtc import (
+    RegulatoryArtifactKind,
+    RegulatoryArtifactPin,
+    RegulatoryBaseline,
+    RegulatoryBaselineError,
+)
 from kordena_fiscal.compliance.rtc_catalog import (
     VerifiedRtcClassificationCatalog,
+    load_verified_rtc_classification_catalog,
     resolve_rule_with_verified_rtc_catalog,
 )
 from kordena_fiscal.domain import (
@@ -246,12 +254,32 @@ def test_rule_and_outcome_validate_required_shapes() -> None:
 
 
 def _synthetic_rtc_catalog() -> VerifiedRtcClassificationCatalog:
-    # Synthetic verified payload representation only; not an official tax source.
-    return VerifiedRtcClassificationCatalog(
-        artifact_version="SYNTHETIC-v1",
-        allowed_pairs=frozenset({("000", "000001")}),
+    # Synthetic fixtures still pass through the pinned bytes/digest validator.
+    payload = json.dumps(
+        {
+            "schema_version": 1,
+            "artifact_id": "IBSCBS-CCLASSTRIB",
+            "artifact_version": "SYNTHETIC-v1",
+            "records": [{"cst": "000", "cclass_trib": "000001"}],
+        },
+        sort_keys=True,
+    ).encode("utf-8")
+    baseline = RegulatoryBaseline(
+        baseline_id="synthetic-rtc-tax-rule",
+        version=1,
+        captured_at=datetime(2026, 9, 10, tzinfo=UTC),
+        artifacts=(
+            RegulatoryArtifactPin(
+                artifact_id="IBSCBS-CCLASSTRIB",
+                kind=RegulatoryArtifactKind.CLASSIFICATION_TABLE,
+                version="SYNTHETIC-v1",
+                published_on=date(2026, 9, 1),
+                source_reference="synthetic-test-only",
+                checksum_sha256=sha256(payload).hexdigest(),
+            ),
+        ),
     )
-
+    return load_verified_rtc_classification_catalog(baseline, payload)
 
 def _rtc_rule(
     *, cst: str | None = "000", version: str | None = "SYNTHETIC-v1"
