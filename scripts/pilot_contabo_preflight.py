@@ -120,7 +120,8 @@ def assess_pilot(
         "public_sales_gate": "CONFIGURATION_REQUIRED" if not billing else "CHECK_EXTERNALLY",
         "limitations": [
             "No authenticated customer journey is proven by this unauthenticated check.",
-            "No provider homologation, fiscal authorization, backup or production approval is inferred.",
+            "No provider homologation, fiscal authorization, backup or production "
+            "approval is inferred.",
         ],
     }
 
