@@ -245,3 +245,27 @@ def test_package_has_no_model_sdk_secret_or_network_dependency() -> None:
         text = path.read_text(encoding="utf-8")
         assert not forbidden.search(text), path
         assert not secrets.search(text), path
+
+
+def test_baseline_crash_is_contained_and_recorded(build_service) -> None:  # type: ignore[no-untyped-def]
+    def broken(_request):  # type: ignore[no-untyped-def]
+        raise ValueError("bug")
+
+    model = ScriptedModel(sections=good_sections())
+    service = build_service(model, baselines={Capability.EXPLAIN_REJECTION: broken})
+    result = service.advise(make_request())
+    assert result.status is AdviceStatus.INSUFFICIENT_BASIS
+    assert "baseline_error:ValueError" in result.provenance.guard_findings
+    assert model.calls == 0
+
+
+def test_only_the_adapters_package_may_touch_the_network() -> None:
+    root = Path(__file__).resolve().parents[2] / "src" / "kordena_fiscal" / "cognitive"
+    network = re.compile(
+        r"^\s*(import|from)\s+(urllib\.request|urllib\.error|socket|http\.client|ssl)\b",
+        re.MULTILINE,
+    )
+    for path in root.rglob("*.py"):
+        if "adapters" in path.relative_to(root).parts:
+            continue
+        assert not network.search(path.read_text(encoding="utf-8")), path

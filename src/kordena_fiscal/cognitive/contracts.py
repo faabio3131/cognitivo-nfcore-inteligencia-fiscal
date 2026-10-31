@@ -34,6 +34,7 @@ class EvidenceKind(StrEnum):
     REJECTION = "rejection"
     DOCUMENT_STATE = "document_state"
     TAX_DECISION = "tax_decision"
+    PRODUCT_PROFILE = "product_profile"
     CLASSIFICATION_CATALOG = "classification_catalog"
     RECONCILIATION_ISSUE = "reconciliation_issue"
     KNOWLEDGE_BASE = "knowledge_base"

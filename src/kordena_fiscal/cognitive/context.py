@@ -107,6 +107,10 @@ class ContextPackBuilder:
             untrusted_data=fenced,
             boundary=boundary,
             context_hash=context_hash,
+            tenant_id=request.scope.tenant_id,
+            unit_id=request.scope.unit_id,
+            request_id=request.request_id,
+            correlation_id=request.scope.correlation_id,
         )
         return ContextPack(
             prompt=prompt,

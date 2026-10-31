@@ -24,6 +24,8 @@ from .contracts import (
 from .guardrails import OutputGuard
 from .ports import (
     AdviceAuditEvent,
+    AdviceMetricsPort,
+    AdviceMetricsSample,
     AdvisoryModelPort,
     AuditSinkPort,
     EntitlementPort,
@@ -65,6 +67,7 @@ class CognitiveAdviceService:
         entitlements: EntitlementPort | None = None,
         ledger: UsageLedgerPort | None = None,
         audit: AuditSinkPort | None = None,
+        metrics: AdviceMetricsPort | None = None,
         context_builder: ContextPackBuilder | None = None,
         guard: OutputGuard | None = None,
         breaker: CircuitBreaker | None = None,
@@ -80,6 +83,7 @@ class CognitiveAdviceService:
         self._entitlements = entitlements
         self._ledger = ledger
         self._audit = audit
+        self._metrics = metrics
         self._builder = context_builder or ContextPackBuilder()
         self._guard = guard or OutputGuard()
         self._breaker = breaker or CircuitBreaker()
@@ -114,6 +118,8 @@ class CognitiveAdviceService:
             status = baseline.status
 
         findings = list(outcome.findings)
+        if baseline.error:
+            findings.append(f"baseline_error:{baseline.error}")
         if pack.injection_markers:
             findings.append(f"injection_markers_in_input:{pack.injection_markers}")
         if outcome.provider_id and self._ledger is not None:
@@ -136,6 +142,7 @@ class CognitiveAdviceService:
             usage=outcome.usage,
         )
         self._emit(request, "advice.completed", context_hash, status.value, outcome.degraded_reason)
+        self._observe(request, status, outcome.degraded_reason, provenance)
         return AdviceResult(status=status, sections=sections, provenance=provenance)
 
     # ----------------------------------------------------------------- helpers
@@ -148,8 +155,9 @@ class CognitiveAdviceService:
             )
         try:
             return fn(request)
-        except Exception:  # deterministic baseline must never take the caller down
-            return insufficient("Não foi possível montar a base determinística desta consulta.")
+        except Exception as exc:  # deterministic baseline must never take the caller down
+            failed = insufficient("Não foi possível montar a base determinística desta consulta.")
+            return replace(failed, error=type(exc).__name__)
 
     def _maybe_call_model(
         self, request: AdviceRequest, baseline: Baseline, prompt: ModelPrompt, context_hash: str
@@ -157,7 +165,7 @@ class CognitiveAdviceService:
         if self._model is None:
             return _ModelOutcome(degraded_reason="ai_disabled")
         if not baseline.model_eligible:
-            return _ModelOutcome(degraded_reason="insufficient_basis")
+            return _ModelOutcome(degraded_reason=baseline.no_model_reason)
         if self._entitlements is not None:
             try:
                 decision = self._entitlements.check(
@@ -245,6 +253,7 @@ class CognitiveAdviceService:
             latency_ms=int((self._clock() - started) * 1000),
         )
         self._emit(request, "advice.denied", _DENIED_CONTEXT, "denied", reason)
+        self._observe(request, AdviceStatus.DENIED, reason, provenance)
         return AdviceResult(
             status=AdviceStatus.DENIED,
             sections=(
@@ -255,6 +264,29 @@ class CognitiveAdviceService:
             ),
             provenance=provenance,
         )
+
+    def _observe(
+        self,
+        request: AdviceRequest,
+        status: AdviceStatus,
+        reason: str | None,
+        provenance: Provenance,
+    ) -> None:
+        if self._metrics is None:
+            return
+        try:
+            self._metrics.observe(
+                AdviceMetricsSample(
+                    scope=request.scope,
+                    capability=request.capability,
+                    status=status.value,
+                    degraded_reason=reason,
+                    latency_ms=provenance.latency_ms or 0,
+                    usage=provenance.usage,
+                )
+            )
+        except Exception:  # metrics are best-effort and never affect the answer
+            return
 
     def _emit(
         self,

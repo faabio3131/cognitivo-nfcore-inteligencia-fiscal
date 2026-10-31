@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from kordena_fiscal.domain import ExecutionScope
+
 from .contracts import AdviceSection, Capability, ModelUsage, SectionKind
 
 
@@ -40,6 +42,10 @@ class ModelPrompt:
     untrusted_data: str
     boundary: str
     context_hash: str
+    tenant_id: str
+    unit_id: str
+    request_id: str
+    correlation_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,3 +120,23 @@ class AuditSinkPort(Protocol):
 
 def section_from_provider(section: ProviderSection) -> AdviceSection:
     return AdviceSection(kind=section.kind, text=section.text, evidence_ids=section.evidence_ids)
+
+
+@dataclass(frozen=True, slots=True)
+class AdviceMetricsSample:
+    scope: ExecutionScope
+    capability: Capability
+    status: str
+    degraded_reason: str | None
+    latency_ms: int
+    usage: ModelUsage
+
+
+class AdviceMetricsPort(Protocol):
+    def observe(self, sample: AdviceMetricsSample) -> None:
+        """Best-effort. Never receives prompt text, answers, secrets or personal data."""
+
+
+class PlanResolverPort(Protocol):
+    def plan_for(self, *, tenant_id: str, unit_id: str) -> str | None:
+        """Plan id from the canonical commercial authority, or None when unknown."""
