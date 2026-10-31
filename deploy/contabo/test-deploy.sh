@@ -13,7 +13,8 @@ cat > "$T/bin/docker" <<'D'
 C="$CTL"; echo "docker $*" >> "$C/calls"
 case "$1 $2" in
   "image inspect") [ -f "$C/img-$3" ] ;;
-  "compose build") touch "$C/img-nfcore-api:current" "$C/img-nfcore-portal:current" ;;
+  "compose build") [ -f "$C/build-fail" ] && { echo "simulated build error"; exit 65; }
+                   touch "$C/img-nfcore-api:current" "$C/img-nfcore-portal:current" ;;
   "compose run") 
      if [[ "$*" == *--assert-current-production* && -f "$C/schema-pending" ]]; then echo "schema pending"; exit 1; fi
      if [[ "$*" == *--check-policy* && -f "$C/mig-policy-fail" ]]; then echo "policy denied"; exit 1; fi
@@ -64,6 +65,10 @@ rm -f "$CTL/schema-pending" "$T/root/.failed-sha"
 V4=$(newcommit c4); touch "$CTL/mig-policy-fail"
 rc=$(run); chk "politica bloqueia migracao destrutiva => recusado, sem tocar no banco" '[ "$rc" = 1 ] && grep -q "politica de migration bloqueou" "$T/out" && [ ! -f "$CTL/restored" ]'
 rm -f "$CTL/mig-policy-fail" "$T/root/.failed-sha"
+
+touch "$CTL/build-fail"
+rc=$(run); chk "docker build que falha bloqueia deploy mesmo com tag antiga presente" '[ "$rc" = 1 ] && grep -q "docker compose build failed" "$T/out" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V2" ] && ! grep -q -- "--apply" "$CTL/calls"'
+rm -f "$CTL/build-fail" "$T/root/.failed-sha"
 
 touch "$CTL/unhealthy"
 rc=$(run); chk "health falhou => rollback somente codigo, sem restore de banco" '[ "$rc" = 1 ] && [ ! -f "$CTL/restored" ] && grep -q "ROLLBACK" "$T/out" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V2" ]'
