@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -14,6 +15,11 @@ from kordena_fiscal.domain import (
     NcmCode,
     ProductOrigin,
     TaxRegimeCode,
+)
+from kordena_fiscal.compliance.rtc import RegulatoryBaselineError
+from kordena_fiscal.compliance.rtc_catalog import (
+    VerifiedRtcClassificationCatalog,
+    resolve_rule_with_verified_rtc_catalog,
 )
 from kordena_fiscal.tax import (
     RecipientTaxProfile,
@@ -237,3 +243,98 @@ def test_rule_and_outcome_validate_required_shapes() -> None:
 
     with pytest.raises(FiscalValidationError, match="explicit state_code"):
         TaxRuleSelector(municipality_ibge_code="3550308")
+
+
+def _synthetic_rtc_catalog() -> VerifiedRtcClassificationCatalog:
+    # Synthetic verified payload representation only; not an official tax source.
+    return VerifiedRtcClassificationCatalog(
+        artifact_version="SYNTHETIC-v1",
+        allowed_pairs=frozenset({("000", "000001")}),
+    )
+
+
+def _rtc_rule(
+    *, cst: str | None = "000", version: str | None = "SYNTHETIC-v1"
+) -> TaxRule:
+    rule = _rule("rtc-synthetic", TaxRuleSelector(state_code="SP", ncm_prefix="2106"))
+    return replace(
+        rule,
+        outcome=replace(
+            rule.outcome,
+            ibs_cbs_cst_code=cst,
+            ibs_cbs_classification_table_version=version,
+        ),
+    )
+
+
+def test_rtc_rule_reuses_canonical_engine_and_verifies_exact_catalog_pair() -> None:
+    decision, proof = resolve_rule_with_verified_rtc_catalog(
+        engine=TaxRuleEngine(),
+        context=_context(),
+        rules=[_rtc_rule()],
+        catalog=_synthetic_rtc_catalog(),
+    )
+    assert decision.rule_id == "rtc-synthetic"
+    assert decision.source_normative == "NORMA-SINTETICA-TESTE"
+    assert decision.rank == (2, 4, 0)
+    assert (proof.cst_code, proof.classification_code) == ("000", "000001")
+    assert proof.classification_table_version == "SYNTHETIC-v1"
+
+
+@pytest.mark.parametrize(
+    "cst,version,expected",
+    (
+        (None, "SYNTHETIC-v1", "explicit CST"),
+        ("000", None, "explicit CST"),
+        ("001", "SYNTHETIC-v1", "unrecognized RTC"),
+        ("000", "OUTDATED-v0", "version mismatch"),
+    ),
+)
+def test_rtc_rule_does_not_infer_absent_or_incompatible_classification(
+    cst: str | None,
+    version: str | None,
+    expected: str,
+) -> None:
+    with pytest.raises(RegulatoryBaselineError, match=expected):
+        resolve_rule_with_verified_rtc_catalog(
+            engine=TaxRuleEngine(),
+            context=_context(),
+            rules=[_rtc_rule(cst=cst, version=version)],
+            catalog=_synthetic_rtc_catalog(),
+        )
+
+
+def test_rtc_rule_rejects_unverified_catalog_input() -> None:
+    with pytest.raises(RegulatoryBaselineError, match="verified RTC"):
+        resolve_rule_with_verified_rtc_catalog(
+            engine=TaxRuleEngine(),
+            context=_context(),
+            rules=[_rtc_rule()],
+            catalog=None,  # type: ignore[arg-type]
+        )
+
+
+def test_rtc_rule_preserves_fail_closed_no_match_and_ambiguous_resolution() -> None:
+    context = _context()
+    with pytest.raises(TaxRuleNotFoundError):
+        resolve_rule_with_verified_rtc_catalog(
+            engine=TaxRuleEngine(),
+            context=context,
+            rules=[_rule("rj", TaxRuleSelector(state_code="RJ"))],
+            catalog=_synthetic_rtc_catalog(),
+        )
+    with pytest.raises(TaxRuleAmbiguityError):
+        resolve_rule_with_verified_rtc_catalog(
+            engine=TaxRuleEngine(),
+            context=context,
+            rules=[_rtc_rule(), replace(_rtc_rule(), rule_id="rtc-tie")],
+            catalog=_synthetic_rtc_catalog(),
+        )
+
+
+def test_rtc_outcome_rejects_malformed_cst_without_changing_legacy_rules() -> None:
+    assert _outcome().ibs_cbs_cst_code is None
+    with pytest.raises(FiscalValidationError, match="ibs_cbs_cst_code"):
+        replace(_outcome(), ibs_cbs_cst_code="01")
+    with pytest.raises(FiscalValidationError, match="ibs_cbs_classification_table_version"):
+        replace(_outcome(), ibs_cbs_classification_table_version=" ")
