@@ -200,15 +200,17 @@ def create_public_trial_router(
                 content={"detail": "invalid idempotency key"},
                 headers=headers,
             )
-        body = await request.body()
-        if len(body) > 4096:
-            return JSONResponse(
-                status_code=413,
-                content={"detail": "payload too large"},
-                headers=headers,
-            )
+        body = bytearray()
+        async for chunk in request.stream():
+            if len(body) + len(chunk) > 4096:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "payload too large"},
+                    headers=headers,
+                )
+            body.extend(chunk)
         try:
-            payload = json.loads(body, object_pairs_hook=_strict_trial_json_pairs)
+            payload = json.loads(bytes(body), object_pairs_hook=_strict_trial_json_pairs)
         except (ValueError, UnicodeDecodeError):
             return JSONResponse(
                 status_code=400,
