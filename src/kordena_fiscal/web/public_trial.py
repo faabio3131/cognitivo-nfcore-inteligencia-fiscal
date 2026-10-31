@@ -194,7 +194,7 @@ def create_public_trial_router(
                 headers=headers,
             )
         key = request.headers.get("Idempotency-Key", "").strip()
-        if not (8 <= len(key) <= 128 and key.isascii() and key.isprintable()):
+        if not (16 <= len(key) <= 128 and key.isascii() and key.isprintable()):
             return JSONResponse(
                 status_code=400,
                 content={"detail": "invalid idempotency key"},
