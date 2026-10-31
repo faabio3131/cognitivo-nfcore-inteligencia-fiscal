@@ -46,6 +46,8 @@ run(){ : > "$CTL/calls"; bash "$T/root/deploy.sh" "$@" > "$T/out" 2>&1; echo $?;
 
 rc=$(run); chk "sem mudanca: sai 0 e nao faz nada" '[ "$rc" = 0 ] && [ ! -s "$CTL/calls" ]'
 V2=$(newcommit c2)
+rc=$(run); chk "sem aprovacao de migration recusa antes de backup/build" '[ "$rc" = 42 ] && grep -q "BLOCKED: production schema migration" "$T/out" && [ ! -s "$CTL/calls" ]'
+export NFCORE_SCHEMA_MIGRATION_APPROVED=true NFCORE_PRODUCTION_APPROVAL=PRODUCTION_APPROVED
 rc=$(run --check); chk "--check mostra o que mudaria e nao implanta" 'grep -q MUDARIA "$T/out" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V1" ]'
 rc=$(run); chk "deploy ok grava o SHA novo" '[ "$rc" = 0 ] && grep -q "DEPLOY OK" "$T/out" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V2" ]'
 chk "deploy ok fez backup verificado" 'grep -q "backup verificado" "$T/out"'
@@ -61,7 +63,7 @@ rc=$(run); chk "politica bloqueia migracao destrutiva => recusado, sem tocar no 
 rm -f "$CTL/mig-policy-fail" "$T/root/.failed-sha"
 
 echo "'versao'" > "$CTL/applied"; touch "$CTL/unhealthy"
-rc=$(run); chk "migrou mas saude falhou => restaura o banco do backup e volta" '[ "$rc" = 1 ] && [ -f "$CTL/restored" ] && grep -q "restaurando o banco" "$T/out" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V2" ]'
+rc=$(run); chk "migrou mas saude falhou => hard-stop sem destruir dados" '[ "$rc" = 40 ] && [ ! -f "$CTL/restored" ] && grep -q "HARD_STOP" "$T/out" && grep -q "compose stop nfcore-api nfcore-portal" "$CTL/calls" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V2" ]'
 rm -f "$CTL/unhealthy" "$CTL/applied" "$CTL/restored" "$T/root/.failed-sha"
 
 rc=$(run); chk "depois de corrigido, o mesmo commit implanta" '[ "$rc" = 0 ] && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V4" ]'
@@ -69,5 +71,6 @@ rc=$(run); chk "depois de corrigido, o mesmo commit implanta" '[ "$rc" = 0 ] && 
 (cd "$T/root/src" && git checkout -q -B production "$V1" && git push -q -f origin production)
 rc=$(run); chk "historico reescrito e recusado" '[ "$rc" = 2 ] && grep -q "RECUSADO" "$T/out"'
 
+: > "$T/bk/x.dump"; chk "restore em banco nao descartavel e negado" '! (. "$HERE/deploy-lib.sh"; NFCORE_RESTORE_DISPOSABLE_DB=true nf_restore_db "$T/bk/x.dump")'
 : > "$T/bk/x.dump"; chk "dump sem sha256 nao e aceito" '! (. "$HERE/deploy-lib.sh"; nf_verify_dump "$T/bk/x.dump")'
 [ "$fail" = 0 ] && echo "TODOS OS TESTES PASSARAM" || { echo "HA FALHAS"; exit 1; }
