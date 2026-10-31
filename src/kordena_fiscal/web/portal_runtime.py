@@ -819,8 +819,6 @@ class DurableHumanPortalExecutor:
         Tenant, host, profile identity, version, actor and effective timestamp
         are server owned. A retried key never creates a second issuer profile.
         """
-        from hashlib import sha256
-
         from kordena_fiscal.domain import (
             BrazilianJurisdiction,
             CnaeCode,
@@ -853,7 +851,7 @@ class DurableHumanPortalExecutor:
             unit_id = payload["unit_id"].strip()
             environment = FiscalEnvironment(payload["environment"])
             authority.assert_permission(PortalPermission.CONFIGURATION_WRITE, unit_id=unit_id)
-            fingerprint = sha256(
+            fingerprint = hashlib.sha256(
                 (authority.tenant_id + ":" + unit_id + ":" + environment.value + ":" + key)
                 .encode("utf-8")
             ).hexdigest()
@@ -928,7 +926,9 @@ class DurableHumanPortalExecutor:
         except HumanAuthorizationError as exc:
             raise _portal_error(403, "FISCAL_PROFILE_FORBIDDEN", "Profile scope denied") from exc
         except ControlPlaneNotFoundError as exc:
-            raise _portal_error(404, "FISCAL_PROFILE_UNIT_NOT_FOUND", "Unit not configured") from exc
+            raise _portal_error(
+                404, "FISCAL_PROFILE_UNIT_NOT_FOUND", "Unit not configured"
+            ) from exc
         except ControlPlaneAuthorizationError as exc:
             raise _portal_error(403, "FISCAL_PROFILE_FORBIDDEN", "Profile scope denied") from exc
         except (FiscalValidationError, ValueError, TypeError, AttributeError) as exc:
