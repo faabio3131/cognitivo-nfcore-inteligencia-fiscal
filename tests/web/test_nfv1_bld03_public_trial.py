@@ -29,7 +29,7 @@ class Delivery:
         raise AssertionError("no activation reset was issued")
 
 
-def client(service: Trial) -> TestClient:
+def client(service: Trial, *, commercially_authorized=None) -> TestClient:
     app = FastAPI()
     app.include_router(create_public_trial_router(
         service,  # type: ignore[arg-type]
@@ -37,6 +37,7 @@ def client(service: Trial) -> TestClient:
         allowed_origins=("https://fmtecnologia.com.br",),
         rate_limiter=FixedWindowRateLimiter(max_requests=3, window_seconds=3600),
         delivery=Delivery(),  # type: ignore[arg-type]
+        commercially_authorized=commercially_authorized,
     ))
     return TestClient(app)
 
@@ -131,3 +132,27 @@ def test_browser_catalog_post_uses_same_publication_authority() -> None:
     assert response.status_code == 503
     assert response.headers["cache-control"] == "no-store"
     assert service.calls == []
+
+
+@pytest.mark.parametrize("release_reader", (lambda: False, lambda: None, lambda: (_ for _ in ()).throw(RuntimeError("unavailable"))))
+def test_public_trial_denies_catalog_and_submission_without_canonical_release(release_reader) -> None:
+    service = Trial()
+    c = client(service, commercially_authorized=release_reader)
+    origin = {"Origin": "https://fmtecnologia.com.br"}
+    catalog = c.post("/v1/public/trial-plans", headers=origin)
+    assert catalog.status_code == 503
+    assert "plans" not in catalog.json()
+    body = {"plan_id": "p", "price_id": "price", "buyer_email": "a@example.com", "legal_name": "ACME"}
+    submission = c.post("/v1/public/trials", json=body, headers={**origin, "Idempotency-Key": "trial-gated-0001"})
+    assert submission.status_code == 503
+    assert submission.headers["cache-control"] == "no-store, max-age=0"
+    assert service.calls == []
+
+
+def test_approved_release_preserves_public_trial_submission_contract() -> None:
+    service = Trial()
+    c = client(service, commercially_authorized=lambda: True)
+    body = {"plan_id": "p", "price_id": "price", "buyer_email": "a@example.com", "legal_name": "ACME"}
+    response = c.post("/v1/public/trials", json=body, headers={"Origin": "https://fmtecnologia.com.br", "Idempotency-Key": "trial-approved-0001"})
+    assert response.status_code == 201
+    assert len(service.calls) == 1
