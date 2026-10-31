@@ -1,6 +1,6 @@
 # NFCore — Core Cognitivo Fiscal V1: arquitetura
 
-**Estado:** `PENDING_IMPLEMENTATION` → fundação em construção (PR de fundação).
+**Estado:** `IMPLEMENTED_NOT_EXTERNALLY_CERTIFIED` — fundação, classificação, conciliação, adaptador central FM (contrato proposto), governança/métricas, rota do Portal e painel implementados e testados; sem IA real conectada, sem homologação externa.
 **Repositório:** `faabio3131/cognitivo-nfcore-inteligencia-fiscal` (cópia de `nf-core-v001@207fbf2`).
 **Regra-mestre:** *o Core coordena e raciocina; os serviços determinísticos validam e executam.*
 **Pacote:** `src/kordena_fiscal/cognitive/`.
@@ -39,7 +39,7 @@ com evidência e proveniência, e continua útil mesmo com a IA desligada.
 ## 3. Camadas
 
 ```
-Portal/API (sessão, RBAC, tenant/unidade)            [T04, fora da fundação]
+Portal/API (sessão, RBAC, tenant/unidade)            [T04: POST /v1/portal/cognitive/advise]
         │
         ▼
 CognitiveAdviceService  ── orquestra e nunca levanta por falha de IA
@@ -83,24 +83,23 @@ evidências, provedor/modelo/versão, achados do guard, motivo de degradação, 
 Status: `ADVISED` (modelo validado) · `BASELINE_ONLY` (determinístico; IA indisponível/negada)
 · `INSUFFICIENT_BASIS` (sem evidência para responder) · `DENIED` (sem autorização/escopo).
 
-## 6. O que fica fora desta fundação (com dono)
+## 6. Estado por item e o que depende de humanos
 
-| Item | Depende de |
-|---|---|
-| Contrato S2S NFCore↔Command (T01) e adaptador real (T03) | contrato aprovado pelo mantenedor do Command |
-| Credencial central de IA | **Fábio** coloca no cofre; eu nunca digito segredo |
-| Cota/plano `cognitive.advice` (T07) | política de preço aprovada por Fábio |
-| Rota de API e superfície no Portal (T04–T06) | PRs seguintes |
-| Catálogos oficiais (rejeição, CST, cClassTrib, NCM) | curadoria/revisão humana e artefatos oficiais com SHA-256 |
+| Item | Estado | Depende de |
+|---|---|---|
+| Fundação, rejeição, classificação, conciliação, pergunta do contador | implementado e testado | — |
+| Adaptador S2S central FM (`nfcore.cognitive.s2s/v1`) | implementado contra servidor HTTP local; contrato **proposto** | aprovação do contrato pelo mantenedor do Command |
+| Credencial central de IA | não conectada | **Fábio** coloca no cofre; nenhum segredo neste repositório |
+| Quota/plano/métricas (T07) | implementado (quota branda, em memória) | política de preço aprovada por Fábio; ledger persistente |
+| Rota do Portal e painel (T04) | implementado; ligado só com `NFCORE_COGNITIVE_ENABLED=true`, sem modelo (determinístico) | ligar o adaptador central na composição após contrato + cofre |
+| Bateria de avaliação golden/adversarial (T08) | implementada (`tests/cognitive/test_evaluation.py`) | ampliar com casos reais revisados por contador |
+| Catálogos (rejeição, CST/CSOSN, conciliação) | sementes `PENDING_NORMATIVE_REVIEW` | revisão normativa humana; tabelas oficiais NCM/cClassTrib com SHA-256 |
 
-## 7. Evolução (PRs pequenos, cada um testado)
+Limitações conhecidas: a projeção `errors` do Portal não expõe o `rejection_code` de emissão; não há projeção de leitura de decisão tributária (classificação fica sem evidência do Portal até existir); quota é process-local.
 
-1. **Fundação** — contratos, redação, ContextPack, guard, resiliência, serviço, rejeição.
-2. **Classificação (T05)** — sugestão CST/cClassTrib/NCM com catálogo vigente, sem write path.
-3. **Conciliação e contador (T06)**.
-4. **Adaptador central FM (T03)** — HTTP S2S assinado, após contrato T01.
-5. **Entitlement, custo e auditoria persistente (T07)**.
-6. **API + Portal (T04–T06 UI)** e certificação integrada (T08).
+## 7. Evolução
+
+Concluído: fundação → classificação → conciliação/contador → adaptador central → governança/métricas → rota e painel do Portal → avaliação. Próximos passos: ligar o adaptador central (contrato + cofre), persistir ledger/auditoria, curadoria normativa dos catálogos e certificação integrada após sincronizar com `nf-core-v001`.
 
 ## 8. Não objetivos
 
