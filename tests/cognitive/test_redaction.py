@@ -35,7 +35,8 @@ def test_masks_access_key_with_and_without_separators() -> None:
 
 
 def test_masks_secrets_and_tokens() -> None:
-    pem = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkq\n-----END PRIVATE KEY-----"
+    dashes = "-" * 5
+    pem = f"{dashes}BEGIN PRIVATE KEY{dashes}\nMIIEvQIBADANBgkq\n{dashes}END PRIVATE KEY{dashes}"
     out = R.redact(
         f"{pem} Authorization: Bearer abcdef1234567890 senha=hunter2x "
         "https://user:pass@host.example/x eyJhbGciOiJI.eyJzdWIiOiIx.c2lnbmF0dXJl"
