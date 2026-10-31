@@ -144,3 +144,12 @@ def test_endpoint_probe_uses_expected_read_only_routes_and_never_posts() -> None
     assert len(calls) == 6
     assert all(url.startswith("https://") for url in calls)
     assert all("tenant" not in url and "token" not in url for url in calls)
+
+
+def test_production_promotion_pr_gets_same_quality_gate_as_main() -> None:
+    workflow = (
+        Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.yml"
+    ).read_text(encoding="utf-8")
+    trigger = workflow.split("  pull_request:", 1)[1].split("  push:", 1)[0]
+    assert "      - main" in trigger
+    assert "      - production" in trigger
