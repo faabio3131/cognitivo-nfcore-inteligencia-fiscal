@@ -136,6 +136,15 @@ def create_public_trial_router(
             },
         )
 
+    def _strict_trial_json_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        """Reject ambiguous JSON objects at every nesting level."""
+        result: dict[str, object] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate JSON field")
+            result[key] = value
+        return result
+
     @router.post("/v1/public/trials")
     async def public_trial(request: Request) -> JSONResponse:
         origin = request.headers.get("origin", "")
@@ -191,7 +200,7 @@ def create_public_trial_router(
                 headers=headers,
             )
         try:
-            payload = json.loads(body)
+            payload = json.loads(body, object_pairs_hook=_strict_trial_json_pairs)
         except (ValueError, UnicodeDecodeError):
             return JSONResponse(
                 status_code=400,
