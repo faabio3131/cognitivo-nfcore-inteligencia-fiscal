@@ -848,6 +848,8 @@ class DurableHumanPortalExecutor:
                 raise ValueError("CRT must be integer")
             if type(payload["state_registration_exempt"]) is not bool:
                 raise ValueError("state registration exemption must be boolean")
+            if payload["state_registration_exempt"] and payload["state_registration"].strip():
+                raise ValueError("exempt issuer cannot declare state registration number")
             unit_id = payload["unit_id"].strip()
             environment = FiscalEnvironment(payload["environment"])
             authority.assert_permission(PortalPermission.CONFIGURATION_WRITE, unit_id=unit_id)
