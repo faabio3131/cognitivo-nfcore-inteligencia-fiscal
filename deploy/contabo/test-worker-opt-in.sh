@@ -50,7 +50,7 @@ mount = mounts[0]
 assert mount["type"] == "bind"
 assert mount["read_only"] is True
 assert mount["target"] == "/run/nfcore/worker-identity.json"
-assert mount["bind"]["create_host_path"] is False
+assert mount.get("bind", {}).get("create_host_path", False) is False
 print("OK: worker opt-in isolado, sem porta e sem montagem implicita")
 PY
 
