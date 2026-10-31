@@ -14,8 +14,10 @@ C="$CTL"; echo "docker $*" >> "$C/calls"
 case "$1 $2" in
   "image inspect") [ -f "$C/img-$3" ] ;;
   "compose build") touch "$C/img-nfcore-api:current" "$C/img-nfcore-portal:current" ;;
-  "compose run") [ -f "$C/mig-$( [[ "$*" == *--apply* ]] && echo apply || echo policy)-fail" ] && { echo "erro simulado"; exit 1; }
-                 [[ "$*" == *--apply* ]] && echo "applied=($(cat "$C/applied" 2>/dev/null))" ;;
+  "compose run") 
+     if [[ "$*" == *--assert-current-production* && -f "$C/schema-pending" ]]; then echo "schema pending"; exit 1; fi
+     if [[ "$*" == *--check-policy* && -f "$C/mig-policy-fail" ]]; then echo "policy denied"; exit 1; fi
+     [[ "$*" == *--apply* ]] && { echo "UNSAFE APPLY"; exit 91; } ;;
   "compose up"|"compose stop") : ;;
 esac
 case "$1" in
@@ -46,25 +48,26 @@ run(){ : > "$CTL/calls"; bash "$T/root/deploy.sh" "$@" > "$T/out" 2>&1; echo $?;
 
 rc=$(run); chk "sem mudanca: sai 0 e nao faz nada" '[ "$rc" = 0 ] && [ ! -s "$CTL/calls" ]'
 V2=$(newcommit c2)
-rc=$(run); chk "sem aprovacao de migration recusa antes de backup/build" '[ "$rc" = 42 ] && grep -q "BLOCKED: production schema migration" "$T/out" && [ ! -s "$CTL/calls" ]'
-export NFCORE_SCHEMA_MIGRATION_APPROVED=true NFCORE_PRODUCTION_APPROVAL=PRODUCTION_APPROVED
+# Sem qualquer autorização de migration, o deploy code-only deve funcionar com schema atual.
+unset NFCORE_SCHEMA_MIGRATION_APPROVED NFCORE_PRODUCTION_APPROVAL
 rc=$(run --check); chk "--check mostra o que mudaria e nao implanta" 'grep -q MUDARIA "$T/out" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V1" ]'
 rc=$(run); chk "deploy ok grava o SHA novo" '[ "$rc" = 0 ] && grep -q "DEPLOY OK" "$T/out" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V2" ]'
 chk "deploy ok fez backup verificado" 'grep -q "backup verificado" "$T/out"'
+chk "deploy valida schema sem DDL" 'grep -q -- "--assert-current-production" "$CTL/calls" && ! grep -q -- "--apply" "$CTL/calls"'
 
-V3=$(newcommit c3); touch "$CTL/mig-apply-fail"
-rc=$(run); chk "migracao que falha => rollback, versao antiga fica" '[ "$rc" = 1 ] && grep -q "ROLLBACK" "$T/out" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V2" ] && [ ! -f "$CTL/restored" ]'
+V3=$(newcommit c3); touch "$CTL/schema-pending"
+rc=$(run); chk "schema pendente => rollback sem migration, revisao antiga fica" '[ "$rc" = 1 ] && grep -q "schema pendente/divergente" "$T/out" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V2" ] && [ ! -f "$CTL/restored" ] && ! grep -q -- "--apply" "$CTL/calls"'
 chk "commit que falhou e marcado" '[ "$(cat "$T/root/.failed-sha")" = "$V3" ]'
 rc=$(run); chk "commit que falhou nao repete" '[ "$rc" = 0 ] && [ ! -s "$CTL/calls" ]'
-rm -f "$CTL/mig-apply-fail" "$T/root/.failed-sha"
+rm -f "$CTL/schema-pending" "$T/root/.failed-sha"
 
 V4=$(newcommit c4); touch "$CTL/mig-policy-fail"
 rc=$(run); chk "politica bloqueia migracao destrutiva => recusado, sem tocar no banco" '[ "$rc" = 1 ] && grep -q "politica de migracao bloqueou" "$T/out" && [ ! -f "$CTL/restored" ]'
 rm -f "$CTL/mig-policy-fail" "$T/root/.failed-sha"
 
-echo "'versao'" > "$CTL/applied"; touch "$CTL/unhealthy"
-rc=$(run); chk "migrou mas saude falhou => hard-stop sem destruir dados" '[ "$rc" = 40 ] && [ ! -f "$CTL/restored" ] && grep -q "HARD_STOP" "$T/out" && grep -q "compose stop nfcore-api nfcore-portal" "$CTL/calls" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V2" ]'
-rm -f "$CTL/unhealthy" "$CTL/applied" "$CTL/restored" "$T/root/.failed-sha"
+touch "$CTL/unhealthy"
+rc=$(run); chk "health falhou => rollback somente codigo, sem restore de banco" '[ "$rc" = 1 ] && [ ! -f "$CTL/restored" ] && grep -q "ROLLBACK" "$T/out" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V2" ]'
+rm -f "$CTL/unhealthy" "$CTL/restored" "$T/root/.failed-sha"
 
 rc=$(run); chk "depois de corrigido, o mesmo commit implanta" '[ "$rc" = 0 ] && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V4" ]'
 
