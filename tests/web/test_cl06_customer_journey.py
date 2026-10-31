@@ -322,3 +322,92 @@ def test_rtc_portal_reads_only_canonical_issuer_profile_in_authorized_scope(
     assert "federal_income_tax_regime" not in issuer
     assert "cnpj" not in issuer
     assert "tenant_id" not in issuer
+
+
+def test_owner_registers_initial_fiscal_profile_idempotently_via_canonical_portal(
+    tmp_path: Path,
+) -> None:
+    from kordena_fiscal.domain import FiscalEnvironment
+
+    web, database = _onboarding_client(tmp_path)
+    csrf = web.cookies.get(CSRF_COOKIE)
+    assert csrf
+    onboard = web.post(
+        "/v1/portal/operations/onboardUnit",
+        headers={CSRF_HEADER: csrf, "Idempotency-Key": "rtc-profile-unit-onboard"},
+        json={"unit_id": "matriz", "display_name": "Matriz"},
+    )
+    assert onboard.status_code == 200
+
+    payload = {
+        "unit_id": "matriz",
+        "environment": "homologation",
+        "cnpj": "11222333000181",
+        "legal_name": "Synthetic Pilot Accounting Issuer Ltda",
+        "crt": 3,
+        "primary_cnae": "6202300",
+        "state_registration": "110042490114",
+        "state_registration_exempt": False,
+        "street": "Praca da Se",
+        "number": "100",
+        "district": "Se",
+        "municipality_name": "Sao Paulo",
+        "state_code": "SP",
+        "municipality_ibge_code": "3550308",
+        "postal_code": "01001000",
+    }
+    endpoint = "/v1/portal/operations/registerFiscalProfile"
+    no_csrf = web.post(endpoint, json=payload, headers={"Idempotency-Key": "rtc-pilot"})
+    assert no_csrf.status_code == 403
+    no_key = web.post(endpoint, json=payload, headers={CSRF_HEADER: csrf})
+    assert no_key.status_code == 400
+    spoofed = web.post(
+        endpoint,
+        json={**payload, "tenant_id": "wrong-tenant"},
+        headers={CSRF_HEADER: csrf, "Idempotency-Key": "rtc-pilot"},
+    )
+    assert spoofed.status_code == 400
+
+    headers = {CSRF_HEADER: csrf, "Idempotency-Key": "rtc-pilot"}
+    first = web.post(endpoint, json=payload, headers=headers)
+    assert first.status_code == 200, first.text
+    assert first.json()["status"] == "profile_registered"
+    assert first.json()["version"] == 1
+    assert first.json()["replay"] is False
+    replay = web.post(endpoint, json=payload, headers=headers)
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["profile_id"] == first.json()["profile_id"]
+    assert replay.json()["replay"] is True
+
+    changed = web.post(
+        endpoint,
+        json={**payload, "legal_name": "Changed issuer with reused key"},
+        headers=headers,
+    )
+    assert changed.status_code == 409
+    invalid = web.post(
+        endpoint,
+        json={**payload, "cnpj": "00000000000000"},
+        headers={CSRF_HEADER: csrf, "Idempotency-Key": "rtc-invalid-cnpj"},
+    )
+    assert invalid.status_code == 400
+
+    with database.unit_of_work() as uow:
+        issuer = uow.control_plane.resolve_profile(
+            host_namespace="fm-nfcore", tenant_id=TENANT_ID,
+            unit_id="matriz", environment=FiscalEnvironment.HOMOLOGATION,
+            instant=datetime.now(UTC),
+        )
+        audit = uow.control_plane.list_audit(TENANT_ID)
+    assert issuer is not None
+    assert issuer.legal_name == payload["legal_name"]
+    assert int(issuer.tax_regime) == 3
+    assert sum(event.action.value == "fiscal_profile.added" for event in audit) == 1
+
+    visible = web.get(
+        "/v1/portal/surfaces/tax-reform?unit_id=matriz&environment=homologation"
+    )
+    assert visible.status_code == 200
+    assert visible.json()["rows"][0]["profile_id"] == first.json()["profile_id"]
+    assert "cnpj" not in visible.json()["rows"][0]
+    assert "tenant_id" not in visible.json()["rows"][0]
