@@ -3,6 +3,11 @@ from datetime import UTC, datetime
 
 import pytest
 
+from kordena_fiscal.compliance.rtc import RegulatoryBaselineError
+from kordena_fiscal.compliance.rtc_catalog import (
+    VerifiedRtcClassificationCatalog,
+    resolve_rule_with_verified_rtc_catalog,
+)
 from kordena_fiscal.domain import (
     BrazilianJurisdiction,
     ExecutionScope,
@@ -15,11 +20,6 @@ from kordena_fiscal.domain import (
     NcmCode,
     ProductOrigin,
     TaxRegimeCode,
-)
-from kordena_fiscal.compliance.rtc import RegulatoryBaselineError
-from kordena_fiscal.compliance.rtc_catalog import (
-    VerifiedRtcClassificationCatalog,
-    resolve_rule_with_verified_rtc_catalog,
 )
 from kordena_fiscal.tax import (
     RecipientTaxProfile,
