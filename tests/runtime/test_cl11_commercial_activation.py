@@ -51,8 +51,12 @@ def _dsn() -> str:
 def database() -> PostgresFiscalDatabase:
     # Never drop public schema or touch a shared/remote PostgreSQL database.
     dsn = _dsn()
-    if conninfo_to_dict(dsn).get("host") not in {"127.0.0.1", "localhost", "::1"}:
-        pytest.fail("CL11 PostgreSQL tests require an explicit local disposable DSN")
+    connection_info = conninfo_to_dict(dsn)
+    if (
+        connection_info.get("host") not in {"127.0.0.1", "localhost", "::1"}
+        or not connection_info.get("dbname", "").endswith("_test")
+    ):
+        pytest.fail("CL11 PostgreSQL tests require a local *_test disposable database")
     schema = "cl11_activation_" + uuid4().hex
     with psycopg.connect(dsn, autocommit=True) as connection:
         connection.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
