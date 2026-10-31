@@ -48,9 +48,9 @@ Cada `Evidência` abaixo é levantamento de baseline, **não certificação do b
 ### NFV1-BLD-03 — Trial first-party no NFCore e site estático
 - **Estado:** IN_PROGRESS
 - **Depende de:** BLD-00 e interfaces de identidade BLD-01; código interno pode avançar se sessão admin/config comercial bloquearem operações
-- **CURRENT 31/10:** `portal/trial.*`, ingresso Web, catálogo/antiabuso e serviços canônicos estão integrados via #234/#235/#260; `main=d68c62d9`, CI/Gov pós-merge SUCCESS. **Não recriar UI/API/trial service.** PR #279 OPEN/DRAFT corrige a exigência da decisão canônica de liberação comercial antes de expor trial; PR #237 OPEN/DRAFT cobre concorrência PostgreSQL e precisa comparação com suíte atual. Oferta real, preço/duração, admin binding e Web publicada seguem sem comprovação de prontidão.
+- **CURRENT:** 31/10/2026 — `portal/trial.*`, ingresso Web, catálogo/antiabuso e serviços canônicos estão integrados via #234/#235/#260; `main=d68c62d9`, CI/Gov pós-merge SUCCESS. **Não recriar UI/API/trial service.** PR #279 OPEN/DRAFT corrige a exigência da decisão canônica de liberação comercial antes de expor trial; PR #237 OPEN/DRAFT cobre concorrência PostgreSQL e precisa comparação com suíte atual. Oferta real, preço/duração, admin binding e Web publicada seguem sem comprovação de prontidão.
 - **Target e aceite:** seção `NFV1-BLD-03` do anexo de execução.
-- **Evidência parcial confirmada:** #260 MERGED, `main=d68c62d9c7e90581ad5efd387927f83c40a59ba2`, CI #41167507102/Gov #41167507147 SUCCESS. **Evidência de fechamento BLD-03 ainda PENDENTE**, incluindo revisão/CI/merge apropriado da #279 e demais gates. Ver checkpoint cruzado de 31/10.
+- **Evidência final:** PENDENTE (fechamento BLD-03 ainda exige revisão/CI/merge apropriado da #279 e demais gates). Evidência parcial: PR #260 MERGED, `main=d68c62d9c7e90581ad5efd387927f83c40a59ba2`, CI #41167507102/Gov #41167507147 SUCCESS. Ver checkpoint cruzado de 31/10.
 - **Pendência / decisão humana:** se surgir, registrar o bloqueio exato com decisão necessária, sem gerar novo serviço, preço ou credencial.
 
 ### NFV1-BLD-04 — Comercial interno e integração Command
