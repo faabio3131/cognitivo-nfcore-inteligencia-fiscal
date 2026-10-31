@@ -9,6 +9,7 @@ No rates or implicit classifications are provided by this module.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from kordena_fiscal.compliance.rtc import (
@@ -18,6 +19,7 @@ from kordena_fiscal.compliance.rtc import (
     RegulatoryBaselineError,
 )
 from kordena_fiscal.compliance.rtc_evidence import verify_regulatory_artifact_bytes
+from kordena_fiscal.tax import TaxDecision, TaxRule, TaxRuleContext, TaxRuleEngine
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,3 +106,36 @@ def load_verified_rtc_classification_catalog(
     if len(set(pairs)) != len(pairs):
         raise RegulatoryBaselineError("duplicate RTC CST/cClassTrib pair")
     return VerifiedRtcClassificationCatalog(artifact.version, frozenset(pairs))
+
+
+def resolve_rule_with_verified_rtc_catalog(
+    *,
+    engine: TaxRuleEngine,
+    context: TaxRuleContext,
+    rules: Iterable[TaxRule],
+    catalog: VerifiedRtcClassificationCatalog,
+) -> tuple[TaxDecision, ReformTaxClassificationSnapshot]:
+    """Bind the existing deterministic rule winner to a version-pinned RTC pair.
+
+    No fallback classification, rate, or fiscal emission is inferred. Callers must
+    supply a catalog verified from a reviewed normative artifact via the loader.
+    """
+    if not isinstance(catalog, VerifiedRtcClassificationCatalog):
+        raise RegulatoryBaselineError("verified RTC classification catalog required")
+    decision = engine.resolve(context, rules)
+    outcome = decision.outcome
+    if (
+        outcome.ibs_cbs_cst_code is None
+        or outcome.ibs_cbs_classification_code is None
+        or outcome.ibs_cbs_classification_table_version is None
+    ):
+        raise RegulatoryBaselineError("RTC rule requires explicit CST, cClassTrib and version")
+    if outcome.ibs_cbs_classification_table_version != catalog.artifact_version:
+        raise RegulatoryBaselineError("RTC tax-rule classification version mismatch")
+    snapshot = ReformTaxClassificationSnapshot(
+        cst_code=outcome.ibs_cbs_cst_code,
+        classification_code=outcome.ibs_cbs_classification_code,
+        classification_table_version=outcome.ibs_cbs_classification_table_version,
+    )
+    catalog.require_classification(snapshot)
+    return decision, snapshot
