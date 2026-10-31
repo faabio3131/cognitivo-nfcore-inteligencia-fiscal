@@ -144,16 +144,34 @@ def test_browser_catalog_post_uses_same_publication_authority() -> None:
     assert service.calls == []
 
 
-@pytest.mark.parametrize("release_reader", (lambda: False, lambda: None, lambda: (_ for _ in ()).throw(RuntimeError("unavailable"))))
-def test_public_trial_denies_catalog_and_submission_without_canonical_release(release_reader) -> None:
+@pytest.mark.parametrize(
+    "release_reader",
+    (
+        lambda: False,
+        lambda: None,
+        lambda: (_ for _ in ()).throw(RuntimeError("unavailable")),
+    ),
+)
+def test_public_trial_denies_catalog_and_submission_without_canonical_release(
+    release_reader,
+) -> None:
     service = Trial()
     c = client(service, commercially_authorized=release_reader)
     origin = {"Origin": "https://fmtecnologia.com.br"}
     catalog = c.post("/v1/public/trial-plans", headers=origin)
     assert catalog.status_code == 503
     assert "plans" not in catalog.json()
-    body = {"plan_id": "p", "price_id": "price", "buyer_email": "a@example.com", "legal_name": "ACME"}
-    submission = c.post("/v1/public/trials", json=body, headers={**origin, "Idempotency-Key": "trial-gated-0001"})
+    body = {
+        "plan_id": "p",
+        "price_id": "price",
+        "buyer_email": "a@example.com",
+        "legal_name": "ACME",
+    }
+    submission = c.post(
+        "/v1/public/trials",
+        json=body,
+        headers={**origin, "Idempotency-Key": "trial-gated-0001"},
+    )
     assert submission.status_code == 503
     assert submission.headers["cache-control"] == "no-store, max-age=0"
     assert service.calls == []
@@ -162,8 +180,20 @@ def test_public_trial_denies_catalog_and_submission_without_canonical_release(re
 def test_approved_release_preserves_public_trial_submission_contract() -> None:
     service = Trial()
     c = client(service, commercially_authorized=lambda: True)
-    body = {"plan_id": "p", "price_id": "price", "buyer_email": "a@example.com", "legal_name": "ACME"}
-    response = c.post("/v1/public/trials", json=body, headers={"Origin": "https://fmtecnologia.com.br", "Idempotency-Key": "trial-approved-0001"})
+    body = {
+        "plan_id": "p",
+        "price_id": "price",
+        "buyer_email": "a@example.com",
+        "legal_name": "ACME",
+    }
+    response = c.post(
+        "/v1/public/trials",
+        json=body,
+        headers={
+            "Origin": "https://fmtecnologia.com.br",
+            "Idempotency-Key": "trial-approved-0001",
+        },
+    )
     assert response.status_code == 201
     assert len(service.calls) == 1
 
@@ -171,24 +201,36 @@ def test_approved_release_preserves_public_trial_submission_contract() -> None:
 def test_missing_release_reader_fails_closed() -> None:
     service = Trial()
     app = FastAPI()
-    app.include_router(create_public_trial_router(
-        service,  # type: ignore[arg-type]
-        pricing=SimpleNamespace(current=None),  # type: ignore[arg-type]
-        allowed_origins=("https://fmtecnologia.com.br",),
-        rate_limiter=FixedWindowRateLimiter(max_requests=3, window_seconds=3600),
-        delivery=Delivery(),  # type: ignore[arg-type]
-    ))
+    app.include_router(
+        create_public_trial_router(
+            service,  # type: ignore[arg-type]
+            pricing=SimpleNamespace(current=None),  # type: ignore[arg-type]
+            allowed_origins=("https://fmtecnologia.com.br",),
+            rate_limiter=FixedWindowRateLimiter(max_requests=3, window_seconds=3600),
+            delivery=Delivery(),  # type: ignore[arg-type]
+        )
+    )
     c = TestClient(app)
     origin = {"Origin": "https://fmtecnologia.com.br"}
     assert c.post("/v1/public/trial-plans", headers=origin).status_code == 503
-    assert c.post("/v1/public/trials", json={"plan_id": "p", "price_id": "price", "buyer_email": "a@example.com", "legal_name": "ACME"}, headers={**origin, "Idempotency-Key": "trial-missing-release"}).status_code == 503
+    assert c.post(
+        "/v1/public/trials",
+        json={
+            "plan_id": "p",
+            "price_id": "price",
+            "buyer_email": "a@example.com",
+            "legal_name": "ACME",
+        },
+        headers={**origin, "Idempotency-Key": "trial-missing-release"},
+    ).status_code == 503
     assert service.calls == []
 
 
 def test_trial_intake_tracks_governed_release_approval_and_revocation() -> None:
     release = CommercialReleaseAdministrationService(InMemoryCommercialReleaseCatalog())
     actor = AdminPrincipal(
-        actor_id="synthetic-platform-admin", global_scope=True,
+        actor_id="synthetic-platform-admin",
+        global_scope=True,
         permissions=frozenset({ControlPlanePermission.COMMERCIAL_CONFIG_WRITE}),
     )
     service = Trial()
@@ -198,25 +240,43 @@ def test_trial_intake_tracks_governed_release_approval_and_revocation() -> None:
             release.current is not None and release.current.commercially_approved
         ),
     )
-    headers = {"Origin": "https://fmtecnologia.com.br", "Idempotency-Key": "governed-release-0001"}
-    body = {"plan_id": "p", "price_id": "price", "buyer_email": "a@example.com", "legal_name": "ACME"}
+    headers = {
+        "Origin": "https://fmtecnologia.com.br",
+        "Idempotency-Key": "governed-release-0001",
+    }
+    body = {
+        "plan_id": "p",
+        "price_id": "price",
+        "buyer_email": "a@example.com",
+        "legal_name": "ACME",
+    }
     assert c.post("/v1/public/trials", json=body, headers=headers).status_code == 503
     release.publish(
-        actor=actor, expected_version=None,
-        decision=CommercialReleaseDecision(version=1, status=CommercialReleaseStatus.INTERNAL_ONLY),
+        actor=actor,
+        expected_version=None,
+        decision=CommercialReleaseDecision(
+            version=1,
+            status=CommercialReleaseStatus.INTERNAL_ONLY,
+        ),
     )
     assert c.post("/v1/public/trials", json=body, headers=headers).status_code == 503
     release.publish(
-        actor=actor, expected_version=1,
+        actor=actor,
+        expected_version=1,
         decision=CommercialReleaseDecision(
-            version=2, status=CommercialReleaseStatus.COMMERCIAL_APPROVED,
+            version=2,
+            status=CommercialReleaseStatus.COMMERCIAL_APPROVED,
             human_decision_reference="synthetic-approval-reference",
         ),
     )
     assert c.post("/v1/public/trials", json=body, headers=headers).status_code == 201
     release.publish(
-        actor=actor, expected_version=2,
-        decision=CommercialReleaseDecision(version=3, status=CommercialReleaseStatus.INTERNAL_ONLY),
+        actor=actor,
+        expected_version=2,
+        decision=CommercialReleaseDecision(
+            version=3,
+            status=CommercialReleaseStatus.INTERNAL_ONLY,
+        ),
     )
     assert c.post("/v1/public/trials", json=body, headers=headers).status_code == 503
     assert len(service.calls) == 1
