@@ -80,29 +80,37 @@ def create_public_trial_router(
                 content={"detail": "trial offers not released"},
                 headers=headers,
             )
-        catalog = pricing.current
-        if catalog is None:
+        try:
+            catalog = pricing.current
+            if catalog is None:
+                return JSONResponse(
+                    status_code=503,
+                    content={"detail": "trial plans not published"},
+                    headers=headers,
+                )
+            entries = []
+            for plan in catalog.plans:
+                if not plan.enabled or plan.trial_days < 1:
+                    continue
+                for price_id in plan.price_ids:
+                    price = catalog.price(price_id)
+                    if price.enabled:
+                        entries.append({
+                            "plan_id": plan.plan_id,
+                            "price_id": price.price_id,
+                            "display_name": plan.display_name,
+                            "trial_days": plan.trial_days,
+                            "currency": price.currency,
+                            "billing_cadence": price.cadence.value,
+                            "base_amount": str(price.base_amount),
+                        })
+        except Exception:
+            # The pricing authority is unavailable: never synthesize public offers.
             return JSONResponse(
                 status_code=503,
-                content={"detail": "trial plans not published"},
+                content={"detail": "trial plans temporarily unavailable"},
                 headers=headers,
             )
-        entries = []
-        for plan in catalog.plans:
-            if not plan.enabled or plan.trial_days < 1:
-                continue
-            for price_id in plan.price_ids:
-                price = catalog.price(price_id)
-                if price.enabled:
-                    entries.append({
-                        "plan_id": plan.plan_id,
-                        "price_id": price.price_id,
-                        "display_name": plan.display_name,
-                        "trial_days": plan.trial_days,
-                        "currency": price.currency,
-                        "billing_cadence": price.cadence.value,
-                        "base_amount": str(price.base_amount),
-                    })
         return JSONResponse(
             status_code=200,
             content={"plans": entries},
