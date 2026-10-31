@@ -1,3 +1,9 @@
+> **SUBSTITUÍDO (31/10/2026).** O ADR-013 do FM Command define que cada produto é dono do seu próprio
+> núcleo cognitivo e da sua chave de IA independente; o Command não é hub de IA dos produtos e só
+> lê fatos/métricas por contrato (Integration Fabric). Este contrato central **não será usado**.
+> O modelo do NFCore é próprio (`adapters/openai_compatible.py`). A ligação com o Command é outra:
+> exposição de métricas/uso do core ao Command (ver arquitetura, seção 6). Mantido só como histórico.
+
 # Contrato S2S NFCore → Core Cognitivo Central FM — v1 (PROPOSTA)
 
 **Estado:** `PROPOSED`. Nada aqui foi homologado com o Command. O endpoint abaixo é um

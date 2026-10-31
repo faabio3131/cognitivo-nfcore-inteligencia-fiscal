@@ -88,7 +88,9 @@ Status: `ADVISED` (modelo validado) · `BASELINE_ONLY` (determinístico; IA indi
 | Item | Estado | Depende de |
 |---|---|---|
 | Fundação, rejeição, classificação, conciliação, pergunta do contador | implementado e testado | — |
-| Adaptador S2S central FM (`nfcore.cognitive.s2s/v1`) | implementado contra servidor HTTP local; contrato **proposto** | aprovação do contrato pelo mantenedor do Command |
+| Modelo próprio do NFCore (OpenAI-compatível; Gemini e OpenAI com troca automática) | implementado e testado com transporte simulado; chave lida só em tempo de chamada, enviada só no cabeçalho Authorization | chave **independente do NFCore** injetada pelo secret store (variáveis `NFCORE_COGNITIVE_AI_{PRIMARY,SECONDARY}_*`); limite de gasto no console de cada provedor |
+| Ligação com o FM Command (métricas/uso do core, somente leitura) | **pendente de desenho** conforme o padrão já usado pelo NFCore (bindings por `key_id`/`product_id`) e o Integration Fabric do Command | alinhar com o Command quais fatos ele lê (chamadas, taxa de degradação, latência, custo; nunca conteúdo) |
+| Auditoria durável | provisória: log estruturado só com ids/hashes (`LoggingAuditSink`) | trocar pelo ledger de auditoria da plataforma antes do go-live comercial |
 | Credencial central de IA | não conectada | **Fábio** coloca no cofre; nenhum segredo neste repositório |
 | Quota/plano/métricas (T07) | implementado (quota branda, em memória) | política de preço aprovada por Fábio; ledger persistente |
 | Rota do Portal e painel (T04) | implementado; ligado só com `NFCORE_COGNITIVE_ENABLED=true`, sem modelo (determinístico) | ligar o adaptador central na composição após contrato + cofre |
@@ -100,7 +102,7 @@ Limitações conhecidas: a projeção `errors` do Portal não expõe o `rejectio
 
 ## 7. Evolução
 
-Concluído: fundação → classificação → conciliação/contador → adaptador central → governança/métricas → rota e painel do Portal → avaliação. Próximos passos: ligar o adaptador central (contrato + cofre), persistir ledger/auditoria, curadoria normativa dos catálogos e certificação integrada após sincronizar com `nf-core-v001`.
+Concluído: fundação → classificação → conciliação/contador → adaptador central → governança/métricas → rota e painel do Portal → avaliação. Próximos passos: injetar a chave própria do NFCore, expor métricas ao Command no padrão do Integration Fabric, persistir ledger/auditoria, curadoria normativa dos catálogos e certificação integrada após sincronizar com `nf-core-v001`.
 
 ## 8. Não objetivos
 
