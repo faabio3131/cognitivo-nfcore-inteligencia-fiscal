@@ -63,17 +63,17 @@ def _headers():
 def _event():
     return {
         "version": 1,
-        "event_id": "event-synthetic",
+        "event_id": "event_synthetic",
         "event_type": "sale_confirmed",
         "occurred_at": datetime.now(UTC).isoformat(),
         "product_id": "nfcore",
         "environment": "test",
-        "command_customer_id": "customer-synthetic",
-        "command_subscription_id": "subscription-synthetic",
-        "command_invoice_id": "invoice-synthetic",
-        "acquisition_id": "acquisition-synthetic",
-        "plan_id": "plan-synthetic",
-        "price_id": "price-synthetic",
+        "command_customer_id": "customer_synthetic",
+        "command_subscription_id": "subscription_synthetic",
+        "command_invoice_id": "invoice_synthetic",
+        "acquisition_id": "acquisition_synthetic",
+        "plan_id": "plan_synthetic",
+        "price_id": "price_synthetic",
     }
 
 
