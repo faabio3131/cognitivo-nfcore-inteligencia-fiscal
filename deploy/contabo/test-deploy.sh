@@ -19,7 +19,8 @@ case "$1 $2" in
      if [[ "$*" == *--assert-current-production* && -f "$C/schema-pending" ]]; then echo "schema pending"; exit 1; fi
      if [[ "$*" == *--check-policy* && -f "$C/mig-policy-fail" ]]; then echo "policy denied"; exit 1; fi
      [[ "$*" == *--apply* ]] && { echo "UNSAFE APPLY"; exit 91; } ;;
-  "compose up"|"compose stop") : ;;
+  "compose up") if [ -f "$C/up-fail" ]; then rm -f "$C/up-fail"; echo "simulated up failure"; exit 71; fi ;;
+  "compose stop") : ;;
 esac
 case "$1" in
   tag) [ -f "$C/img-$2" ] && touch "$C/img-$3" ;;
@@ -69,6 +70,10 @@ rm -f "$CTL/mig-policy-fail" "$T/root/.failed-sha"
 touch "$CTL/build-fail"
 rc=$(run); chk "docker build que falha bloqueia deploy mesmo com tag antiga presente" '[ "$rc" = 1 ] && grep -q "docker compose build failed" "$T/out" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V2" ] && ! grep -q -- "--apply" "$CTL/calls"'
 rm -f "$CTL/build-fail" "$T/root/.failed-sha"
+
+touch "$CTL/up-fail"
+rc=$(run); chk "docker compose up falhou => rollback do codigo" '[ "$rc" = 1 ] && grep -q "docker compose up failed" "$T/out" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V2" ] && [ ! -f "$CTL/restored" ]'
+rm -f "$T/root/.failed-sha"
 
 touch "$CTL/unhealthy"
 rc=$(run); chk "health falhou => rollback somente codigo, sem restore de banco" '[ "$rc" = 1 ] && [ ! -f "$CTL/restored" ] && grep -q "ROLLBACK" "$T/out" && [ "$(sed -n s/^SHA=//p "$T/root/.deployed")" = "$V2" ]'
