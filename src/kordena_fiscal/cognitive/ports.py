@@ -40,6 +40,10 @@ class ModelPrompt:
     untrusted_data: str
     boundary: str
     context_hash: str
+    tenant_id: str
+    unit_id: str
+    request_id: str
+    correlation_id: str
 
 
 @dataclass(frozen=True, slots=True)
