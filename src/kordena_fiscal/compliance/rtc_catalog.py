@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from kordena_fiscal.compliance.rtc import (
     ReformTaxClassificationSnapshot,
@@ -22,13 +22,21 @@ from kordena_fiscal.compliance.rtc_evidence import verify_regulatory_artifact_by
 from kordena_fiscal.tax import TaxDecision, TaxRule, TaxRuleContext, TaxRuleEngine
 
 
+# Local construction witness: a catalog object is not verified merely by its type.
+# This protects the canonical code path against accidental unpinned synthetic data.
+_VERIFIED_CATALOG_WITNESS = object()
+
+
 @dataclass(frozen=True, slots=True)
 class VerifiedRtcClassificationCatalog:
     artifact_version: str
     allowed_pairs: frozenset[tuple[str, str]]
+    _verification_witness: object | None = field(default=None, repr=False, compare=False)
 
     def require_classification(self, snapshot: ReformTaxClassificationSnapshot) -> None:
         """Deny unknown codes, including missing classification on nonempty catalogs."""
+        if self._verification_witness is not _VERIFIED_CATALOG_WITNESS:
+            raise RegulatoryBaselineError("RTC catalog requires pinned artifact verification")
         if not isinstance(snapshot, ReformTaxClassificationSnapshot):
             raise RegulatoryBaselineError("RTC classification snapshot required")
         if snapshot.classification_table_version != self.artifact_version:
@@ -105,7 +113,11 @@ def load_verified_rtc_classification_catalog(
         pairs.append((cst, classification))
     if len(set(pairs)) != len(pairs):
         raise RegulatoryBaselineError("duplicate RTC CST/cClassTrib pair")
-    return VerifiedRtcClassificationCatalog(artifact.version, frozenset(pairs))
+    return VerifiedRtcClassificationCatalog(
+        artifact.version,
+        frozenset(pairs),
+        _verification_witness=_VERIFIED_CATALOG_WITNESS,
+    )
 
 
 def resolve_rule_with_verified_rtc_catalog(
@@ -120,7 +132,10 @@ def resolve_rule_with_verified_rtc_catalog(
     No fallback classification, rate, or fiscal emission is inferred. Callers must
     supply a catalog verified from a reviewed normative artifact via the loader.
     """
-    if not isinstance(catalog, VerifiedRtcClassificationCatalog):
+    if (
+        not isinstance(catalog, VerifiedRtcClassificationCatalog)
+        or catalog._verification_witness is not _VERIFIED_CATALOG_WITNESS
+    ):
         raise RegulatoryBaselineError("verified RTC classification catalog required")
     decision = engine.resolve(context, rules)
     outcome = decision.outcome
