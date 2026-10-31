@@ -305,3 +305,38 @@ def test_public_trial_rejects_duplicate_json_fields_before_service(raw: bytes) -
     assert response.json() == {"detail": "invalid JSON"}
     assert service.calls == []
 
+
+
+@pytest.mark.parametrize("failure", ["read", "malformed-catalog"])
+def test_public_trial_catalog_failure_is_503_without_offer_leak(failure: str) -> None:
+    class UnavailablePricing:
+        @property
+        def current(self):
+            if failure == "read":
+                raise RuntimeError("synthetic-internal-pricing-error")
+            return SimpleNamespace(plans=[SimpleNamespace(
+                enabled=True, trial_days=7, price_ids=["missing"],
+            )], price=lambda _id: (_ for _ in ()).throw(
+                RuntimeError("synthetic-internal-price-error")
+            ))
+
+    service = Trial()
+    app = FastAPI()
+    app.include_router(create_public_trial_router(
+        service,  # type: ignore[arg-type]
+        pricing=UnavailablePricing(),  # type: ignore[arg-type]
+        allowed_origins=("https://fmtecnologia.com.br",),
+        rate_limiter=FixedWindowRateLimiter(max_requests=3, window_seconds=3600),
+        delivery=Delivery(),  # type: ignore[arg-type]
+        commercially_authorized=lambda: True,
+    ))
+    response = TestClient(app).get(
+        "/v1/public/trial-plans",
+        headers={"Origin": "https://fmtecnologia.com.br"},
+    )
+    assert response.status_code == 503
+    assert response.json() == {"detail": "trial plans temporarily unavailable"}
+    assert "synthetic-internal" not in response.text
+    assert "plans" not in response.json()
+    assert response.headers["cache-control"] == "no-store"
+    assert service.calls == []
