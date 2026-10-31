@@ -274,3 +274,26 @@ def test_tax_reform_surface_uses_existing_session_rbac_and_unit_isolation() -> N
     assert owner.get(
         "/v1/portal/surfaces/tax-reform?unit_id=unit-a&environment=invalid"
     ).status_code == 400
+
+
+def test_profile_registration_denies_operator_and_cross_unit_before_executor() -> None:
+    executor = RecordingPortalExecutor()
+    operator = logged_client(executor, role=PortalRole.OPERATOR)
+    token = operator.cookies.get(CSRF_COOKIE)
+    assert token
+    headers = {CSRF_HEADER: token, "Idempotency-Key": "fiscal-registration-negative"}
+    blocked = operator.post(
+        "/v1/portal/operations/registerFiscalProfile",
+        json={"unit_id": "unit-a"}, headers=headers,
+    )
+    assert blocked.status_code == 403
+    owner = logged_client(executor, role=PortalRole.OWNER)
+    token = owner.cookies.get(CSRF_COOKIE)
+    assert token
+    cross_unit = owner.post(
+        "/v1/portal/operations/registerFiscalProfile",
+        json={"unit_id": "unit-b"},
+        headers={CSRF_HEADER: token, "Idempotency-Key": "cross-unit-attempt"},
+    )
+    assert cross_unit.status_code == 403
+    assert executor.operation_authority is None

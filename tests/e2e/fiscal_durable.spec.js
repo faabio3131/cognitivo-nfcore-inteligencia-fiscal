@@ -93,7 +93,8 @@ test("RTC-09 page reads canonical tenant scope and reports missing regime withou
   await page.getByRole("button", {name: "Reforma Tributária", exact: true}).click();
   await expect(page.locator("#workspace")).toContainText("Perfil fiscal vigente não configurado");
   await expect(page.locator("#workspace")).toContainText("O CRT não define sozinho o regime de IRPJ/CSLL");
-  await expect(page.locator("#workspace")).toContainText("Esta tela é somente consulta");
+  await expect(page.locator("#workspace")).toContainText("nenhuma emissão ou cálculo fiscal é executado nesta tela");
+  await expect(page.locator("#rtc-profile-registration")).toBeVisible();
   await page.locator("#fiscal-unit-filter").selectOption("unit-b");
   await expect(page.locator("#workspace")).toContainText("Perfil fiscal vigente não configurado");
   await expect(page.locator("#workspace")).not.toContainText("RTC Test Company");
