@@ -34,6 +34,20 @@ class VerifiedRtcClassificationCatalog:
         key = (snapshot.cst_code, snapshot.classification_code or "")
         if key not in self.allowed_pairs:
             raise RegulatoryBaselineError("unrecognized RTC CST/cClassTrib combination")
+        if snapshot.presumed_credit_code is not None:
+            raise RegulatoryBaselineError(
+                "RTC cCredPres requires an independently verified credit catalog"
+            )
+
+
+def _unique_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject JSON key collisions rather than silently accepting last-write wins."""
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise RegulatoryBaselineError("duplicate RTC normalized catalog JSON key")
+        result[key] = value
+    return result
 
 
 def load_verified_rtc_classification_catalog(
@@ -54,14 +68,16 @@ def load_verified_rtc_classification_catalog(
         raise RegulatoryBaselineError("RTC artifact must be a classification table")
     verify_regulatory_artifact_bytes(artifact, artifact_payload)
     try:
-        raw = json.loads(artifact_payload)
+        raw = json.loads(artifact_payload, object_pairs_hook=_unique_json_keys)
     except (ValueError, UnicodeDecodeError) as exc:
         raise RegulatoryBaselineError("RTC normalized catalog must be JSON") from exc
     if not isinstance(raw, dict) or set(raw) != {
         "schema_version", "artifact_id", "artifact_version", "records",
     }:
         raise RegulatoryBaselineError("invalid RTC normalized catalog schema")
-    if raw["schema_version"] != 1 or raw["artifact_id"] != artifact.artifact_id:
+    if type(raw["schema_version"]) is not int or raw["schema_version"] != 1:
+        raise RegulatoryBaselineError("RTC normalized catalog schema version mismatch")
+    if raw["artifact_id"] != artifact.artifact_id:
         raise RegulatoryBaselineError("RTC normalized catalog identity mismatch")
     if raw["artifact_version"] != artifact.version:
         raise RegulatoryBaselineError("RTC normalized catalog version mismatch")
