@@ -12,14 +12,14 @@ from kordena_fiscal.application.commercial_acquisition import (
     CommercialAcquisitionService,
 )
 from kordena_fiscal.product.commercial_fulfillment import CommercialFulfillmentError
-MAX_ACQUISITION_BODY_BYTES = 64 * 1024
-
 from kordena_fiscal.security.s2s import (
     FixedWindowRateLimiter,
     WebhookSecurity,
     WebhookSignature,
     WebhookSignatureError,
 )
+
+MAX_ACQUISITION_BODY_BYTES = 64 * 1024
 
 
 def create_commercial_acquisition_router(
