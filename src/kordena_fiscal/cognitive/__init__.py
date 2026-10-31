@@ -18,12 +18,15 @@ from .contracts import (
 )
 from .guardrails import GuardResult, OutputGuard
 from .knowledge import RejectionKnowledgeBase, default_rejection_knowledge_base
+from .reconciliation_advice import AccountantQuestionBaseline, ReconciliationBaseline
 from .redaction import Redactor
 from .registry import default_baselines
 from .resilience import Bulkhead, CircuitBreaker
 from .service import CognitiveAdviceService
 
 __all__ = [
+    "AccountantQuestionBaseline",
+    "ReconciliationBaseline",
     "BASELINE_VERSION",
     "SCHEMA_VERSION",
     "AdviceRequest",

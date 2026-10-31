@@ -110,3 +110,11 @@ def test_request_validation() -> None:
         make_request(evidence=duplicated)
     with pytest.raises(dataclasses.FrozenInstanceError):
         make_request().request_id = "x"  # type: ignore[misc]
+
+
+def test_guard_blocks_percentages_and_amounts_absent_from_evidence() -> None:
+    for text in ("A alíquota é 18%.", "O valor correto seria R$ 1.234,56."):
+        result = OutputGuard().validate(
+            (ProviderSection(SectionKind.HYPOTHESIS, text, ("rej-1",)),), make_request()
+        )
+        assert result.accepted == () and "ungrounded_amount" in result.findings[0]

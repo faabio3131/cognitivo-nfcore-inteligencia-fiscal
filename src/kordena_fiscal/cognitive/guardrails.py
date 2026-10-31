@@ -17,6 +17,7 @@ _CLASSIFICATION_REF = re.compile(
     r"(?i)\b(cst|csosn|cfop|ncm|cclasstrib|cclass)\b[^\d\n]{0,12}(\d{2,8})"
 )
 _DIGIT_RUN = re.compile(r"\d+")
+_AMOUNT = re.compile(r"(?i)(\d+(?:[.,]\d+)?)\s*%|R\$\s*(\d[\d.,]*)")
 _EXECUTION_CLAIM = re.compile(
     r"(?i)\b(eu\s+)?(emiti|cancelei|inutilizei|transmiti|assinei|alterei|corrigi|apliquei|"
     r"reenviei|autorizei|salvei|atualizei|reprocessei)\b"
@@ -98,6 +99,10 @@ class OutputGuard:
             if token not in corpus:
                 return "ungrounded_code"
         corpus_numbers = set(_DIGIT_RUN.findall(corpus))
+        for amount in _AMOUNT.finditer(text):
+            figure = amount.group(1) or amount.group(2)
+            if figure.rstrip(".,") not in corpus:
+                return "ungrounded_amount"
         for match in _CLASSIFICATION_REF.finditer(text):
             if match.group(2) not in corpus_numbers:
                 return "ungrounded_classification_code"

@@ -6,6 +6,11 @@ from .classification import (
     ClassificationCatalog,
     default_classification_catalog,
 )
+from .reconciliation import (
+    ReconciliationEntry,
+    ReconciliationKnowledgeBase,
+    default_reconciliation_knowledge_base,
+)
 from .rejections import (
     RejectionEntry,
     RejectionKnowledgeBase,
@@ -17,9 +22,12 @@ __all__ = [
     "CatalogEntry",
     "CatalogKind",
     "ClassificationCatalog",
+    "ReconciliationEntry",
+    "ReconciliationKnowledgeBase",
     "RejectionEntry",
     "RejectionKnowledgeBase",
     "ReviewStatus",
     "default_classification_catalog",
+    "default_reconciliation_knowledge_base",
     "default_rejection_knowledge_base",
 ]
