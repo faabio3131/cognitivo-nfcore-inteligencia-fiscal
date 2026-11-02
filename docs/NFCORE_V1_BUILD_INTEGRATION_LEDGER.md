@@ -55,12 +55,12 @@ Cada `Evidência` abaixo é levantamento de baseline, **não certificação do b
 - **Pendência / decisão humana:** se surgir, registrar o bloqueio exato com decisão necessária, sem gerar novo serviço, preço ou credencial.
 
 ### NFV1-BLD-04 — Comercial interno e integração Command
-- **Estado:** IN_PROGRESS
+- **Estado:** BLOCKED_HUMAN_ACTION
 - **Depende de:** BLD-03 contratos, ou interfaces canônicas já verificadas; não ativar pagamentos
 - **CURRENT:** Pricing/release e aquisição/fulfillment internos existem; #281 (testes HTTP autenticados do FM Command) MERGED em `5d894ffcf34c8a9ee6d66876ee35c2c9273ee32a` após CI pré-merge #41168608800 e Governança #41168608803 SUCCESS. Os gates registrados neste parágrafo pertencem ao snapshot de 31/10; não afirmam o status CURRENT. Checar eventual evidência de CI pós-merge se necessária ao aceite. Este incremento não encerra BLD-04: catálogo/release/checkout runtime sem readiness e E2E comercial integral ainda exigem evidência. Backend multi-tenant é autoridade; simular somente entrada de provedor em testes.
 - **Target e aceite:** seção `NFV1-BLD-04` do anexo de execução.
 - **Evidência final:** PENDENTE para fechamento integral de BLD-04. Evidência parcial: #281 merge `5d894ffcf34c8a9ee6d66876ee35c2c9273ee32a`, CI da PR #41168608800 e Gov #41168608803 SUCCESS; pós-merge em andamento. Não confundir testes de contrato com a cadeia inteira.
-- **Pendência / decisão humana:** revisar gaps reais de checkout, billing/Command e E2E interno sem preço/pagamento real; credenciais, publicações e ativação seguem decisão humana.
+- **Pendência / decisão humana:** a ativação comercial real depende de aprovação de planos/checkout, credenciais, publicação e pagamentos; isso bloqueia o ACEITE integral do bloco, não sua implementação interna já existente. Deltas internos específicos ainda podem ser executados de forma independente, sem recomeçar. Classificação BLOCKED_HUMAN_ACTION atende à ordem estrutural do ledger e não equivale a trabalho não iniciado.
 
 ### NFV1-BLD-05 — Fiscal adapter/contratos para homologação futura
 - **Estado:** PENDING
