@@ -180,3 +180,24 @@ def test_catalog_invalidates_provenance_when_verified_object_is_replaced(
     )
     with pytest.raises(RegulatoryBaselineError, match="pinned artifact"):
         changed.require_classification(_snapshot())
+
+
+def test_catalog_rejects_artifact_published_after_baseline_capture() -> None:
+    payload = _payload()
+    baseline = _baseline(payload)
+    pin = baseline.artifacts[0]
+    future = replace(pin, published_on=date(2026, 10, 31))
+    with pytest.raises(RegulatoryBaselineError, match="published after pinned baseline"):
+        load_verified_rtc_classification_catalog(
+            replace(baseline, artifacts=(future,)), payload
+        )
+
+
+def test_catalog_publication_guard_rejects_naive_or_missing_instant() -> None:
+    payload = _payload()
+    catalog = load_verified_rtc_classification_catalog(_baseline(payload), payload)
+    with pytest.raises(RegulatoryBaselineError, match="timezone-aware"):
+        catalog.require_published_at(datetime(2026, 10, 31))
+    with pytest.raises(RegulatoryBaselineError, match="not published"):
+        catalog.require_published_at(datetime(2026, 10, 29, tzinfo=UTC))
+    catalog.require_published_at(datetime(2026, 10, 30, tzinfo=UTC))
