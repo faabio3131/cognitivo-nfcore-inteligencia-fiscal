@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from datetime import date, datetime
 
 from kordena_fiscal.compliance.rtc import (
     ReformTaxClassificationSnapshot,
@@ -31,16 +32,39 @@ _VERIFIED_CATALOG_WITNESS = object()
 class VerifiedRtcClassificationCatalog:
     artifact_version: str
     allowed_pairs: frozenset[tuple[str, str]]
+    published_on: date | None = None
+    effective_from: date | None = None
     _verification_witness: (
-        tuple[object, str, frozenset[tuple[str, str]]] | None
+        tuple[object, str, frozenset[tuple[str, str]], date | None, date | None] | None
     ) = field(default=None, repr=False, compare=False)
 
     def _is_verified(self) -> bool:
         # Replacing a verified dataclass with different codes or version
         # must invalidate its verification provenance.
         return self._verification_witness == (
-            _VERIFIED_CATALOG_WITNESS, self.artifact_version, self.allowed_pairs
+            _VERIFIED_CATALOG_WITNESS, self.artifact_version, self.allowed_pairs,
+            self.published_on, self.effective_from,
         )
+
+    def require_published_at(self, instant: datetime) -> None:
+        """Deny retrospective/future catalog use before official publication.
+
+        Publication is only a lower bound, not proof of legal effectiveness.
+        Any explicit effective_from is an additional lower bound. This preview
+        does not confer XML emission or calculation authority.
+        """
+        if not self._is_verified():
+            raise RegulatoryBaselineError("RTC catalog requires pinned artifact verification")
+        if not isinstance(instant, datetime) or instant.tzinfo is None or (
+            instant.utcoffset() is None
+        ):
+            raise RegulatoryBaselineError("RTC catalog instant must be timezone-aware")
+        if not isinstance(self.published_on, date):
+            raise RegulatoryBaselineError("RTC catalog publication is not pinned")
+        if instant.date() < self.published_on:
+            raise RegulatoryBaselineError("RTC catalog was not published at fiscal instant")
+        if self.effective_from is not None and instant.date() < self.effective_from:
+            raise RegulatoryBaselineError("RTC catalog not effective at fiscal instant")
 
     def require_classification(self, snapshot: ReformTaxClassificationSnapshot) -> None:
         """Deny unknown codes, including missing classification on nonempty catalogs."""
@@ -123,11 +147,16 @@ def load_verified_rtc_classification_catalog(
     if len(set(pairs)) != len(pairs):
         raise RegulatoryBaselineError("duplicate RTC CST/cClassTrib pair")
     reviewed_pairs = frozenset(pairs)
+    if artifact.published_on > baseline.captured_at.date():
+        raise RegulatoryBaselineError("RTC catalog published after pinned baseline capture")
     return VerifiedRtcClassificationCatalog(
         artifact.version,
         reviewed_pairs,
+        published_on=artifact.published_on,
+        effective_from=artifact.effective_from,
         _verification_witness=(
-            _VERIFIED_CATALOG_WITNESS, artifact.version, reviewed_pairs
+            _VERIFIED_CATALOG_WITNESS, artifact.version, reviewed_pairs,
+            artifact.published_on, artifact.effective_from,
         ),
     )
 
@@ -149,6 +178,9 @@ def resolve_rule_with_verified_rtc_catalog(
         or not catalog._is_verified()
     ):
         raise RegulatoryBaselineError("verified RTC classification catalog required")
+    if not isinstance(context, TaxRuleContext):
+        raise RegulatoryBaselineError("canonical RTC tax context required")
+    catalog.require_published_at(context.instant)
     decision = engine.resolve(context, rules)
     outcome = decision.outcome
     if (
