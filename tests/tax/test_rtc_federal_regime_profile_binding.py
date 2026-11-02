@@ -211,6 +211,7 @@ def _simples_election(
         scope=profile.scope,
         profile_id=profile.profile_id,
         profile_version=profile.version,
+        crt=profile.tax_regime,
         mode=mode,
         effective_from=effective_from,
         effective_to=effective_to,
@@ -299,11 +300,14 @@ def test_simples_excess_sublimit_crt2_resolves_explicit_ibscbs_mode() -> None:
 def test_crt1_and_crt2_elections_cannot_cross_issuer_snapshot() -> None:
     base = _simples_profile()
     excess = replace(base, tax_regime=TaxRegimeCode.SIMPLES_NACIONAL_EXCESS_SUBLIMIT)
-    # Same issuer snapshot keys are not proof of the exact CRT; option mode
-    # remains non-authoritative and must be checked with the tax-regime profile.
-    assert resolve_simples_ibs_cbs_mode(
-        excess, (_simples_election(base),), datetime(2027, 1, 1, 12, tzinfo=UTC)
-    ) is SimplesIbsCbsMode.SIMPLES_UNIFIED
+    with pytest.raises(FiscalValidationError, match="CRT mismatch"):
+        resolve_simples_ibs_cbs_mode(
+            excess, (_simples_election(base),), datetime(2027, 1, 1, 12, tzinfo=UTC)
+        )
+    with pytest.raises(FiscalValidationError, match="CRT mismatch"):
+        resolve_simples_ibs_cbs_mode(
+            base, (_simples_election(excess),), datetime(2027, 1, 1, 12, tzinfo=UTC)
+        )
 
 
 def test_simples_mode_must_not_be_inferred_from_normal_crt_or_mei() -> None:
