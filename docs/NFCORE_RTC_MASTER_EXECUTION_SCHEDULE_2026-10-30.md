@@ -39,6 +39,14 @@ Cada WP: auditar CURRENT e fonte oficial → mapear autoridade/camadas → conge
 - **Fonte técnica oficial:** NT 2024.001 CRT MEI, https://www.nfe.fazenda.gov.br/Portal/exibirArquivo.aspx?conteudo=kIiniiSkpKc%3D, e leiaute CRT=1/2/3/4; não cria alíquotas ou habilita XML RTC.
 - **Evidência de código:** testes preservam os três regimes federais com CRT coerente e acrescentam rejeição de combinações contraditórias. O resultado não é homologação oficial nem fechamento do RTC-02/04 integral.
 
+### RTC-04 B4 — bloqueio de regra genérica e baseline SVRS (candidato 02/11/2026)
+
+**Código construído nesta PR:** a função `calculate_2026_nominal_reference_preview` passa a usar `resolve_strict_rtc_2026_incidence_candidate` do mesmo `TaxRuleEngine` já utilizado em B3. A consequência funcional é que a prévia isolada, inclusive quando usada pela base art. 12, não aceita mais regras `wildcard` sem UF, CRT, modelo, operação, destinatário e NCM explícitos. Não altera fórmula, alíquota, serializador ou emissão. Os testes têm casos de bloqueio e os cenários existentes são atualizados para usar seletor específico.
+
+**Fontes oficiais consultadas em 02/11/2026:** [SVRS NF-e/Documentos](https://dfe-portal.svrs.rs.gov.br/NFe/Documentos) registra **NT 2026.005 v1.00 (Simples Nacional)** e **IT 2025.002 v1.71** publicadas em **30/10/2026**; o catálogo CST/cClassTrib da RT foi atualizado na mesma data. O arquivo `config/rtc/official-baseline-2026-10-30.json` registra apenas esses metadados, **sem baixar/adotar tabelas, PDF, XSD, SHA originais ou ativar regras**. A tabela de créditos presumidos mantém referência histórica 1.70 até verificação documental própria. `REFERENCE_ONLY_NOT_PRODUCTION_APPROVED` e `authoritative=False` permanecem.
+
+**Aceite do delta:** CI/Gov desta PR + pós-merge; ausência de cálculo baseado em wildcard; nenhuma mudança produtiva. **Ainda pendente:** obtenção/revisão de PDFs/XSD e tabela cClassTrib 1.71 com hashes e matriz de vigência/validações, golden cases por célula do Simples, regras especiais, reduções, créditos, IS e demais etapas RTC-04/05. Nunca interpretar metadado de publicação como vigência operacional da SEFAZ.
+
 ## Microentregas implementáveis com autonomia controlada
 
 ### Bloco A — foundations, sem alterar operação produtiva
