@@ -380,7 +380,21 @@ def test_regular_2027_h1_rejects_filing_outside_cgsn_window(
 ) -> None:
     profile = _simples_profile()
     with pytest.raises(FiscalValidationError, match="filing window"):
-        _simples_receipt(profile, submitted_at=submitted_at)
+        _simples_receipt(
+            profile,
+            submitted_at=submitted_at,
+            confirmed_at=submitted_at + timedelta(hours=1),
+        )
+
+
+def test_regular_2027_h1_rejects_confirmation_before_submission() -> None:
+    profile = _simples_profile()
+    with pytest.raises(FiscalValidationError, match="confirmation precedes submission"):
+        _simples_receipt(
+            profile,
+            submitted_at=datetime(2026, 10, 30, 12, tzinfo=UTC),
+            confirmed_at=datetime(2026, 10, 29, 12, tzinfo=UTC),
+        )
 
 
 def test_regular_2027_h1_cancellation_fails_closed() -> None:
