@@ -1,6 +1,7 @@
 """RTC-02 contract: corporate income-tax regime must match issuer profile scope/CRT."""
 
-from datetime import UTC, datetime
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -19,6 +20,9 @@ from kordena_fiscal.domain import (
 from kordena_fiscal.tax.regimes import (
     FederalIncomeTaxRegime,
     FederalRegimeDeclaration,
+    SimplesIbsCbsElection,
+    SimplesIbsCbsMode,
+    resolve_simples_ibs_cbs_mode,
     resolve_federal_regime_for_profile,
     resolve_federal_regime_timeline,
 )
@@ -186,3 +190,104 @@ def test_regime_timeline_checks_effective_crt_against_issuer_profile() -> None:
     )
     with pytest.raises(FiscalValidationError, match="CRT does not match"):
         resolve_federal_regime_timeline(_profile(scope), (mismatched,), _NOW)
+
+
+def _simples_profile(scope: ExecutionScope | None = None) -> FiscalProfile:
+    selected = scope or _scope()
+    return replace(
+        _profile(selected, crt=TaxRegimeCode.SIMPLES_NACIONAL),
+        effective_to=None,
+    )
+
+
+def _simples_election(
+    profile: FiscalProfile,
+    *,
+    mode: SimplesIbsCbsMode = SimplesIbsCbsMode.SIMPLES_UNIFIED,
+    effective_from: datetime = datetime(2027, 1, 1, 3, tzinfo=UTC),
+    effective_to: datetime | None = None,
+) -> SimplesIbsCbsElection:
+    return SimplesIbsCbsElection(
+        scope=profile.scope,
+        profile_id=profile.profile_id,
+        profile_version=profile.version,
+        mode=mode,
+        effective_from=effective_from,
+        effective_to=effective_to,
+        source_reference="synthetic-evidence:competent-authority-review-required",
+    )
+
+
+def test_simples_2026_is_non_rtc_without_authorizing_nfse_omission() -> None:
+    profile = _simples_profile()
+    assert resolve_simples_ibs_cbs_mode(
+        profile, (), datetime(2026, 12, 31, 23, tzinfo=UTC)
+    ) is SimplesIbsCbsMode.NOT_EFFECTIVE_IN_SIMPLES_2026
+
+
+def test_simples_2027_requires_evidence_and_supports_either_collection_choice() -> None:
+    profile = _simples_profile()
+    instant = datetime(2027, 1, 1, 12, tzinfo=UTC)
+    with pytest.raises(FiscalValidationError, match="explicit effective"):
+        resolve_simples_ibs_cbs_mode(profile, (), instant)
+    for mode in (
+        SimplesIbsCbsMode.SIMPLES_UNIFIED,
+        SimplesIbsCbsMode.REGULAR_SEPARATE,
+    ):
+        assert resolve_simples_ibs_cbs_mode(
+            profile, (_simples_election(profile, mode=mode),), instant
+        ) is mode
+
+
+def test_simples_ibs_cbs_guard_rejects_cross_tenant_and_profile_version() -> None:
+    profile = _simples_profile()
+    other = _simples_profile(_scope("tenant-other"))
+    instant = datetime(2027, 1, 1, 12, tzinfo=UTC)
+    with pytest.raises(FiscalValidationError, match="scope mismatch"):
+        resolve_simples_ibs_cbs_mode(profile, (_simples_election(other),), instant)
+    modified = replace(_simples_election(profile), profile_version=2)
+    with pytest.raises(FiscalValidationError, match="snapshot mismatch"):
+        resolve_simples_ibs_cbs_mode(profile, (modified,), instant)
+
+
+def test_simples_ibs_cbs_guard_rejects_overlap_gaps_and_earlier_periods() -> None:
+    profile = _simples_profile()
+    instant = datetime(2027, 6, 1, tzinfo=UTC)
+    first = _simples_election(
+        profile,
+        effective_to=datetime(2027, 7, 1, 3, tzinfo=UTC),
+    )
+    overlapping = _simples_election(
+        profile,
+        effective_from=datetime(2027, 6, 1, 3, tzinfo=UTC),
+    )
+    with pytest.raises(FiscalValidationError, match="overlapping"):
+        resolve_simples_ibs_cbs_mode(profile, (first, overlapping), instant)
+    with pytest.raises(FiscalValidationError, match="explicit effective"):
+        resolve_simples_ibs_cbs_mode(
+            profile,
+            (_simples_election(profile, effective_from=instant + timedelta(days=1)),),
+            instant,
+        )
+    with pytest.raises(FiscalValidationError, match="cannot predate"):
+        resolve_simples_ibs_cbs_mode(
+            profile,
+            (_simples_election(profile, effective_from=datetime(2026, 12, 31, 3, tzinfo=UTC)),),
+            instant,
+        )
+
+
+def test_simples_mode_must_not_be_inferred_from_normal_crt_or_mei() -> None:
+    instant = datetime(2027, 1, 1, 12, tzinfo=UTC)
+    for crt in (TaxRegimeCode.NORMAL, TaxRegimeCode.MEI):
+        other = replace(_simples_profile(), tax_regime=crt)
+        with pytest.raises(FiscalValidationError, match="CRT=1"):
+            resolve_simples_ibs_cbs_mode(other, (), instant)
+
+
+def test_simples_mode_rejects_naive_dates_and_unverified_mode() -> None:
+    profile = _simples_profile()
+    with pytest.raises(FiscalValidationError, match="timezone-aware"):
+        resolve_simples_ibs_cbs_mode(profile, (), datetime(2027, 1, 1))
+    with pytest.raises(FiscalValidationError, match="invalid Simples IBS/CBS election mode"):
+        _simples_election(profile, mode=SimplesIbsCbsMode.NOT_EFFECTIVE_IN_SIMPLES_2026)
