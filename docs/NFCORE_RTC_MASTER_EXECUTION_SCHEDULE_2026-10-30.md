@@ -63,6 +63,14 @@ Cada WP: auditar CURRENT e fonte oficial → mapear autoridade/camadas → conge
 
 **Limites:** o objeto de protocolo não comprova autenticidade por si só; apenas camada confiável ou aprovação humana pode fornecer evidência verificada. Não registra opção/cancelamento na Receita, não calcula IBS/CBS/IS, não autoriza XML/transmissão e não prova conformidade ao XSD. Aceite interno: CI, governança, testes de períodos e isolamento, merge e gates pós-merge. RTC-04 total continua `IMPLEMENTED_PARTIAL`, RTC-05 não iniciado nesta entrega.
 
+### RTC-04 B7 — guarda temporal do catálogo CST/cClassTrib (02/11/2026)
+
+- **Gap funcional comprovado:** `resolve_rule_with_verified_rtc_catalog` validava par CST/cClassTrib e SHA do catálogo normalizado, mas não comparava a **data do fato gerador** com a publicação/vigência do artefato. Assim seria possível uma prévia retrospectiva usando uma versão de tabela publicada depois da operação.
+- **Delta construído:** a `VerifiedRtcClassificationCatalog` passa a carregar `published_on` e `effective_from` herdados da `RegulatoryArtifactPin`, incluídos no witness de integridade. O loader rejeita publicação posterior à captura do baseline; o resolvedor canônico exige timestamp com timezone e recusa fatos anteriores à publicação ou à vigência explícita. Sem autoridade temporal alternativa e sem mudança de TaxRuleEngine.
+- **Prova:** novos testes negativos contra versão publicada no futuro, vigência posterior ao fato, metadados adulterados, timestamp sem timezone e baseline capturado antes da publicação. Mantém `authoritative=False` e **não presume** que a publicação isolada certifique vigência legal: `effective_from` somente opera quando fonte/pin o declara explicitamente.
+- **Fontes oficiais e limite:** SVRS `https://dfe-portal.svrs.rs.gov.br/NFe/Documentos` publica a NT 2026.005 v1.00 e a IT 2025.002 v1.71 (30/10/2026). O manifesto atual contém referência sem bytes/XSD/hash originais e não é adotado como catálogo produtivo nesta entrega. **Ainda faltam** obtenção do pacote original, verificação de autenticidade, vigência por operação/CRT, golden cases de bases, créditos, redução, CBS/IBS/IS e autorização/homologação de emissão. Nenhum código XML, alíquota ou produção foi alterado.
+- **Aceite:** CI/Gov no exato HEAD da PR e pós-merge da `main`; B7 só fica `INTERNALLY_CERTIFIED` após ambos os gates. RTC-04 segue `IMPLEMENTED_PARTIAL`.
+
 ## Microentregas implementáveis com autonomia controlada
 
 ### Bloco A — foundations, sem alterar operação produtiva
