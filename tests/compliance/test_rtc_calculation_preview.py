@@ -270,3 +270,21 @@ def test_rate_preview_rejects_catalog_temporal_metadata_tampering() -> None:
     tampered = replace(catalog, published_on=date(2026, 10, 1))
     with pytest.raises(RegulatoryBaselineError, match="pinned artifact verification"):
         _preview(baseline, payload, tampered, classification)
+
+
+def test_rate_preview_rejects_foreign_catalog_source_with_same_digest() -> None:
+    """A matching normalized payload is not permission to swap source provenance."""
+    baseline, payload, catalog, classification = _setup()
+    other_pin = replace(
+        baseline.artifacts[1], source_reference="synthetic-other-source-not-official"
+    )
+    foreign = replace(baseline, artifacts=(baseline.artifacts[0], other_pin))
+    with pytest.raises(RegulatoryBaselineError, match="baseline pin mismatch"):
+        _preview(foreign, payload, catalog, classification)
+
+
+def test_rate_preview_rejects_catalog_source_witness_tampering() -> None:
+    baseline, payload, catalog, classification = _setup()
+    forged = replace(catalog, source_reference="synthetic-forged-source")
+    with pytest.raises(RegulatoryBaselineError, match="pinned artifact verification"):
+        _preview(baseline, payload, forged, classification)
