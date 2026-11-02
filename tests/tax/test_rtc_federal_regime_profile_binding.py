@@ -22,6 +22,7 @@ from kordena_fiscal.tax.regimes import (
     FederalRegimeDeclaration,
     SimplesIbsCbsElection,
     SimplesIbsCbsMode,
+    SimplesRegularOptionReceipt2027H1,
     resolve_federal_regime_for_profile,
     resolve_federal_regime_timeline,
     resolve_simples_ibs_cbs_mode,
@@ -219,6 +220,25 @@ def _simples_election(
     )
 
 
+def _simples_receipt(
+    profile: FiscalProfile,
+    *,
+    submitted_at: datetime = datetime(2026, 10, 30, 12, tzinfo=UTC),
+    confirmed_at: datetime = datetime(2026, 10, 30, 13, tzinfo=UTC),
+    cancelled_at: datetime | None = None,
+) -> SimplesRegularOptionReceipt2027H1:
+    return SimplesRegularOptionReceipt2027H1(
+        scope=profile.scope,
+        profile_id=profile.profile_id,
+        profile_version=profile.version,
+        crt=profile.tax_regime,
+        submitted_at=submitted_at,
+        confirmed_at=confirmed_at,
+        protocol_reference="TEST-CGSN-PROTOCOL-NOT-REAL",
+        cancelled_at=cancelled_at,
+    )
+
+
 def test_simples_2026_is_non_rtc_without_authorizing_nfse_omission() -> None:
     profile = _simples_profile()
     assert resolve_simples_ibs_cbs_mode(
@@ -236,7 +256,11 @@ def test_simples_2027_requires_evidence_and_supports_either_collection_choice() 
         SimplesIbsCbsMode.REGULAR_SEPARATE,
     ):
         assert resolve_simples_ibs_cbs_mode(
-            profile, (_simples_election(profile, mode=mode),), instant
+            profile, (_simples_election(profile, mode=mode),), instant,
+            regular_option_receipt_2027_h1=(
+                _simples_receipt(profile)
+                if mode is SimplesIbsCbsMode.REGULAR_SEPARATE else None
+            ),
         ) is mode
 
 
@@ -289,7 +313,13 @@ def test_simples_excess_sublimit_crt2_resolves_explicit_ibscbs_mode() -> None:
         SimplesIbsCbsMode.REGULAR_SEPARATE,
     ):
         election = _simples_election(profile, mode=mode)
-        assert resolve_simples_ibs_cbs_mode(profile, (election,), instant) is mode
+        assert resolve_simples_ibs_cbs_mode(
+            profile, (election,), instant,
+            regular_option_receipt_2027_h1=(
+                _simples_receipt(profile)
+                if mode is SimplesIbsCbsMode.REGULAR_SEPARATE else None
+            ),
+        ) is mode
     with pytest.raises(FiscalValidationError, match="explicit effective"):
         resolve_simples_ibs_cbs_mode(profile, (), instant)
     assert resolve_simples_ibs_cbs_mode(
@@ -324,3 +354,102 @@ def test_simples_mode_rejects_naive_dates_and_unverified_mode() -> None:
         resolve_simples_ibs_cbs_mode(profile, (), datetime(2027, 1, 1))
     with pytest.raises(FiscalValidationError, match="invalid Simples IBS/CBS election mode"):
         _simples_election(profile, mode=SimplesIbsCbsMode.NOT_EFFECTIVE_IN_SIMPLES_2026)
+
+
+def test_regular_2027_h1_requires_confirmed_external_receipt() -> None:
+    profile = _simples_profile()
+    date_in_h1 = datetime(2027, 3, 1, tzinfo=UTC)
+    election = _simples_election(profile, mode=SimplesIbsCbsMode.REGULAR_SEPARATE)
+    with pytest.raises(FiscalValidationError, match="external receipt"):
+        resolve_simples_ibs_cbs_mode(profile, (election,), date_in_h1)
+    assert resolve_simples_ibs_cbs_mode(
+        profile, (election,), date_in_h1,
+        regular_option_receipt_2027_h1=_simples_receipt(profile),
+    ) is SimplesIbsCbsMode.REGULAR_SEPARATE
+
+
+@pytest.mark.parametrize(
+    "submitted_at",
+    (
+        datetime(2026, 8, 31, 12, tzinfo=UTC),
+        datetime(2026, 10, 31, 12, tzinfo=UTC),
+    ),
+)
+def test_regular_2027_h1_rejects_filing_outside_cgsn_window(
+    submitted_at: datetime,
+) -> None:
+    profile = _simples_profile()
+    with pytest.raises(FiscalValidationError, match="filing window"):
+        _simples_receipt(
+            profile,
+            submitted_at=submitted_at,
+            confirmed_at=submitted_at + timedelta(hours=1),
+        )
+
+
+def test_regular_2027_h1_rejects_confirmation_before_submission() -> None:
+    profile = _simples_profile()
+    with pytest.raises(FiscalValidationError, match="confirmation precedes submission"):
+        _simples_receipt(
+            profile,
+            submitted_at=datetime(2026, 10, 30, 12, tzinfo=UTC),
+            confirmed_at=datetime(2026, 10, 29, 12, tzinfo=UTC),
+        )
+
+
+def test_regular_2027_h1_cancellation_fails_closed() -> None:
+    profile = _simples_profile()
+    receipt = _simples_receipt(
+        profile, cancelled_at=datetime(2026, 11, 3, 12, tzinfo=UTC)
+    )
+    with pytest.raises(FiscalValidationError, match="cancelled"):
+        resolve_simples_ibs_cbs_mode(
+            profile,
+            (_simples_election(profile, mode=SimplesIbsCbsMode.REGULAR_SEPARATE),),
+            datetime(2027, 3, 1, tzinfo=UTC),
+            regular_option_receipt_2027_h1=receipt,
+        )
+    with pytest.raises(FiscalValidationError, match="cancellation outside window"):
+        _simples_receipt(
+            profile, cancelled_at=datetime(2026, 11, 2, 12, tzinfo=UTC)
+        )
+
+
+def test_regular_2027_h1_denies_receipt_from_other_issuer_or_crt() -> None:
+    profile = _simples_profile()
+    election = _simples_election(
+        profile, mode=SimplesIbsCbsMode.REGULAR_SEPARATE
+    )
+    instant = datetime(2027, 1, 3, tzinfo=UTC)
+    with pytest.raises(FiscalValidationError, match="scope mismatch"):
+        resolve_simples_ibs_cbs_mode(
+            profile, (election,), instant,
+            regular_option_receipt_2027_h1=_simples_receipt(
+                _simples_profile(_scope("foreign-tenant"))
+            ),
+        )
+    with pytest.raises(FiscalValidationError, match="CRT mismatch"):
+        resolve_simples_ibs_cbs_mode(
+            profile, (election,), instant,
+            regular_option_receipt_2027_h1=_simples_receipt(
+                replace(profile, tax_regime=TaxRegimeCode.SIMPLES_NACIONAL_EXCESS_SUBLIMIT)
+            ),
+        )
+
+
+def test_regular_option_not_extrapolated_into_2027_second_semester() -> None:
+    profile = _simples_profile()
+    with pytest.raises(FiscalValidationError, match="period not verified"):
+        resolve_simples_ibs_cbs_mode(
+            profile,
+            (_simples_election(profile, mode=SimplesIbsCbsMode.REGULAR_SEPARATE),),
+            datetime(2027, 7, 1, 12, tzinfo=UTC),
+            regular_option_receipt_2027_h1=_simples_receipt(profile),
+        )
+
+
+def test_simples_unified_choice_requires_no_regular_option_receipt() -> None:
+    profile = _simples_profile()
+    assert resolve_simples_ibs_cbs_mode(
+        profile, (_simples_election(profile),), datetime(2027, 7, 1, 12, tzinfo=UTC)
+    ) is SimplesIbsCbsMode.SIMPLES_UNIFIED
