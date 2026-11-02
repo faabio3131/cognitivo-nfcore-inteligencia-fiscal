@@ -231,6 +231,8 @@ def resolve_simples_ibs_cbs_mode(
     01/01/2027; before then this result NEVER waives other fiscal duties,
     notably national NFS-e from 01/11/2026 for affected ME/EPP.
 
+    Both CRT=1 and CRT=2 belong to Simples for this option declaration;
+    CRT=2 retains its distinct ICMS/ISS treatment outside this resolver.
     This is a scoped eligibility guard, not a second TaxRuleEngine or evidence
     of a formally registered option. Missing/overlapping/future elections fail
     closed; caller must verify the competent authority and the option's term.
@@ -243,9 +245,12 @@ def resolve_simples_ibs_cbs_mode(
         raise FiscalValidationError("Simples mode instant must be timezone-aware")
     if not profile.is_effective_at(instant):
         raise FiscalValidationError("Simples mode requires effective FiscalProfile")
-    if profile.tax_regime is not TaxRegimeCode.SIMPLES_NACIONAL:
+    if profile.tax_regime not in (
+        TaxRegimeCode.SIMPLES_NACIONAL,
+        TaxRegimeCode.SIMPLES_NACIONAL_EXCESS_SUBLIMIT,
+    ):
         raise FiscalValidationError(
-            "Simples IBS/CBS mode supports only explicitly confirmed CRT=1"
+            "Simples IBS/CBS mode requires explicitly confirmed CRT=1 or CRT=2"
         )
     entries = tuple(elections)
     for entry in entries:
