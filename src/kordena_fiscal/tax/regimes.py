@@ -169,7 +169,7 @@ class SimplesIbsCbsElection:
             self.profile_version, bool
         ) or self.profile_version < 1:
             raise FiscalValidationError("Simples election requires profile_version")
-        if self.mode not in (
+        if not isinstance(self.mode, SimplesIbsCbsMode) or self.mode not in (
             SimplesIbsCbsMode.SIMPLES_UNIFIED, SimplesIbsCbsMode.REGULAR_SEPARATE
         ):
             raise FiscalValidationError("invalid Simples IBS/CBS election mode")
