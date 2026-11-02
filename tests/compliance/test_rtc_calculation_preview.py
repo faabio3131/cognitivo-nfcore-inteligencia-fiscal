@@ -207,3 +207,66 @@ def test_naive_rtc_instant_fails_closed() -> None:
             tax_base=Money(Decimal("100.00")),
             instant=datetime(2026, 11, 1),
         )
+
+
+@pytest.mark.parametrize(
+    ("component", "expected"),
+    (
+        ("cbs", ReformTaxComponent.CBS),
+        ("ibs_state", ReformTaxComponent.IBS_STATE),
+        ("ibs_municipal", ReformTaxComponent.IBS_MUNICIPAL),
+        ("selective_tax", ReformTaxComponent.SELECTIVE_TAX),
+    ),
+)
+def test_four_rtc_components_use_same_pinned_catalog(
+    component: str, expected: ReformTaxComponent,
+) -> None:
+    baseline, payload, catalog, classification = _setup(component=component)
+    result = _preview(baseline, payload, catalog, classification)
+    assert result.component is expected
+    assert result.tax_amount.amount == Decimal("1.54")
+
+
+def test_rate_preview_rejects_foreign_catalog_same_version_different_digest() -> None:
+    baseline, payload, catalog, classification = _setup()
+    other_pin = replace(baseline.artifacts[1], checksum_sha256="a" * 64)
+    foreign = replace(baseline, artifacts=(baseline.artifacts[0], other_pin))
+    with pytest.raises(RegulatoryBaselineError, match="baseline pin mismatch"):
+        _preview(foreign, payload, catalog, classification)
+
+
+@pytest.mark.parametrize("field", ("published_on", "effective_from"))
+def test_rate_preview_rejects_foreign_catalog_dates_with_same_version(
+    field: str,
+) -> None:
+    baseline, payload, catalog, classification = _setup()
+    other_pin = replace(baseline.artifacts[1], **{field: date(2026, 11, 2)})
+    foreign = replace(baseline, artifacts=(baseline.artifacts[0], other_pin))
+    with pytest.raises(RegulatoryBaselineError, match="baseline pin mismatch"):
+        _preview(foreign, payload, catalog, classification)
+
+
+def test_rate_preview_rejects_catalog_that_is_not_yet_effective_at_fact() -> None:
+    baseline, payload, catalog, classification = _setup()
+    future_pin = replace(baseline.artifacts[1], effective_from=date(2026, 11, 2))
+    future_baseline = replace(
+        baseline, artifacts=(baseline.artifacts[0], future_pin)
+    )
+    classification_bytes = _json_bytes({
+        "schema_version": 1,
+        "artifact_id": "IBSCBS-CCLASSTRIB",
+        "artifact_version": "SYNTHETIC-1",
+        "records": [{"cst": "000", "cclass_trib": "000001"}],
+    })
+    future_catalog = load_verified_rtc_classification_catalog(
+        future_baseline, classification_bytes
+    )
+    with pytest.raises(RegulatoryBaselineError, match="not effective"):
+        _preview(future_baseline, payload, future_catalog, classification)
+
+
+def test_rate_preview_rejects_catalog_temporal_metadata_tampering() -> None:
+    baseline, payload, catalog, classification = _setup()
+    tampered = replace(catalog, published_on=date(2026, 10, 1))
+    with pytest.raises(RegulatoryBaselineError, match="pinned artifact verification"):
+        _preview(baseline, payload, tampered, classification)
