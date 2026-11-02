@@ -55,7 +55,7 @@ Cada `Evidência` abaixo é levantamento de baseline, **não certificação do b
 - **Pendência / decisão humana:** se surgir, registrar o bloqueio exato com decisão necessária, sem gerar novo serviço, preço ou credencial.
 
 ### NFV1-BLD-04 — Comercial interno e integração Command
-- **Estado:** IN_PROGRESS — implementação substancial integrada, certificação de jornada inteira pendente (não recomeçar)
+- **Estado:** IN_PROGRESS
 - **Depende de:** BLD-03 contratos, ou interfaces canônicas já verificadas; não ativar pagamentos
 - **CURRENT:** Pricing/release e aquisição/fulfillment internos existem; #281 (testes HTTP autenticados do FM Command) MERGED em `5d894ffcf34c8a9ee6d66876ee35c2c9273ee32a` após CI pré-merge #41168608800 e Governança #41168608803 SUCCESS. Os gates registrados neste parágrafo pertencem ao snapshot de 31/10; não afirmam o status CURRENT. Checar eventual evidência de CI pós-merge se necessária ao aceite. Este incremento não encerra BLD-04: catálogo/release/checkout runtime sem readiness e E2E comercial integral ainda exigem evidência. Backend multi-tenant é autoridade; simular somente entrada de provedor em testes.
 - **Target e aceite:** seção `NFV1-BLD-04` do anexo de execução.
@@ -73,7 +73,7 @@ Cada `Evidência` abaixo é levantamento de baseline, **não certificação do b
 ### NFV1-BLD-06 — Persistência e Worker das jornadas Web
 - **Estado:** PENDING
 - **Depende de:** BLD-02/BLD-04/BLD-05 contratos relevantes
-- **CURRENT do código (02/11):** Worker, PostgreSQL, outbox, retries, idempotência e recuperação preexistem; PRs #294/#295 foram integradas com isolamento do teste de claim e composição opt-in do Worker, sem ativação produtiva. Falta prova E2E específica e configuração externa, não reconstrução do Worker.
+- **CURRENT:** Worker, PostgreSQL, outbox, retries, idempotência e recuperação preexistem; PRs #294/#295 foram integradas com isolamento do teste de claim e composição opt-in do Worker, sem ativação produtiva. Falta prova E2E específica e configuração externa, não reconstrução do Worker.
 - **Target e aceite:** seção `NFV1-BLD-06` do anexo de execução.
 - **Evidência final:** PENDENTE (registrar PR + HEAD + merge SHA + CI/Gov PR e main + prova funcional apropriada).
 - **Pendência / decisão humana:** se surgir, registrar o bloqueio exato com decisão necessária, sem gerar novo serviço, preço ou credencial.
@@ -81,7 +81,7 @@ Cada `Evidência` abaixo é levantamento de baseline, **não certificação do b
 ### NFV1-BLD-07 — Conectar site novo e jornada NFCore
 - **Estado:** PENDING
 - **Depende de:** BLD-03 ingresso seguro e catálogo quando aprovado; separar canal interno de liberação pública
-- **CURRENT conhecido:** site canônico `faabio3131/fm-site-novo` PR #10 integrou acesso ao Portal; PR #12 contém proposta de trial/CTA e exigia reconciliação no último checkpoint cruzado (31/10). Este ledger não certifica o HEAD atual de outro repositório nem publicação de oferta; verificar antes de implementar.
+- **CURRENT:** site canônico `faabio3131/fm-site-novo` PR #10 integrou acesso ao Portal; PR #12 contém proposta de trial/CTA e exigia reconciliação no último checkpoint cruzado (31/10). Este ledger não certifica o HEAD atual de outro repositório nem publicação de oferta; verificar antes de implementar.
 - **Target e aceite:** seção `NFV1-BLD-07` do anexo de execução.
 - **Evidência final:** PENDENTE (registrar PR + HEAD + merge SHA + CI/Gov PR e main + prova funcional apropriada).
 - **Pendência / decisão humana:** se surgir, registrar o bloqueio exato com decisão necessária, sem gerar novo serviço, preço ou credencial.
