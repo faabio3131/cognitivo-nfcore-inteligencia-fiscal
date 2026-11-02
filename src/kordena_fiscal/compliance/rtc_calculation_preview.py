@@ -24,6 +24,7 @@ from kordena_fiscal.compliance.rtc import (
 from kordena_fiscal.compliance.rtc_catalog import (
     VerifiedRtcClassificationCatalog,
     resolve_rule_with_verified_rtc_catalog,
+    resolve_strict_rtc_2026_incidence_candidate,
 )
 from kordena_fiscal.compliance.rtc_evidence import verify_regulatory_artifact_bytes
 from kordena_fiscal.domain import FiscalValidationError, Money, TaxRegimeCode
@@ -353,7 +354,6 @@ class RtcRoundedFieldCandidate:
 
     @property
     def authoritative(self) -> bool:
-        # An integrity-checked candidate must never be promoted by a flag.
         return False
 
 
@@ -416,4 +416,95 @@ def calculate_pinned_rtc_field_rounding_candidate(
         candidate=candidate,
         technical_note_version=artifact.version,
         artifact_id=artifact.artifact_id,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class Rtc2026AuditedPreviewBundle:
+    """Combined, context-bound internal candidate; NEVER a fiscal tax result."""
+
+    decision: TaxDecision
+    classification: ReformTaxClassificationSnapshot
+    base: Rtc2026Art12BasePreview
+    cbs_rounding_candidate: RtcRoundedFieldCandidate
+
+    @property
+    def authoritative(self) -> bool:
+        return False
+
+
+def calculate_2026_audited_preview_bundle(
+    *,
+    engine: TaxRuleEngine,
+    context: TaxRuleContext,
+    rules: Iterable[TaxRule],
+    catalog: VerifiedRtcClassificationCatalog,
+    gross_operation_value: Money,
+    unconditional_discount: Money,
+    ipi_excluded: Money,
+    ibs_cbs_excluded: Money,
+    legacy_taxes_excluded: Money,
+    public_lighting_contribution_excluded: Money,
+    confirmed_standard_nonfuel_operation: bool,
+    confirmed_no_differentiated_or_special_regime: bool,
+    confirmed_no_market_valuation_or_special_base: bool,
+    confirmed_no_third_party_reimbursement: bool,
+    confirmed_all_art12_exclusions_itemized: bool,
+    confirmed_tax_base_reviewed: bool,
+    rounding_baseline: RegulatoryBaseline,
+    rounding_artifact_id: str,
+    rounding_policy_payload: bytes,
+) -> Rtc2026AuditedPreviewBundle:
+    """Compose RTC-04 B1/B2 with canonical Art.12 preliminary base, fail closed.
+
+    All components use the same immutable TaxRuleContext, frozen rule iterable
+    and verified classification; no caller-supplied tax decision is accepted.
+    The rounded CBS candidate MUST NOT be forwarded to fiscal XML or ledger.
+    """
+    candidates = tuple(rules)
+    decision, classification = resolve_strict_rtc_2026_incidence_candidate(
+        engine=engine, context=context, rules=candidates, catalog=catalog,
+    )
+    base = calculate_2026_art12_base_preview(
+        engine=engine,
+        context=context,
+        rules=candidates,
+        catalog=catalog,
+        gross_operation_value=gross_operation_value,
+        unconditional_discount=unconditional_discount,
+        ipi_excluded=ipi_excluded,
+        ibs_cbs_excluded=ibs_cbs_excluded,
+        legacy_taxes_excluded=legacy_taxes_excluded,
+        public_lighting_contribution_excluded=public_lighting_contribution_excluded,
+        confirmed_standard_nonfuel_operation=confirmed_standard_nonfuel_operation,
+        confirmed_no_differentiated_or_special_regime=(
+            confirmed_no_differentiated_or_special_regime
+        ),
+        confirmed_no_market_valuation_or_special_base=(
+            confirmed_no_market_valuation_or_special_base
+        ),
+        confirmed_no_third_party_reimbursement=confirmed_no_third_party_reimbursement,
+        confirmed_all_art12_exclusions_itemized=(
+            confirmed_all_art12_exclusions_itemized
+        ),
+        confirmed_tax_base_reviewed=confirmed_tax_base_reviewed,
+    )
+    if (
+        base.nominal_reference.decision != decision
+        or base.nominal_reference.classification != classification
+    ):
+        raise RegulatoryBaselineError("inconsistent RTC incidence and base-preview decisions")
+    rounding = calculate_pinned_rtc_field_rounding_candidate(
+        baseline=rounding_baseline,
+        artifact_id=rounding_artifact_id,
+        policy_payload=rounding_policy_payload,
+        field_name="vCBS",
+        amount=base.nominal_reference.cbs_unrounded,
+        instant=context.instant,
+    )
+    return Rtc2026AuditedPreviewBundle(
+        decision=decision,
+        classification=classification,
+        base=base,
+        cbs_rounding_candidate=rounding,
     )
