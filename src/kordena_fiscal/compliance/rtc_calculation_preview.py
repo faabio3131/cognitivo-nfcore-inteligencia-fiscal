@@ -77,8 +77,6 @@ def calculate_evidenced_rtc_preview(
     artifact = baseline.artifact(rate_artifact_id)
     if artifact.kind is not RegulatoryArtifactKind.RATE_TABLE:
         raise RegulatoryBaselineError("rate artifact must be a rate_table")
-    if artifact.published_on > baseline.captured_at.date():
-        raise RegulatoryBaselineError("RTC rate artifact published after baseline capture")
     # A checksum pin is not proof of temporal applicability. Do not calculate a
     # historical period from a source that was unpublished or not yet effective.
     if not isinstance(instant, datetime) or instant.tzinfo is None or instant.utcoffset() is None:
@@ -89,6 +87,8 @@ def calculate_evidenced_rtc_preview(
         raise RegulatoryBaselineError("RTC rate artifact was not published at instant")
     if instant.date() < artifact.effective_from:
         raise RegulatoryBaselineError("RTC rate artifact was not effective at instant")
+    if artifact.published_on > baseline.captured_at.date():
+        raise RegulatoryBaselineError("RTC rate artifact published after baseline capture")
     verify_regulatory_artifact_bytes(artifact, rate_payload)
     try:
         raw = json.loads(rate_payload, object_pairs_hook=_unique_json_pairs)
@@ -455,14 +455,14 @@ def calculate_pinned_rtc_field_rounding_candidate(
     artifact = baseline.artifact(artifact_id)
     if artifact.kind is not RegulatoryArtifactKind.TECHNICAL_NOTE:
         raise RegulatoryBaselineError("RTC rounding requires a pinned technical note")
-    if artifact.published_on > baseline.captured_at.date():
-        raise RegulatoryBaselineError("RTC rounding artifact published after baseline capture")
     if not isinstance(instant, datetime) or instant.tzinfo is None or instant.utcoffset() is None:
         raise RegulatoryBaselineError("RTC rounding instant must be timezone-aware")
     if artifact.effective_from is None or instant.date() < max(
         artifact.published_on, artifact.effective_from
     ):
         raise RegulatoryBaselineError("RTC rounding artifact not published/effective at instant")
+    if artifact.published_on > baseline.captured_at.date():
+        raise RegulatoryBaselineError("RTC rounding artifact published after baseline capture")
     if not isinstance(amount, Decimal) or not amount.is_finite() or amount < 0:
         raise FiscalValidationError("RTC rounding amount must be nonnegative finite Decimal")
     if field_name not in {"pAliqEfet", "vBC", "vIBSUF", "vIBSMun", "vCBS"}:
