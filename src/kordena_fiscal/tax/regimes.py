@@ -172,6 +172,7 @@ class SimplesIbsCbsElection:
     scope: ExecutionScope
     profile_id: str
     profile_version: int
+    crt: TaxRegimeCode
     mode: SimplesIbsCbsMode
     effective_from: datetime
     source_reference: str
@@ -187,6 +188,11 @@ class SimplesIbsCbsElection:
             self.profile_version, bool
         ) or self.profile_version < 1:
             raise FiscalValidationError("Simples election requires profile_version")
+        if not isinstance(self.crt, TaxRegimeCode) or self.crt not in (
+            TaxRegimeCode.SIMPLES_NACIONAL,
+            TaxRegimeCode.SIMPLES_NACIONAL_EXCESS_SUBLIMIT,
+        ):
+            raise FiscalValidationError("Simples election must be for CRT=1 or CRT=2")
         if not isinstance(self.mode, SimplesIbsCbsMode) or self.mode not in (
             SimplesIbsCbsMode.SIMPLES_UNIFIED, SimplesIbsCbsMode.REGULAR_SEPARATE
         ):
@@ -260,6 +266,8 @@ def resolve_simples_ibs_cbs_mode(
             raise FiscalValidationError("Simples election scope mismatch")
         if (entry.profile_id, entry.profile_version) != profile.snapshot_key:
             raise FiscalValidationError("Simples election profile snapshot mismatch")
+        if entry.crt is not profile.tax_regime:
+            raise FiscalValidationError("Simples election CRT mismatch")
         if entry.effective_from.astimezone(ZoneInfo("America/Sao_Paulo")).date() < date(
             2027, 1, 1
         ):
