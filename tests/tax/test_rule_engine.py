@@ -439,6 +439,12 @@ def _rule_bound_preview(*, rules: list[TaxRule] | None = None, day: int = 10):
         "quantum": "0.01",
         "rounding_mode": "ROUND_HALF_UP",
     }, sort_keys=True).encode("utf-8")
+    classification_payload = json.dumps({
+        "schema_version": 1,
+        "artifact_id": "IBSCBS-CCLASSTRIB",
+        "artifact_version": "SYNTHETIC-v1",
+        "records": [{"cst": "000", "cclass_trib": "000001"}],
+    }, sort_keys=True).encode("utf-8")
     baseline = RegulatoryBaseline(
         baseline_id="rtc-rule-bound-preview-synthetic", version=1,
         captured_at=datetime(2026, 9, 11, tzinfo=UTC),
@@ -447,13 +453,20 @@ def _rule_bound_preview(*, rules: list[TaxRule] | None = None, day: int = 10):
             version="SYNTHETIC-v1", published_on=date(2026, 9, 1),
             effective_from=date(2026, 9, 1), source_reference="synthetic-test-only",
             checksum_sha256=sha256(payload).hexdigest(),
-        ),),
+        ), RegulatoryArtifactPin(
+            artifact_id="IBSCBS-CCLASSTRIB",
+            kind=RegulatoryArtifactKind.CLASSIFICATION_TABLE,
+            version="SYNTHETIC-v1", published_on=date(2026, 9, 1),
+            source_reference="synthetic-test-only",
+            checksum_sha256=sha256(classification_payload).hexdigest(),
+        )),
     )
     return calculate_rule_bound_rtc_preview(
         engine=TaxRuleEngine(), context=_context(instant=_instant(day)),
         rules=[_rtc_rule()] if rules is None else rules,
         baseline=baseline, rate_artifact_id="RATE-SYNTHETIC",
-        rate_payload=payload, catalog=_synthetic_rtc_catalog(),
+        rate_payload=payload,
+        catalog=load_verified_rtc_classification_catalog(baseline, classification_payload),
         tax_base=Money(Decimal("123.45")),
     )
 
