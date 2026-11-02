@@ -460,7 +460,7 @@ def _rtc_2026_reference(**overrides: object):
     params: dict[str, object] = {
         "engine": TaxRuleEngine(),
         "context": _context(tax_regime=TaxRegimeCode.NORMAL),
-        "rules": [_rtc_rule()],
+        "rules": [_rtc_strict_rule()],
         "catalog": _synthetic_rtc_catalog(),
         "tax_base": Money(Decimal("123.45")),
         "confirmed_standard_nonfuel_operation": True,
@@ -509,6 +509,16 @@ def test_rtc_2026_reference_rejects_unreviewed_scope(missing: str) -> None:
         _rtc_2026_reference(**{missing: 1})
 
 
+def test_rtc_2026_standalone_reference_denies_wildcard_incidence() -> None:
+    with pytest.raises(RegulatoryBaselineError, match="explicit contextual selectors"):
+        _rtc_2026_reference(rules=[_rtc_rule()])
+
+
+def test_rtc_2026_art12_reference_denies_wildcard_incidence() -> None:
+    with pytest.raises(RegulatoryBaselineError, match="explicit contextual selectors"):
+        _art12_preview(rules=[_rtc_rule()])
+
+
 def test_rtc_2026_reference_denies_missing_or_ambiguous_rule() -> None:
     with pytest.raises(TaxRuleNotFoundError):
         _rtc_2026_reference(rules=[])
@@ -532,7 +542,7 @@ def _art12_preview(**overrides: object):
     params: dict[str, object] = {
         "engine": TaxRuleEngine(),
         "context": _context(tax_regime=TaxRegimeCode.NORMAL),
-        "rules": [_rtc_rule()],
+        "rules": [_rtc_strict_rule()],
         "catalog": _synthetic_rtc_catalog(),
         "gross_operation_value": Money(Decimal("1000.00")),
         "unconditional_discount": Money(Decimal("100.00")),
