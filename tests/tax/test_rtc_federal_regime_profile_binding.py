@@ -22,9 +22,9 @@ from kordena_fiscal.tax.regimes import (
     FederalRegimeDeclaration,
     SimplesIbsCbsElection,
     SimplesIbsCbsMode,
-    resolve_simples_ibs_cbs_mode,
     resolve_federal_regime_for_profile,
     resolve_federal_regime_timeline,
+    resolve_simples_ibs_cbs_mode,
 )
 
 _NOW = datetime(2026, 10, 30, tzinfo=UTC)
