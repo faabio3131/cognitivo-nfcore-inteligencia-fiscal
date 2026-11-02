@@ -49,6 +49,24 @@ class FederalRegimeDeclaration:
             raise FiscalValidationError("crt must be TaxRegimeCode")
         if not isinstance(self.federal_income_tax_regime, FederalIncomeTaxRegime):
             raise FiscalValidationError("federal_income_tax_regime must be explicit")
+        # The two dimensions remain separate, but inconsistent declarations
+        # cannot authorize an impossible issuer fiscal combination. CRT=2 and
+        # CRT=4 retain their distinct document treatment elsewhere.
+        simple_crts = {
+            TaxRegimeCode.SIMPLES_NACIONAL,
+            TaxRegimeCode.SIMPLES_NACIONAL_EXCESS_SUBLIMIT,
+            TaxRegimeCode.MEI,
+        }
+        if self.crt in simple_crts:
+            if self.federal_income_tax_regime is not FederalIncomeTaxRegime.SIMPLES_NACIONAL:
+                raise FiscalValidationError(
+                    "Simples/MEI CRT is inconsistent with federal income-tax regime"
+                )
+        elif self.crt is TaxRegimeCode.NORMAL:
+            if self.federal_income_tax_regime is FederalIncomeTaxRegime.SIMPLES_NACIONAL:
+                raise FiscalValidationError(
+                    "normal CRT is inconsistent with Simples Nacional federal regime"
+                )
         if self.effective_from.tzinfo is None or self.effective_from.utcoffset() is None:
             raise FiscalValidationError("effective_from must be timezone-aware")
         if self.effective_to is not None:

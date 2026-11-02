@@ -32,6 +32,13 @@ Cada WP: auditar CURRENT e fonte oficial → mapear autoridade/camadas → conge
 - **Gate restante:** conexão persistente da declaração à fonte autorizada, revisão de opções/competências específicas, regras de cálculo por células normativas e golden cases; `authoritative=False` na prévia fiscal; nenhum imposto/aliquota/valor, XML, transmissão, migration, deploy ou homologação criados aqui.
 - **Relação com BLD:** não retomar onboarding/trial/site/checkout antes da conclusão do produto; integrações comerciais externas seguem pendentes por decisão.
 
+### RTC-02/04 — coerência CRT × regime federal (02/11/2026)
+
+- **Causa concreta:** `FederalRegimeDeclaration` exigia as duas dimensões, mas permitia pares contraditórios (ex.: CRT=3 normal + regime federal Simples Nacional), mesmo após validar escopo/perfil. Não confundir a identidade do CRT com a escolha independente Lucro Real/Presumido dentro do regime normal.
+- **Implementação incremental:** validação no **mesmo** `tax/regimes.py`, preservando o `FederalRegimeDeclaration` canônico. CRT=1/2/4 exige classificação federal Simples; CRT=3 admite Lucro Real ou Presumido explicitamente declarado. O CRT=2/4 continua distinto para cálculo ICMS/ISS/MEI e **não** recebe regras fiscais de CRT=1 automaticamente.
+- **Fonte técnica oficial:** NT 2024.001 CRT MEI, https://www.nfe.fazenda.gov.br/Portal/exibirArquivo.aspx?conteudo=kIiniiSkpKc%3D, e leiaute CRT=1/2/3/4; não cria alíquotas ou habilita XML RTC.
+- **Evidência de código:** testes preservam os três regimes federais com CRT coerente e acrescentam rejeição de combinações contraditórias. O resultado não é homologação oficial nem fechamento do RTC-02/04 integral.
+
 ## Microentregas implementáveis com autonomia controlada
 
 ### Bloco A — foundations, sem alterar operação produtiva
