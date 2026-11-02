@@ -46,7 +46,7 @@ def _baseline() -> RegulatoryBaseline:
 def test_rtc_official_reference_manifest_uses_existing_compliance_authority() -> None:
     baseline = _baseline()
     assert baseline.artifact("NT-2025.002").version == "1.53"
-    assert baseline.version == 3
+    assert baseline.version == 4
     assert baseline.artifact("NT-2025.002").published_on == date(2026, 10, 30)
     assert baseline.artifact("NT-2026.005").version == "1.00"
     assert baseline.artifact("NT-2026.005").published_on == date(2026, 10, 30)
