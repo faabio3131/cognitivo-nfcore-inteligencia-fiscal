@@ -23,6 +23,15 @@ Cada WP: auditar CURRENT e fonte oficial → mapear autoridade/camadas → conge
 | **RTC-11** | Certificação interna ponta a ponta, matrix regimes × operações × documentos × período × UF/município | RTC-01..10 | Todos os casos obrigatórios aplicáveis evidenciados + CI/Gov verde sem gaps ocultos | PENDING |
 | **RTC-12** | Homologação oficial por provedor/jurisdição/operação, pilotos limitados, observabilidade, certificação de produção e Go/No-Go | RTC-11 + ações externas/humanas | Request/response oficiais + vault + ambiente + performance + runbooks + rollback e GO humano explícito | BLOCKED_EXTERNAL |
 
+## RTC-04 — incremento após B3: opção IBS/CBS do Simples Nacional (02/11/2026)
+
+- **Current de código:** CRT=1/2/3/4 permanece no `FiscalProfile`; regimes federais são declarações explícitas em `tax/regimes.py`; o preview nominal do regime normal 2026 segue recusando Simples Nacional.
+- **Delta desta entrega:** `SimplesIbsCbsElection` e `resolve_simples_ibs_cbs_mode` no módulo canônico de declarações, com vínculo a tenant/unidade/host, ID+versão do perfil, fonte, vigência, períodos sem sobreposição e distinção entre recolhimento unificado e apuração regular do IBS/CBS, sem criar TaxRuleEngine paralelo.
+- **Base normativa:** LC 214/2025 art. 41 §§2–4, https://normas.leg.br/?urn=urn:lex:br:federal:lei.complementar:2025-01-16;214!art41 ; Receita Federal 11/08/2026 https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/agosto/cgsn-atualiza-regras-do-simples-nacional-para-adequacao-a-reforma-tributaria-do-consumo ; Receita Federal 14/08/2026 https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/agosto/simples-nacional-nfs-e-nacional-sera-obrigatoria-para-me-e-epp-a-partir-de-1o-de-novembro-de-2026 .
+- **Temporalidade:** a resolução dos modos IBS/CBS do Simples **não** autoriza cálculo RTC em 2026; a partir de 01/01/2027 exige evidência explícita revisada do enquadramento/opção no escopo e período. A inexistência de opção formal pode levar ao regime simplificado conforme norma, mas este contrato exige evidência de enquadramento/não-opção; **não cria opção formal perante o CGSN**. A NFS-e nacional obrigatória para ME/EPP abrangidas a partir de 01/11/2026 é obrigação **separada** e não fica dispensada por esse resultado.
+- **Gate restante:** conexão persistente da declaração à fonte autorizada, revisão de opções/competências específicas, regras de cálculo por células normativas e golden cases; `authoritative=False` na prévia fiscal; nenhum imposto/aliquota/valor, XML, transmissão, migration, deploy ou homologação criados aqui.
+- **Relação com BLD:** não retomar onboarding/trial/site/checkout antes da conclusão do produto; integrações comerciais externas seguem pendentes por decisão.
+
 ## Microentregas implementáveis com autonomia controlada
 
 ### Bloco A — foundations, sem alterar operação produtiva
