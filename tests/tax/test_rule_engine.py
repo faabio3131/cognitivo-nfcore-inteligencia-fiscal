@@ -16,6 +16,7 @@ from kordena_fiscal.compliance.rtc_calculation_preview import (
     calculate_2026_art12_base_preview,
     calculate_2026_audited_preview_bundle,
     calculate_2026_nominal_reference_preview,
+    calculate_2027_2028_ibs_transition_reference_preview,
     calculate_rule_bound_rtc_preview,
 )
 from kordena_fiscal.compliance.rtc_catalog import (
@@ -584,6 +585,98 @@ def test_rtc_2026_reference_denies_unverified_classification() -> None:
 def test_rtc_2026_reference_denies_negative_tax_base() -> None:
     with pytest.raises(FiscalValidationError, match="nonnegative"):
         _rtc_2026_reference(tax_base=Money(Decimal("-1.00")))
+
+
+
+# RTC-04 B9: LC 214/2025 Art. 344 — 2027/28 standard IBS only.
+# Synthetic CST/rules do not certify a payable or XML tax amount.
+def _ibs_2027_transition_reference(**overrides: object):
+    params: dict[str, object] = {
+        "engine": TaxRuleEngine(),
+        "context": _context(
+            instant=datetime(2027, 3, 1, 12, tzinfo=UTC),
+            tax_regime=TaxRegimeCode.NORMAL,
+        ),
+        "rules": [_rtc_strict_rule()],
+        "catalog": _synthetic_rtc_catalog(),
+        "tax_base": Money(Decimal("123.45")),
+        "confirmed_standard_nonfuel_operation": True,
+        "confirmed_no_differentiated_or_special_regime": True,
+        "confirmed_tax_base_reviewed": True,
+    }
+    params.update(overrides)
+    return calculate_2027_2028_ibs_transition_reference_preview(
+        **params  # type: ignore[arg-type]
+    )
+
+
+@pytest.mark.parametrize("year", (2027, 2028))
+def test_ibs_transition_2027_2028_is_unrounded_and_not_authoritative(year: int) -> None:
+    context = _context(
+        instant=datetime(year, 3, 1, 12, tzinfo=UTC),
+        tax_regime=TaxRegimeCode.NORMAL,
+    )
+    result = _ibs_2027_transition_reference(context=context)
+    assert result.decision.rule_id == "rtc-synthetic"
+    assert result.state_rate_percent == Decimal("0.05")
+    assert result.municipal_rate_percent == Decimal("0.05")
+    assert result.state_unrounded == Decimal("0.061725")
+    assert result.municipal_unrounded == Decimal("0.061725")
+    assert result.authoritative is False
+    assert "344" in result.source_normative
+
+
+@pytest.mark.parametrize("year", (2026, 2029))
+def test_ibs_transition_rejects_other_fiscal_years(year: int) -> None:
+    # Use an effective product profile: the fiscal-year gate, not the
+    # canonical product-validity gate, is what this regression exercises.
+    fiscal_instant = datetime(year, 10 if year == 2026 else 3, 1, 12, tzinfo=UTC)
+    with pytest.raises(RegulatoryBaselineError, match="only to 2027-2028"):
+        _ibs_2027_transition_reference(
+            context=_context(
+                instant=fiscal_instant,
+                tax_regime=TaxRegimeCode.NORMAL,
+            )
+        )
+
+
+def test_ibs_transition_rejects_simples_without_regular_regime_evidence() -> None:
+    with pytest.raises(RegulatoryBaselineError, match="excludes Simples Nacional"):
+        _ibs_2027_transition_reference(
+            context=_context(instant=datetime(2027, 3, 1, 12, tzinfo=UTC))
+        )
+
+
+@pytest.mark.parametrize(
+    "flag",
+    (
+        "confirmed_standard_nonfuel_operation",
+        "confirmed_no_differentiated_or_special_regime",
+        "confirmed_tax_base_reviewed",
+    ),
+)
+def test_ibs_transition_requires_reviewed_standard_scope(flag: str) -> None:
+    with pytest.raises(RegulatoryBaselineError, match="reviewed standard scope"):
+        _ibs_2027_transition_reference(**{flag: False})
+    with pytest.raises(RegulatoryBaselineError, match="reviewed standard scope"):
+        _ibs_2027_transition_reference(**{flag: 1})
+
+
+def test_ibs_transition_rejects_wildcard_and_ambiguous_rule() -> None:
+    with pytest.raises(RegulatoryBaselineError, match="explicit contextual selectors"):
+        _ibs_2027_transition_reference(rules=[_rtc_rule()])
+    rule = _rtc_strict_rule()
+    with pytest.raises(TaxRuleAmbiguityError):
+        _ibs_2027_transition_reference(
+            rules=[rule, replace(rule, rule_id="rtc-transition-tie")]
+        )
+
+
+def test_ibs_transition_rejects_unverified_catalog_and_negative_base() -> None:
+    with pytest.raises(RegulatoryBaselineError, match="verified RTC"):
+        _ibs_2027_transition_reference(catalog=None)
+    with pytest.raises(FiscalValidationError, match="nonnegative"):
+        _ibs_2027_transition_reference(tax_base=Money(Decimal("-1.00")))
 
 
 # RTC-04: Art. 12 (general-operation-base subset), non-issuable pre-rounding.

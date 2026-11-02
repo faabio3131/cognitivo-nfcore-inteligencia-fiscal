@@ -25,6 +25,7 @@ from kordena_fiscal.compliance.rtc_catalog import (
     VerifiedRtcClassificationCatalog,
     resolve_rule_with_verified_rtc_catalog,
     resolve_strict_rtc_2026_incidence_candidate,
+    resolve_strict_rtc_2027_2028_incidence_candidate,
 )
 from kordena_fiscal.compliance.rtc_evidence import verify_regulatory_artifact_bytes
 from kordena_fiscal.domain import FiscalValidationError, Money, TaxRegimeCode
@@ -248,6 +249,77 @@ def calculate_2026_nominal_reference_preview(
         cbs_unrounded=tax_base.amount * _RTC_2026_CBS_REFERENCE / Decimal("100"),
         ibs_state_unrounded=tax_base.amount * _RTC_2026_IBS_STATE_REFERENCE / Decimal("100"),
         source_normative=_RTC_2026_SOURCE,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class Rtc2027IbsTransitionReferencePreview:
+    """2027/28 Art. 344 IBS state/municipal comparison, NEVER issuable totals."""
+
+    decision: TaxDecision
+    classification: ReformTaxClassificationSnapshot
+    tax_base: Money
+    state_rate_percent: Decimal
+    municipal_rate_percent: Decimal
+    state_unrounded: Decimal
+    municipal_unrounded: Decimal
+    source_normative: str
+
+    @property
+    def authoritative(self) -> bool:
+        return False
+
+
+def calculate_2027_2028_ibs_transition_reference_preview(
+    *,
+    engine: TaxRuleEngine,
+    context: TaxRuleContext,
+    rules: Iterable[TaxRule],
+    catalog: VerifiedRtcClassificationCatalog,
+    tax_base: Money,
+    confirmed_standard_nonfuel_operation: bool,
+    confirmed_no_differentiated_or_special_regime: bool,
+    confirmed_tax_base_reviewed: bool,
+) -> Rtc2027IbsTransitionReferencePreview:
+    """Narrow unrounded standard IBS comparison from LC 214/2025 art. 344.
+
+    For 2027/28 the general IBS rate is 0.05% state plus 0.05% municipal.
+    Explicit review flags do NOT independently prove incidence, tax-base
+    validity, lawful eligibility or official DF-e schema application.
+    Reduced/special regimes, fuel, credits, CBS, IS and tax collection are
+    intentionally excluded. This never creates payable/XML figures.
+    """
+    if not isinstance(context, TaxRuleContext) or not isinstance(engine, TaxRuleEngine):
+        raise FiscalValidationError("canonical RTC tax context and engine required")
+    if context.instant.year not in (2027, 2028):
+        raise RegulatoryBaselineError("IBS transition reference applies only to 2027-2028")
+    if context.tax_regime is not TaxRegimeCode.NORMAL:
+        raise RegulatoryBaselineError("IBS transition reference excludes Simples Nacional")
+    if (
+        confirmed_standard_nonfuel_operation is not True
+        or confirmed_no_differentiated_or_special_regime is not True
+        or confirmed_tax_base_reviewed is not True
+    ):
+        raise RegulatoryBaselineError("IBS transition reference requires reviewed standard scope")
+    if (
+        not isinstance(tax_base, Money)
+        or not tax_base.amount.is_finite()
+        or tax_base.amount < 0
+    ):
+        raise FiscalValidationError("IBS transition reference requires nonnegative finite Money")
+    decision, classification = resolve_strict_rtc_2027_2028_incidence_candidate(
+        engine=engine, context=context, rules=rules, catalog=catalog,
+    )
+    rate = Decimal("0.05")
+    return Rtc2027IbsTransitionReferencePreview(
+        decision=decision,
+        classification=classification,
+        tax_base=tax_base,
+        state_rate_percent=rate,
+        municipal_rate_percent=rate,
+        state_unrounded=tax_base.amount * rate / Decimal("100"),
+        municipal_unrounded=tax_base.amount * rate / Decimal("100"),
+        source_normative="LC 214/2025 (atualizada pela LC 227/2026), art. 344",
     )
 
 

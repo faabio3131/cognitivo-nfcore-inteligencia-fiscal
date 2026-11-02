@@ -234,27 +234,26 @@ def resolve_rule_with_verified_rtc_catalog(
     return decision, snapshot
 
 
-def resolve_strict_rtc_2026_incidence_candidate(
+def _resolve_strict_rtc_standard_incidence(
     *,
     engine: TaxRuleEngine,
     context: TaxRuleContext,
     rules: Iterable[TaxRule],
     catalog: VerifiedRtcClassificationCatalog,
+    allowed_years: tuple[int, ...],
+    period_label: str,
 ) -> tuple[TaxDecision, ReformTaxClassificationSnapshot]:
-    """Require a contextual, effective and versioned rule for RTC-04 analysis.
-
-    A catalog only validates a CST/cClassTrib pair; it does not prove that the
-    pair has correct legal incidence. This internal candidate is non-issuable.
-    In particular a wildcard tax rule cannot justify a 2026 IBS/CBS preview.
-    """
+    """Common canonical strict selector gate for non-issuable RTC previews."""
     if not isinstance(context, TaxRuleContext) or not isinstance(engine, TaxRuleEngine):
         raise RegulatoryBaselineError("canonical tax context and engine required")
-    if context.instant.year != 2026:
-        raise RegulatoryBaselineError("incidence candidate supports only 2026")
+    if context.instant.year not in allowed_years:
+        raise RegulatoryBaselineError(
+            f"incidence candidate supports only {period_label}"
+        )
     if context.tax_regime is not TaxRegimeCode.NORMAL:
-        raise RegulatoryBaselineError("2026 incidence candidate excludes Simples Nacional")
-    # Freeze the iterable so the canonical engine and the later audit see the
-    # exact same rule set, including one-shot iterators.
+        raise RegulatoryBaselineError(
+            f"{period_label} incidence candidate excludes Simples Nacional"
+        )
     candidates = tuple(rules)
     decision, snapshot = resolve_rule_with_verified_rtc_catalog(
         engine=engine, context=context, rules=candidates, catalog=catalog,
@@ -277,6 +276,32 @@ def resolve_strict_rtc_2026_incidence_candidate(
         raise RegulatoryBaselineError(
             "RTC incidence candidate requires explicit contextual selectors"
         )
-    # The selector is already evaluated by TaxRuleEngine; never independently
-    # override its winning rule or its classifications with caller data.
     return decision, snapshot
+
+
+def resolve_strict_rtc_2026_incidence_candidate(
+    *,
+    engine: TaxRuleEngine,
+    context: TaxRuleContext,
+    rules: Iterable[TaxRule],
+    catalog: VerifiedRtcClassificationCatalog,
+) -> tuple[TaxDecision, ReformTaxClassificationSnapshot]:
+    """2026 strict contextual classification; never payment or XML authority."""
+    return _resolve_strict_rtc_standard_incidence(
+        engine=engine, context=context, rules=rules, catalog=catalog,
+        allowed_years=(2026,), period_label="2026",
+    )
+
+
+def resolve_strict_rtc_2027_2028_incidence_candidate(
+    *,
+    engine: TaxRuleEngine,
+    context: TaxRuleContext,
+    rules: Iterable[TaxRule],
+    catalog: VerifiedRtcClassificationCatalog,
+) -> tuple[TaxDecision, ReformTaxClassificationSnapshot]:
+    """2027/28 strict contextual classification; never payment or XML authority."""
+    return _resolve_strict_rtc_standard_incidence(
+        engine=engine, context=context, rules=rules, catalog=catalog,
+        allowed_years=(2027, 2028), period_label="2027-2028",
+    )
