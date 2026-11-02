@@ -332,7 +332,7 @@ def test_rtc_classification_rejects_table_before_explicit_effective_date() -> No
 def test_rtc_classification_rejects_temporal_metadata_tampering() -> None:
     catalog = _synthetic_rtc_catalog()
     forged = replace(catalog, published_on=date(2026, 8, 1))
-    with pytest.raises(RegulatoryBaselineError, match="pinned artifact verification"):
+    with pytest.raises(RegulatoryBaselineError, match="verified RTC classification catalog required"):
         resolve_rule_with_verified_rtc_catalog(
             engine=TaxRuleEngine(), context=_context(), rules=[_rtc_rule()],
             catalog=forged,
