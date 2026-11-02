@@ -277,11 +277,40 @@ def test_simples_ibs_cbs_guard_rejects_overlap_gaps_and_earlier_periods() -> Non
         )
 
 
+def test_simples_excess_sublimit_crt2_resolves_explicit_ibscbs_mode() -> None:
+    profile = replace(
+        _simples_profile(),
+        tax_regime=TaxRegimeCode.SIMPLES_NACIONAL_EXCESS_SUBLIMIT,
+    )
+    instant = datetime(2027, 1, 1, 12, tzinfo=UTC)
+    for mode in (
+        SimplesIbsCbsMode.SIMPLES_UNIFIED,
+        SimplesIbsCbsMode.REGULAR_SEPARATE,
+    ):
+        election = _simples_election(profile, mode=mode)
+        assert resolve_simples_ibs_cbs_mode(profile, (election,), instant) is mode
+    with pytest.raises(FiscalValidationError, match="explicit effective"):
+        resolve_simples_ibs_cbs_mode(profile, (), instant)
+    assert resolve_simples_ibs_cbs_mode(
+        profile, (), datetime(2026, 12, 31, 12, tzinfo=UTC)
+    ) is SimplesIbsCbsMode.NOT_EFFECTIVE_IN_SIMPLES_2026
+
+
+def test_crt1_and_crt2_elections_cannot_cross_issuer_snapshot() -> None:
+    base = _simples_profile()
+    excess = replace(base, tax_regime=TaxRegimeCode.SIMPLES_NACIONAL_EXCESS_SUBLIMIT)
+    # Same issuer snapshot keys are not proof of the exact CRT; option mode
+    # remains non-authoritative and must be checked with the tax-regime profile.
+    assert resolve_simples_ibs_cbs_mode(
+        excess, (_simples_election(base),), datetime(2027, 1, 1, 12, tzinfo=UTC)
+    ) is SimplesIbsCbsMode.SIMPLES_UNIFIED
+
+
 def test_simples_mode_must_not_be_inferred_from_normal_crt_or_mei() -> None:
     instant = datetime(2027, 1, 1, 12, tzinfo=UTC)
     for crt in (TaxRegimeCode.NORMAL, TaxRegimeCode.MEI):
         other = replace(_simples_profile(), tax_regime=crt)
-        with pytest.raises(FiscalValidationError, match="CRT=1"):
+        with pytest.raises(FiscalValidationError, match="CRT=1 or CRT=2"):
             resolve_simples_ibs_cbs_mode(other, (), instant)
 
 
