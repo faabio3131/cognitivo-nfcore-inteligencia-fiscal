@@ -47,6 +47,14 @@ Cada WP: auditar CURRENT e fonte oficial → mapear autoridade/camadas → conge
 
 **Aceite do delta:** CI/Gov desta PR + pós-merge; ausência de cálculo baseado em wildcard; nenhuma mudança produtiva. **Ainda pendente:** obtenção/revisão de PDFs/XSD e tabela cClassTrib 1.71 com hashes e matriz de vigência/validações, golden cases por célula do Simples, regras especiais, reduções, créditos, IS e demais etapas RTC-04/05. Nunca interpretar metadado de publicação como vigência operacional da SEFAZ.
 
+### RTC-04 B5 — CRT=2 na escolha IBS/CBS com anti-replay (candidato 02/11/2026)
+
+**Lacuna de implementação:** o resolvedor de modo IBS/CBS criado em B3/B4 (PR #316) admitia apenas `TaxRegimeCode.SIMPLES_NACIONAL` (CRT=1), embora o perfil fiscal possua também `SIMPLES_NACIONAL_EXCESS_SUBLIMIT` (CRT=2). No mesmo contrato canônico `SimplesIbsCbsElection`, esta entrega permite resolver CRT=1 ou CRT=2 de forma explícita, com `crt` registrado na declaração e comparação obrigatória com o `FiscalProfile` para impedir replay entre estabelecimentos/perfis mesmo se ID e versão forem falsamente reutilizados.
+
+**Limite:** CRT=2 continua com tratamento próprio de ICMS/ISS; o resolvedor de opção não calcula IBS/CBS, não transmite a opção ao CGSN e não aceita CRT=3/MEI. A partir de 2027 exige evidência vigente, com isolamento tenant/unidade/host e proibição de sobreposição de períodos; 2026 permanece sem cálculo RTC pelo Simples. Referência de publicação para revisão posterior: NT 2026.005 v1.00 Simples Nacional, SVRS 30/10/2026, https://dfe-portal.svrs.rs.gov.br/NFe/Documentos; **não há XML, regra de preenchimento, schema ou tributo habilitado sem artefatos oficiais verificados**.
+
+**Aceite desta PR:** novos casos de CRT=2 com opções explícitas e testes negativos para cruzamento CRT=1↔2, ausência de declaração, vigência e separação CRT=3/4, mais gates CI/Gov. RTC-04 global mantém `IMPLEMENTED_PARTIAL`.
+
 ## Microentregas implementáveis com autonomia controlada
 
 ### Bloco A — foundations, sem alterar operação produtiva
