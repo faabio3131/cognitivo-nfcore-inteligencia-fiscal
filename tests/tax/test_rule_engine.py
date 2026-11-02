@@ -628,10 +628,13 @@ def test_ibs_transition_2027_2028_is_unrounded_and_not_authoritative(year: int) 
 
 @pytest.mark.parametrize("year", (2026, 2029))
 def test_ibs_transition_rejects_other_fiscal_years(year: int) -> None:
+    # Use an effective product profile: the fiscal-year gate, not the
+    # canonical product-validity gate, is what this regression exercises.
+    fiscal_instant = datetime(year, 10 if year == 2026 else 3, 1, 12, tzinfo=UTC)
     with pytest.raises(RegulatoryBaselineError, match="only to 2027-2028"):
         _ibs_2027_transition_reference(
             context=_context(
-                instant=datetime(year, 3, 1, 12, tzinfo=UTC),
+                instant=fiscal_instant,
                 tax_regime=TaxRegimeCode.NORMAL,
             )
         )
