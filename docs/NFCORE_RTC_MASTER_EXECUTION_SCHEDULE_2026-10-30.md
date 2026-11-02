@@ -55,6 +55,14 @@ Cada WP: auditar CURRENT e fonte oficial → mapear autoridade/camadas → conge
 
 **Aceite desta PR:** novos casos de CRT=2 com opções explícitas e testes negativos para cruzamento CRT=1↔2, ausência de declaração, vigência e separação CRT=3/4, mais gates CI/Gov. RTC-04 global mantém `IMPLEMENTED_PARTIAL`.
 
+### RTC-04 B6 — recibo de opção regular IBS/CBS do Simples em 2027/H1 (02/11/2026)
+
+**Construção funcional:** em `tax/regimes.py`, `SimplesRegularOptionReceipt2027H1` representa a evidência de opção CGSN confirmada, com protocolo, datas, escopo canônico, perfil fiscal versionado e CRT. `resolve_simples_ibs_cbs_mode` exige esse recibo **somente quando o modo for `REGULAR_SEPARATE` no 1º semestre de 2027**; mantém o Simples unificado sem inferir que houve opção regular. Recusa protocolização fora da janela, opções canceladas, confirmação futura, perfil/CRT/tenant divergentes e extrapolação do período 2027/H1 para H2. É a mesma autoridade do B5, sem API, motor ou persistência paralelos.
+
+**Fonte primária:** Receita Federal, comunicado de 29/09/2026 sobre Resolução CGSN 194, <https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/setembro/simples-nacional-2027-entenda-os-novos-prazos-e-faca-sua-escolha-com-consciencia-e-tranquilidade/>. Jan–Jun/2027: formalização do regime regular IBS/CBS de 01/09 a 30/10/2026; cancelamento de 03/11 a 20/12/2026. **Os prazos de opção pelo Simples Nacional em si são diferentes** e não são reutilizados como janela IBS/CBS. A partir de julho/2027, exige nova prova normativa em vez de usar automaticamente o recibo de H1.
+
+**Limites:** o objeto de protocolo não comprova autenticidade por si só; apenas camada confiável ou aprovação humana pode fornecer evidência verificada. Não registra opção/cancelamento na Receita, não calcula IBS/CBS/IS, não autoriza XML/transmissão e não prova conformidade ao XSD. Aceite interno: CI, governança, testes de períodos e isolamento, merge e gates pós-merge. RTC-04 total continua `IMPLEMENTED_PARTIAL`, RTC-05 não iniciado nesta entrega.
+
 ## Microentregas implementáveis com autonomia controlada
 
 ### Bloco A — foundations, sem alterar operação produtiva
