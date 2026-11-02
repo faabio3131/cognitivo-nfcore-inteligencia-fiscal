@@ -232,7 +232,7 @@ def calculate_2026_nominal_reference_preview(
         or tax_base.amount < 0
     ):
         raise FiscalValidationError("2026 nominal reference requires nonnegative finite Money")
-    decision, classification = resolve_rule_with_verified_rtc_catalog(
+    decision, classification = resolve_strict_rtc_2026_incidence_candidate(
         engine=engine, context=context, rules=rules, catalog=catalog,
     )
     return Rtc2026NominalReferencePreview(
