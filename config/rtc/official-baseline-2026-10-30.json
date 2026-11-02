@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "baseline_id": "nfcore-rtc-regulatory-baseline-2026-10-30",
-  "version": 2,
-  "captured_at": "2026-10-30T22:29:11Z",
+  "version": 3,
+  "captured_at": "2026-11-02T03:05:00Z",
   "status": "REFERENCE_ONLY_NOT_PRODUCTION_APPROVED",
   "source_policy": "official_published_sources_only",
   "artifacts": [
     {
       "artifact_id": "NT-2025.002",
       "kind": "technical_note",
-      "version": "1.52",
-      "published_on": "2026-10-01",
-      "source_reference": "https://www.nfe.fazenda.gov.br/portal/listaConteudo.aspx?tipoConteudo=04BIflQt1aY%3D"
+      "version": "1.53",
+      "published_on": "2026-10-30",
+      "source_reference": "https://dfe-portal.svrs.rs.gov.br/NFe/Documentos"
     },
     {
       "artifact_id": "LC-214-2025",
