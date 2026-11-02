@@ -225,10 +225,76 @@ class SimplesIbsCbsElection:
         object.__setattr__(self, "source_reference", self.source_reference.strip())
 
 
+@dataclass(frozen=True, slots=True)
+class SimplesRegularOptionReceipt2027H1:
+    """External CGSN option evidence for regular IBS/CBS in Jan-Jun 2027.
+
+    The receipt fields are supplied by a trusted integration/approver, not by
+    a browser or a tenant assertion. This class does not prove cryptographic
+    authenticity or register/cancel the option at the competent authority.
+    """
+
+    scope: ExecutionScope
+    profile_id: str
+    profile_version: int
+    crt: TaxRegimeCode
+    submitted_at: datetime
+    confirmed_at: datetime
+    protocol_reference: str
+    cancelled_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.scope, ExecutionScope):
+            raise FiscalValidationError("regular option receipt requires canonical scope")
+        if not isinstance(self.profile_id, str) or not self.profile_id.strip():
+            raise FiscalValidationError("regular option receipt requires profile_id")
+        if (
+            type(self.profile_version) is not int or self.profile_version < 1
+        ):
+            raise FiscalValidationError("regular option receipt requires profile_version")
+        if self.crt not in (
+            TaxRegimeCode.SIMPLES_NACIONAL,
+            TaxRegimeCode.SIMPLES_NACIONAL_EXCESS_SUBLIMIT,
+        ) or not isinstance(self.crt, TaxRegimeCode):
+            raise FiscalValidationError("regular option receipt requires CRT 1 or 2")
+        for name in ("submitted_at", "confirmed_at"):
+            value = getattr(self, name)
+            if not isinstance(value, datetime) or (
+                value.tzinfo is None or value.utcoffset() is None
+            ):
+                raise FiscalValidationError(f"regular option {name} must be timezone-aware")
+        if self.confirmed_at < self.submitted_at:
+            raise FiscalValidationError("regular option confirmation precedes submission")
+        if (
+            not isinstance(self.protocol_reference, str)
+            or not self.protocol_reference.strip()
+            or len(self.protocol_reference.strip()) > 1000
+        ):
+            raise FiscalValidationError("regular option requires external protocol reference")
+        local = ZoneInfo("America/Sao_Paulo")
+        submitted_day = self.submitted_at.astimezone(local).date()
+        if not date(2026, 9, 1) <= submitted_day <= date(2026, 10, 30):
+            raise FiscalValidationError("regular IBS/CBS 2027 H1 option outside filing window")
+        if self.cancelled_at is not None:
+            if not isinstance(self.cancelled_at, datetime) or (
+                self.cancelled_at.tzinfo is None or self.cancelled_at.utcoffset() is None
+            ):
+                raise FiscalValidationError("regular option cancelled_at must be timezone-aware")
+            cancelled_day = self.cancelled_at.astimezone(local).date()
+            if not date(2026, 11, 3) <= cancelled_day <= date(2026, 12, 20):
+                raise FiscalValidationError("regular IBS/CBS 2027 H1 cancellation outside window")
+            if self.cancelled_at < self.submitted_at:
+                raise FiscalValidationError("regular option cancellation precedes submission")
+        object.__setattr__(self, "profile_id", self.profile_id.strip())
+        object.__setattr__(self, "protocol_reference", self.protocol_reference.strip())
+
+
 def resolve_simples_ibs_cbs_mode(
     profile: FiscalProfile,
     elections: Iterable[SimplesIbsCbsElection],
     instant: datetime,
+    *,
+    regular_option_receipt_2027_h1: SimplesRegularOptionReceipt2027H1 | None = None,
 ) -> SimplesIbsCbsMode:
     """Resolve fiscal-period applicability without calculating IBS/CBS amounts.
 
@@ -289,4 +355,23 @@ def resolve_simples_ibs_cbs_mode(
         raise FiscalValidationError(
             "explicit effective Simples IBS/CBS election is required from 2027"
         )
-    return matching[0].mode
+    mode = matching[0].mode
+    if mode is SimplesIbsCbsMode.REGULAR_SEPARATE:
+        # RFB/CGSN 194/2026: the documented option window covers Jan-Jun
+        # 2027 only. Do not extrapolate its authority into July or beyond.
+        if not date(2027, 1, 1) <= local_date <= date(2027, 6, 30):
+            raise FiscalValidationError("regular IBS/CBS option period not verified")
+        receipt = regular_option_receipt_2027_h1
+        if not isinstance(receipt, SimplesRegularOptionReceipt2027H1):
+            raise FiscalValidationError("regular IBS/CBS 2027 H1 needs external receipt")
+        if receipt.scope.identity_partition_key != profile.scope.identity_partition_key:
+            raise FiscalValidationError("regular option receipt scope mismatch")
+        if (receipt.profile_id, receipt.profile_version) != profile.snapshot_key:
+            raise FiscalValidationError("regular option receipt profile mismatch")
+        if receipt.crt is not profile.tax_regime:
+            raise FiscalValidationError("regular option receipt CRT mismatch")
+        if receipt.cancelled_at is not None:
+            raise FiscalValidationError("regular option receipt was cancelled")
+        if receipt.confirmed_at > instant:
+            raise FiscalValidationError("regular option confirmation is in the future")
+    return mode
