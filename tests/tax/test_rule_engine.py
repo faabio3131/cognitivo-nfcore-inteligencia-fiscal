@@ -262,7 +262,10 @@ def test_rule_and_outcome_validate_required_shapes() -> None:
         TaxRuleSelector(municipality_ibge_code="3550308")
 
 
-def _synthetic_rtc_catalog() -> VerifiedRtcClassificationCatalog:
+def _synthetic_rtc_catalog(
+    *, published_on: date = date(2026, 9, 1),
+    effective_from: date | None = None,
+) -> VerifiedRtcClassificationCatalog:
     # Synthetic fixtures still pass through the pinned bytes/digest validator.
     payload = json.dumps(
         {
@@ -276,13 +279,14 @@ def _synthetic_rtc_catalog() -> VerifiedRtcClassificationCatalog:
     baseline = RegulatoryBaseline(
         baseline_id="synthetic-rtc-tax-rule",
         version=1,
-        captured_at=datetime(2026, 9, 10, tzinfo=UTC),
+        captured_at=datetime(2026, 10, 30, tzinfo=UTC),
         artifacts=(
             RegulatoryArtifactPin(
                 artifact_id="IBSCBS-CCLASSTRIB",
                 kind=RegulatoryArtifactKind.CLASSIFICATION_TABLE,
                 version="SYNTHETIC-v1",
-                published_on=date(2026, 9, 1),
+                published_on=published_on,
+                effective_from=effective_from,
                 source_reference="synthetic-test-only",
                 checksum_sha256=sha256(payload).hexdigest(),
             ),
@@ -303,6 +307,36 @@ def _rtc_rule(
             ibs_cbs_classification_table_version=version,
         ),
     )
+
+
+def test_rtc_classification_rejects_table_published_after_fiscal_fact() -> None:
+    with pytest.raises(RegulatoryBaselineError, match="not published"):
+        resolve_rule_with_verified_rtc_catalog(
+            engine=TaxRuleEngine(),
+            context=_context(),
+            rules=[_rtc_rule()],
+            catalog=_synthetic_rtc_catalog(published_on=date(2026, 9, 11)),
+        )
+
+
+def test_rtc_classification_rejects_table_before_explicit_effective_date() -> None:
+    with pytest.raises(RegulatoryBaselineError, match="not effective"):
+        resolve_rule_with_verified_rtc_catalog(
+            engine=TaxRuleEngine(),
+            context=_context(),
+            rules=[_rtc_rule()],
+            catalog=_synthetic_rtc_catalog(effective_from=date(2026, 9, 11)),
+        )
+
+
+def test_rtc_classification_rejects_temporal_metadata_tampering() -> None:
+    catalog = _synthetic_rtc_catalog()
+    forged = replace(catalog, published_on=date(2026, 8, 1))
+    with pytest.raises(RegulatoryBaselineError, match="pinned artifact verification"):
+        resolve_rule_with_verified_rtc_catalog(
+            engine=TaxRuleEngine(), context=_context(), rules=[_rtc_rule()],
+            catalog=forged,
+        )
 
 
 def test_rtc_rule_reuses_canonical_engine_and_verifies_exact_catalog_pair() -> None:
