@@ -36,9 +36,10 @@ class VerifiedRtcClassificationCatalog:
     effective_from: date | None = None
     artifact_id: str | None = None
     checksum_sha256: str | None = None
+    source_reference: str | None = None
     _verification_witness: (
         tuple[object, str, frozenset[tuple[str, str]], date | None, date | None,
-              str | None, str | None] | None
+              str | None, str | None, str | None] | None
     ) = field(default=None, repr=False, compare=False)
 
     def _is_verified(self) -> bool:
@@ -47,7 +48,7 @@ class VerifiedRtcClassificationCatalog:
         return self._verification_witness == (
             _VERIFIED_CATALOG_WITNESS, self.artifact_version, self.allowed_pairs,
             self.published_on, self.effective_from,
-            self.artifact_id, self.checksum_sha256,
+            self.artifact_id, self.checksum_sha256, self.source_reference,
         )
 
     def require_same_baseline(self, baseline: RegulatoryBaseline) -> None:
@@ -70,6 +71,7 @@ class VerifiedRtcClassificationCatalog:
             or artifact.published_on != self.published_on
             or artifact.effective_from != self.effective_from
             or artifact.checksum_sha256 != self.checksum_sha256
+            or artifact.source_reference != self.source_reference
         ):
             raise RegulatoryBaselineError("RTC classification catalog baseline pin mismatch")
 
@@ -183,10 +185,12 @@ def load_verified_rtc_classification_catalog(
         effective_from=artifact.effective_from,
         artifact_id=artifact.artifact_id,
         checksum_sha256=artifact.checksum_sha256,
+        source_reference=artifact.source_reference,
         _verification_witness=(
             _VERIFIED_CATALOG_WITNESS, artifact.version, reviewed_pairs,
             artifact.published_on, artifact.effective_from,
             artifact.artifact_id, artifact.checksum_sha256,
+            artifact.source_reference,
         ),
     )
 
