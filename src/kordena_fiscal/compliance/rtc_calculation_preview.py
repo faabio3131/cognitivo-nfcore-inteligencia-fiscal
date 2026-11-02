@@ -117,6 +117,10 @@ def calculate_evidenced_rtc_preview(
         raise FiscalValidationError("non-negative Money tax_base required")
     if not isinstance(catalog, VerifiedRtcClassificationCatalog):
         raise RegulatoryBaselineError("verified RTC classification catalog required")
+    # A rate pin alone does not authorize a different, future or unrelated
+    # CST/cClassTrib catalog. Both must be backed by the same reviewed baseline.
+    catalog.require_same_baseline(baseline)
+    catalog.require_published_at(instant)
     catalog.require_classification(classification)
     # This intentionally does not implement reductions, credits, deferrals,
     # tax-exclusive bases, selective-tax incidences or transitions.
