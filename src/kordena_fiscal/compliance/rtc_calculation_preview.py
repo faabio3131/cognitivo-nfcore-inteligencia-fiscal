@@ -77,6 +77,8 @@ def calculate_evidenced_rtc_preview(
     artifact = baseline.artifact(rate_artifact_id)
     if artifact.kind is not RegulatoryArtifactKind.RATE_TABLE:
         raise RegulatoryBaselineError("rate artifact must be a rate_table")
+    if artifact.published_on > baseline.captured_at.date():
+        raise RegulatoryBaselineError("RTC rate artifact published after baseline capture")
     # A checksum pin is not proof of temporal applicability. Do not calculate a
     # historical period from a source that was unpublished or not yet effective.
     if not isinstance(instant, datetime) or instant.tzinfo is None or instant.utcoffset() is None:
@@ -453,6 +455,8 @@ def calculate_pinned_rtc_field_rounding_candidate(
     artifact = baseline.artifact(artifact_id)
     if artifact.kind is not RegulatoryArtifactKind.TECHNICAL_NOTE:
         raise RegulatoryBaselineError("RTC rounding requires a pinned technical note")
+    if artifact.published_on > baseline.captured_at.date():
+        raise RegulatoryBaselineError("RTC rounding artifact published after baseline capture")
     if not isinstance(instant, datetime) or instant.tzinfo is None or instant.utcoffset() is None:
         raise RegulatoryBaselineError("RTC rounding instant must be timezone-aware")
     if artifact.effective_from is None or instant.date() < max(
