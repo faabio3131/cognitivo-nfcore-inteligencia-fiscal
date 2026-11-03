@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "baseline_id": "nfcore-rtc-regulatory-baseline-2026-10-30",
-  "version": 4,
-  "captured_at": "2026-11-02T03:05:00Z",
+  "version": 5,
+  "captured_at": "2026-11-03T21:22:18Z",
   "status": "REFERENCE_ONLY_NOT_PRODUCTION_APPROVED",
   "source_policy": "official_published_sources_only",
   "artifacts": [
@@ -46,7 +46,8 @@
       "kind": "technical_report",
       "version": "1.71",
       "published_on": "2026-10-30",
-      "source_reference": "https://dfe-portal.svrs.rs.gov.br/NFe/Documentos"
+      "source_reference": "https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=WYEtloOC2CQ=",
+      "checksum_sha256": "96fb4d462e5973096534e7c3cfef77b2ca1054bff5a4237a2c2a74726e162da1"
     },
     {
       "artifact_id": "IBSCBS-CCLASSTRIB",
@@ -61,6 +62,20 @@
       "version": "IT-2025.002-v1.70",
       "published_on": "2026-10-01",
       "source_reference": "https://www.nfe.fazenda.gov.br/portal/listaConteudo.aspx?tipoConteudo=%2FNJarYc9nus%3D"
+    },
+    {
+      "artifact_id": "NT-2026.008",
+      "kind": "technical_note",
+      "version": "1.01",
+      "published_on": "2026-10-30",
+      "source_reference": "https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=qAoMot6VyiY="
+    },
+    {
+      "artifact_id": "IT-2023.002",
+      "kind": "technical_report",
+      "version": "2.10",
+      "published_on": "2026-09-04",
+      "source_reference": "https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=GyPA/cEjrMk="
     }
   ],
   "excluded_until_verified": [
@@ -69,6 +84,8 @@
     "NFSe national technical schemas/versions",
     "provider homologation",
     "production rates and fiscal formulas",
-    "NT 2026.005 SN official PDF/XSD bytes, version hashes and effective validation matrix"
+    "NT 2026.005 SN official PDF/XSD bytes, version hashes and effective validation matrix",
+    "CFOP indExcIBSCBS 84 authorized codes: official complete tabular source, bytes, checksum and effective dates",
+    "NT 2026.008 v1.01 vItem VB01-10/VB01-20 official golden cases, future activation and import exceptions"
   ]
 }
