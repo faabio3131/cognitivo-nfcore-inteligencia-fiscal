@@ -129,3 +129,8 @@ def test_rounding_artifact_published_after_baseline_capture_fails_closed() -> No
             policy_payload=payload,
             instant=datetime(2026, 9, 3, tzinfo=UTC),
         )
+
+
+def test_rounding_rejects_finite_but_unrepresentable_decimal() -> None:
+    with pytest.raises(FiscalValidationError, match="cannot be represented"):
+        _round(amount=Decimal("1e999"))
