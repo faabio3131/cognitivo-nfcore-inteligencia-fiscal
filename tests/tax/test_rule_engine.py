@@ -587,6 +587,11 @@ def test_rtc_2026_reference_denies_negative_tax_base() -> None:
         _rtc_2026_reference(tax_base=Money(Decimal("-1.00")))
 
 
+def test_rtc_2026_reference_rejects_unrepresentable_finite_base() -> None:
+    with pytest.raises(FiscalValidationError, match="arithmetic is not representable"):
+        _rtc_2026_reference(tax_base=Money(Decimal("1e999999999")))
+
+
 
 # RTC-04 B9: LC 214/2025 Art. 344 — 2027/28 standard IBS only.
 # Synthetic CST/rules do not certify a payable or XML tax amount.
@@ -670,6 +675,11 @@ def test_ibs_transition_rejects_wildcard_and_ambiguous_rule() -> None:
         _ibs_2027_transition_reference(
             rules=[rule, replace(rule, rule_id="rtc-transition-tie")]
         )
+
+
+def test_ibs_transition_rejects_unrepresentable_finite_base() -> None:
+    with pytest.raises(FiscalValidationError, match="arithmetic is not representable"):
+        _ibs_2027_transition_reference(tax_base=Money(Decimal("1e999999999")))
 
 
 def test_ibs_transition_rejects_unverified_catalog_and_negative_base() -> None:
