@@ -127,9 +127,14 @@ def calculate_evidenced_rtc_preview(
     catalog.require_classification(classification)
     # This intentionally does not implement reductions, credits, deferrals,
     # tax-exclusive bases, selective-tax incidences or transitions.
-    amount = (tax_base.amount * rate / Decimal("100")).quantize(
-        quantum, rounding=_ALLOWED_ROUNDING[rounding_name]
-    )
+    try:
+        amount = (tax_base.amount * rate / Decimal("100")).quantize(
+            quantum, rounding=_ALLOWED_ROUNDING[rounding_name]
+        )
+    except InvalidOperation as exc:
+        raise FiscalValidationError(
+            "RTC preview amount cannot be represented at selected quantum"
+        ) from exc
     return ReformTaxComponentSnapshot(
         component=component,
         tax_base=tax_base,
@@ -489,7 +494,12 @@ def calculate_pinned_rtc_field_rounding_candidate(
     mode = raw["rounding_mode"]
     if not isinstance(mode, str) or mode not in _ALLOWED_ROUNDING:
         raise RegulatoryBaselineError("unsupported RTC rounding mode")
-    candidate = amount.quantize(Decimal(quantum_text), rounding=_ALLOWED_ROUNDING[mode])
+    try:
+        candidate = amount.quantize(Decimal(quantum_text), rounding=_ALLOWED_ROUNDING[mode])
+    except InvalidOperation as exc:
+        raise FiscalValidationError(
+            "RTC rounding candidate cannot be represented at selected quantum"
+        ) from exc
     return RtcRoundedFieldCandidate(
         field_name=field_name,
         unrounded=amount,
