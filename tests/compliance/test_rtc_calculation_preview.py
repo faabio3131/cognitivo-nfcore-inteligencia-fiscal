@@ -300,3 +300,9 @@ def test_rate_artifact_published_after_baseline_capture_fails_closed() -> None:
     historical = replace(baseline, artifacts=(late_rate, baseline.artifacts[1]))
     with pytest.raises(RegulatoryBaselineError, match="published after baseline capture"):
         _preview(historical, payload, catalog, classification)
+
+
+def test_preview_rejects_finite_but_unrepresentable_tax_base() -> None:
+    baseline, payload, catalog, classification = _setup()
+    with pytest.raises(FiscalValidationError, match="cannot be represented"):
+        _preview(baseline, payload, catalog, classification, amount="1e999")
