@@ -104,11 +104,11 @@ def normalize_rtc_collection(source: Path, destination: Path) -> dict[str, objec
                 raise RtcCollectionImportError("Supplier filename missing")
             name = ROOT + folder + "/" + filename
             _safe_member(name)
-            info = by_name.get(name)
-            if info is None or name in examined:
+            document_info = by_name.get(name)
+            if document_info is None or name in examined:
                 raise RtcCollectionImportError("Missing or duplicated document")
             examined.add(name)
-            payload = archive.read(info)
+            payload = archive.read(document_info)
             digest = hashlib.sha256(payload).hexdigest()
             if digest != entry.get("sha256") or len(payload) != entry.get("tamanho"):
                 raise RtcCollectionImportError("Document SHA-256 or size mismatch")
