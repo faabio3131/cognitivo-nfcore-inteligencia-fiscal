@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.rtc_import_external_collection import (
+from kordena_fiscal.compliance.rtc_external_collection import (
     ROOT,
     RtcCollectionImportError,
     normalize_rtc_collection,
