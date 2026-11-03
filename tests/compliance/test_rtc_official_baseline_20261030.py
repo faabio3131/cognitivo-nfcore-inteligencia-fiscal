@@ -45,10 +45,13 @@ def _baseline() -> RegulatoryBaseline:
 
 def test_rtc_official_reference_manifest_uses_existing_compliance_authority() -> None:
     baseline = _baseline()
-    assert baseline.artifact("NT-2025.002").version == "1.52"
-    assert baseline.version == 2
-    assert baseline.artifact("IT-2025.002").version == "1.70"
-    assert baseline.artifact("IBSCBS-CCLASSTRIB").version == "IT-2025.002-v1.70"
+    assert baseline.artifact("NT-2025.002").version == "1.53"
+    assert baseline.version == 4
+    assert baseline.artifact("NT-2025.002").published_on == date(2026, 10, 30)
+    assert baseline.artifact("NT-2026.005").version == "1.00"
+    assert baseline.artifact("NT-2026.005").published_on == date(2026, 10, 30)
+    assert baseline.artifact("IT-2025.002").version == "1.71"
+    assert baseline.artifact("IBSCBS-CCLASSTRIB").version == "IT-2025.002-v1.71"
     assert baseline.artifact("IBSCBS-CCREDPRES").version == "IT-2025.002-v1.70"
     assert baseline.artifact("LC-214-2025").version == "214/2025"
     assert baseline.artifact("LC-227-2026").version == "227/2026"
@@ -59,3 +62,20 @@ def test_rtc_reference_baseline_never_implicitly_approves_fiscal_production() ->
     assert manifest["status"] != "PRODUCTION_APPROVED"
     assert "provider homologation" in manifest["excluded_until_verified"]
     assert "production rates and fiscal formulas" in manifest["excluded_until_verified"]
+
+
+def test_new_simplified_rtc_note_is_reference_only_not_calculation_authority() -> None:
+    manifest = loads(_MANIFEST.read_text(encoding="utf-8"))
+    assert manifest["status"] == "REFERENCE_ONLY_NOT_PRODUCTION_APPROVED"
+    note = next(
+        item for item in manifest["artifacts"] if item["artifact_id"] == "NT-2026.005"
+    )
+    table = next(
+        item for item in manifest["artifacts"] if item["artifact_id"] == "IBSCBS-CCLASSTRIB"
+    )
+    assert note["version"] == "1.00"
+    assert table["version"] == "IT-2025.002-v1.71"
+    assert "checksum_sha256" not in note
+    assert "checksum_sha256" not in table
+    assert all(item["kind"] != "rate_table" for item in manifest["artifacts"])
+    assert any("NT 2026.005 SN official PDF/XSD" in v for v in manifest["excluded_until_verified"])
