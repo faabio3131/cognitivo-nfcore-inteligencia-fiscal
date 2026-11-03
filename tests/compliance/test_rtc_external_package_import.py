@@ -28,7 +28,7 @@ def _create_collection(
         "pasta": FOLDER,
         "arquivo": filename,
         "sha256": sha or hashlib.sha256(BYTES).hexdigest(),
-        "tamanho": len(BYTES),
+        "tamanho": len(content),
     }
     manifest = {"arquivos": [entry, dict(entry)] if duplicate else [entry], "nao_obtidos": []}
     mangled_name = (ROOT + FOLDER + "/" + filename).encode("utf-8").decode("cp437")
