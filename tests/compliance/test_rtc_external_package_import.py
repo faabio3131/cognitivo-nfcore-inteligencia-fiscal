@@ -66,7 +66,7 @@ def test_import_rejects_mislabeled_html_login(tmp_path: Path) -> None:
     source = tmp_path / "source.zip"
     data = b"<html><title>Login required</title></html>"
     _create_collection(source, content=data, sha=hashlib.sha256(data).hexdigest())
-    with pytest.raises(RtcCollectionImportError, match="SHA-256 or size mismatch"):
+    with pytest.raises(RtcCollectionImportError, match="Document signature mismatch"):
         normalize_rtc_collection(source, tmp_path / "output.zip")
 
 
