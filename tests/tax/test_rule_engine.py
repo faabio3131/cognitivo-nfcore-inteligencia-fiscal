@@ -951,3 +951,22 @@ def test_rtc_2026_strict_incidence_denies_simples_even_if_rule_matches() -> None
     )
     with pytest.raises(RegulatoryBaselineError, match="excludes Simples Nacional"):
         _strict_incidence(context=_context(), rules=[simples_rule])
+
+
+def test_art12_rejects_overflow_in_sum_of_exclusions() -> None:
+    extreme = Money(Decimal("1e999999999"))
+    with pytest.raises(FiscalValidationError, match="base arithmetic is not representable"):
+        _art12_preview(
+            gross_operation_value=extreme,
+            unconditional_discount=extreme,
+        )
+
+
+def test_art12_rejects_overflow_in_base_subtraction() -> None:
+    with pytest.raises(FiscalValidationError, match="base arithmetic is not representable"):
+        _art12_preview(
+            gross_operation_value=Money(Decimal("1e999999999")),
+            unconditional_discount=Money(Decimal("0")),
+            ipi_excluded=Money(Decimal("0")),
+            legacy_taxes_excluded=Money(Decimal("0")),
+        )
