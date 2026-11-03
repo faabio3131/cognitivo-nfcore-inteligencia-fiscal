@@ -113,3 +113,19 @@ def test_rounding_candidate_denies_policy_field_or_version_conflict() -> None:
     changed_version = replace(baseline.artifacts[0], version="other")
     with pytest.raises(RegulatoryBaselineError, match="artifact mismatch"):
         _round(baseline=replace(baseline, artifacts=(changed_version,)), policy_payload=payload)
+
+
+def test_rounding_artifact_published_after_baseline_capture_fails_closed() -> None:
+    baseline, payload = _fixture()
+    late = replace(
+        baseline.artifacts[0],
+        published_on=date(2026, 9, 2),
+        effective_from=date(2026, 9, 2),
+    )
+    historical = replace(baseline, artifacts=(late,))
+    with pytest.raises(RegulatoryBaselineError, match="published after baseline capture"):
+        _round(
+            baseline=historical,
+            policy_payload=payload,
+            instant=datetime(2026, 9, 3, tzinfo=UTC),
+        )

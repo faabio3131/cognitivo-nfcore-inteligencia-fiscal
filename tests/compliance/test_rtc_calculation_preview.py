@@ -288,3 +288,15 @@ def test_rate_preview_rejects_catalog_source_witness_tampering() -> None:
     forged = replace(catalog, source_reference="synthetic-forged-source")
     with pytest.raises(RegulatoryBaselineError, match="pinned artifact verification"):
         _preview(baseline, payload, forged, classification)
+
+
+def test_rate_artifact_published_after_baseline_capture_fails_closed() -> None:
+    baseline, payload, catalog, classification = _setup()
+    late_rate = replace(
+        baseline.artifacts[0],
+        published_on=date(2026, 11, 1),
+        effective_from=date(2026, 11, 1),
+    )
+    historical = replace(baseline, artifacts=(late_rate, baseline.artifacts[1]))
+    with pytest.raises(RegulatoryBaselineError, match="published after baseline capture"):
+        _preview(historical, payload, catalog, classification)
