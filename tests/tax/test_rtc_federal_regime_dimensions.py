@@ -47,9 +47,15 @@ def test_normal_crt_does_not_collapse_presumido_and_real() -> None:
 
 
 def test_all_three_regimes_require_explicit_declaration() -> None:
-    for regime in FederalIncomeTaxRegime:
-        declaration = _declaration(regime)
+    # Preserve all three regimes without accepting CRT=3 + Simples.
+    for regime, crt in (
+        (FederalIncomeTaxRegime.SIMPLES_NACIONAL, TaxRegimeCode.SIMPLES_NACIONAL),
+        (FederalIncomeTaxRegime.LUCRO_PRESUMIDO, TaxRegimeCode.NORMAL),
+        (FederalIncomeTaxRegime.LUCRO_REAL, TaxRegimeCode.NORMAL),
+    ):
+        declaration = _declaration(regime, crt=crt)
         assert declaration.federal_income_tax_regime is regime
+        assert declaration.crt is crt
     with pytest.raises(FiscalValidationError, match="must be explicit"):
         _declaration(FederalIncomeTaxRegime.LUCRO_REAL, federal_income_tax_regime=None)
 
@@ -78,3 +84,35 @@ def test_invalid_declaration_is_rejected() -> None:
             FederalIncomeTaxRegime.LUCRO_REAL,
             effective_to=datetime(2025, 12, 31, tzinfo=UTC),
         )
+
+
+@pytest.mark.parametrize(
+    ("crt", "regime"),
+    (
+        (TaxRegimeCode.NORMAL, FederalIncomeTaxRegime.SIMPLES_NACIONAL),
+        (TaxRegimeCode.SIMPLES_NACIONAL, FederalIncomeTaxRegime.LUCRO_REAL),
+        (TaxRegimeCode.SIMPLES_NACIONAL_EXCESS_SUBLIMIT, FederalIncomeTaxRegime.LUCRO_PRESUMIDO),
+        (TaxRegimeCode.MEI, FederalIncomeTaxRegime.LUCRO_REAL),
+    ),
+)
+def test_incompatible_crt_and_federal_declaration_is_rejected(
+    crt: TaxRegimeCode, regime: FederalIncomeTaxRegime,
+) -> None:
+    with pytest.raises(FiscalValidationError, match="inconsistent"):
+        _declaration(regime, crt=crt)
+
+
+@pytest.mark.parametrize(
+    "crt",
+    (
+        TaxRegimeCode.SIMPLES_NACIONAL,
+        TaxRegimeCode.SIMPLES_NACIONAL_EXCESS_SUBLIMIT,
+        TaxRegimeCode.MEI,
+    ),
+)
+def test_simples_related_crts_preserve_distinct_codes_with_federal_classification(
+    crt: TaxRegimeCode,
+) -> None:
+    declaration = _declaration(FederalIncomeTaxRegime.SIMPLES_NACIONAL, crt=crt)
+    assert declaration.crt is crt
+    assert declaration.federal_income_tax_regime is FederalIncomeTaxRegime.SIMPLES_NACIONAL
