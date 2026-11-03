@@ -11,7 +11,7 @@ import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import ROUND_HALF_EVEN, ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import ROUND_HALF_EVEN, ROUND_HALF_UP, Decimal, DecimalException, InvalidOperation
 
 from kordena_fiscal.compliance.rtc import (
     ReformTaxClassificationSnapshot,
@@ -247,14 +247,21 @@ def calculate_2026_nominal_reference_preview(
     decision, classification = resolve_strict_rtc_2026_incidence_candidate(
         engine=engine, context=context, rules=rules, catalog=catalog,
     )
+    try:
+        cbs_unrounded = tax_base.amount * _RTC_2026_CBS_REFERENCE / Decimal("100")
+        ibs_unrounded = tax_base.amount * _RTC_2026_IBS_STATE_REFERENCE / Decimal("100")
+    except DecimalException as exc:
+        raise FiscalValidationError(
+            "2026 nominal reference arithmetic is not representable"
+        ) from exc
     return Rtc2026NominalReferencePreview(
         decision=decision,
         classification=classification,
         tax_base=tax_base,
         cbs_rate_percent=_RTC_2026_CBS_REFERENCE,
         ibs_state_rate_percent=_RTC_2026_IBS_STATE_REFERENCE,
-        cbs_unrounded=tax_base.amount * _RTC_2026_CBS_REFERENCE / Decimal("100"),
-        ibs_state_unrounded=tax_base.amount * _RTC_2026_IBS_STATE_REFERENCE / Decimal("100"),
+        cbs_unrounded=cbs_unrounded,
+        ibs_state_unrounded=ibs_unrounded,
         source_normative=_RTC_2026_SOURCE,
     )
 
@@ -318,14 +325,18 @@ def calculate_2027_2028_ibs_transition_reference_preview(
         engine=engine, context=context, rules=rules, catalog=catalog,
     )
     rate = Decimal("0.05")
+    try:
+        ibs_unrounded = tax_base.amount * rate / Decimal("100")
+    except DecimalException as exc:
+        raise FiscalValidationError("IBS transition arithmetic is not representable") from exc
     return Rtc2027IbsTransitionReferencePreview(
         decision=decision,
         classification=classification,
         tax_base=tax_base,
         state_rate_percent=rate,
         municipal_rate_percent=rate,
-        state_unrounded=tax_base.amount * rate / Decimal("100"),
-        municipal_unrounded=tax_base.amount * rate / Decimal("100"),
+        state_unrounded=ibs_unrounded,
+        municipal_unrounded=ibs_unrounded,
         source_normative="LC 214/2025 (atualizada pela LC 227/2026), art. 344",
     )
 
