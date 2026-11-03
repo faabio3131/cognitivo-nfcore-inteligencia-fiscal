@@ -246,7 +246,9 @@ def calculate_2026_nominal_reference_preview(
         cbs_unrounded = tax_base.amount * _RTC_2026_CBS_REFERENCE / Decimal("100")
         ibs_unrounded = tax_base.amount * _RTC_2026_IBS_STATE_REFERENCE / Decimal("100")
     except DecimalException as exc:
-        raise FiscalValidationError("2026 nominal reference arithmetic is not representable") from exc
+        raise FiscalValidationError(
+            "2026 nominal reference arithmetic is not representable"
+        ) from exc
     return Rtc2026NominalReferencePreview(
         decision=decision,
         classification=classification,
