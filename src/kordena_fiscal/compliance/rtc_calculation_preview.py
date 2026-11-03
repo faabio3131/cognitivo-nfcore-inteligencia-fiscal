@@ -131,7 +131,7 @@ def calculate_evidenced_rtc_preview(
         amount = (tax_base.amount * rate / Decimal("100")).quantize(
             quantum, rounding=_ALLOWED_ROUNDING[rounding_name]
         )
-    except InvalidOperation as exc:
+    except DecimalException as exc:
         raise FiscalValidationError(
             "RTC preview amount cannot be represented at selected quantum"
         ) from exc
@@ -406,10 +406,13 @@ def calculate_2026_art12_base_preview(
         for value in amounts
     ):
         raise FiscalValidationError("Art. 12 preview requires finite nonnegative Money")
-    exclusions = sum((value.amount for value in amounts[1:]), Decimal("0"))
-    if exclusions > gross_operation_value.amount:
-        raise FiscalValidationError("Art. 12 exclusions exceed gross operation value")
-    reviewed_base = Money(gross_operation_value.amount - exclusions)
+    try:
+        exclusions = sum((value.amount for value in amounts[1:]), Decimal("0"))
+        if exclusions > gross_operation_value.amount:
+            raise FiscalValidationError("Art. 12 exclusions exceed gross operation value")
+        reviewed_base = Money(gross_operation_value.amount - exclusions)
+    except DecimalException as exc:
+        raise FiscalValidationError("Art. 12 base arithmetic is not representable") from exc
     nominal_reference = calculate_2026_nominal_reference_preview(
         engine=engine,
         context=context,

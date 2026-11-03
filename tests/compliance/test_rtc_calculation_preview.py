@@ -306,3 +306,12 @@ def test_preview_rejects_finite_but_unrepresentable_tax_base() -> None:
     baseline, payload, catalog, classification = _setup()
     with pytest.raises(FiscalValidationError, match="cannot be represented"):
         _preview(baseline, payload, catalog, classification, amount="1e999")
+
+
+def test_rate_preview_rejects_finite_base_overflow_before_quantization() -> None:
+    baseline, payload, catalog, classification = _setup()
+    with pytest.raises(FiscalValidationError, match="cannot be represented"):
+        _preview(
+            baseline, payload, catalog, classification,
+            amount="1e999999999",
+        )
