@@ -56,7 +56,11 @@ from .ai_secrets import build_production_openai_key_readers
 from .alert_rules import InternalAlertMonitor, OperationalSignals
 from .api_staging_gsm_probe import staging_probe_verifier
 from .cakto import build_cakto_webhook_router
-from .composition import RuntimeComposition, build_postgres_runtime_composition
+from .composition import (
+    FiscalOperationHandlerFactory,
+    RuntimeComposition,
+    build_postgres_runtime_composition,
+)
 from .config import RuntimeConfigurationError, RuntimeSettings
 from .development_commercial_ingress import (
     development_command_resolver,
@@ -90,6 +94,7 @@ class RuntimeApi:
         workload_credentials: tuple[WorkloadCredentialRecord, ...] = (),
         security_audit_sink: SecurityAuditSink | None = None,
         fiscal_operation_handlers: Mapping[str, FiscalOperationHandler] | None = None,
+        fiscal_operation_handler_factory: FiscalOperationHandlerFactory | None = None,
         metrics: MetricsRegistry | None = None,
     ) -> None:
         self.settings = settings
@@ -118,6 +123,7 @@ class RuntimeApi:
                         workload_credentials=workload_credentials,
                         security_audit_sink=security_audit_sink,
                         fiscal_operation_handlers=fiscal_operation_handlers,
+                        fiscal_operation_handler_factory=fiscal_operation_handler_factory,
                         metrics=metrics,
                         enable_cakto_checkout=(
                             settings.commercial_checkout_provider == "cakto"
@@ -193,6 +199,7 @@ def create_runtime_app(
     workload_credentials: tuple[WorkloadCredentialRecord, ...] = (),
     security_audit_sink: SecurityAuditSink | None = None,
     fiscal_operation_handlers: Mapping[str, FiscalOperationHandler] | None = None,
+    fiscal_operation_handler_factory: FiscalOperationHandlerFactory | None = None,
 ) -> FastAPI:
     resolved = settings or RuntimeSettings.from_environ()
     runtime_metrics = metrics or MetricsRegistry()
@@ -201,6 +208,7 @@ def create_runtime_app(
         workload_credentials=workload_credentials,
         security_audit_sink=security_audit_sink,
         fiscal_operation_handlers=fiscal_operation_handlers,
+        fiscal_operation_handler_factory=fiscal_operation_handler_factory,
         metrics=runtime_metrics,
     )
     runtime_logger = logger or StructuredLogger(
