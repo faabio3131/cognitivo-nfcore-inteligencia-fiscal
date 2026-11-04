@@ -52,6 +52,7 @@ from kordena_fiscal.web.staging_webhook_approval import create_staging_webhook_e
 from kordena_fiscal.web.staging_webhook_probe import create_staging_webhook_probe_router
 
 from .activation_email import build_activation_delivery_from_environ
+from .ai_secrets import build_production_openai_key_readers
 from .alert_rules import InternalAlertMonitor, OperationalSignals
 from .api_staging_gsm_probe import staging_probe_verifier
 from .cakto import build_cakto_webhook_router
@@ -818,6 +819,16 @@ def create_runtime_app(
                 quota_store=(
                     DurableTokenQuotaStore(runtime.database.connection)
                     if runtime.database is not None else None
+                ),
+                model_key_readers=(
+                    build_production_openai_key_readers(os.environ)
+                    if (
+                        resolved.environment.value == "production"
+                        and os.environ.get("NFCORE_COGNITIVE_ENABLED") == "true"
+                        and os.environ.get("NFCORE_COGNITIVE_DURABLE_AI_ENABLED") == "true"
+                        and runtime.database is not None
+                    )
+                    else None
                 ),
             ),
         ),
