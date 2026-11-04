@@ -14,6 +14,7 @@ from kordena_fiscal.domain import (
     FiscalDomainError,
     FiscalValidationError,
 )
+from kordena_fiscal.domain.identifiers import Cnpj
 
 
 class FiscalSigningError(FiscalDomainError):
@@ -58,6 +59,8 @@ class FiscalSignatureRequest:
     canonical_content: bytes
     certificate_reference: SecretReference
     workload_id: str
+    # Mandatory only for issuer-bound fiscal signing composition, not legacy detached tests.
+    issuer_cnpj: Cnpj | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.scope, ExecutionScope):
@@ -78,6 +81,8 @@ class FiscalSignatureRequest:
             raise FiscalValidationError("certificate reference unit does not match scope")
         if self.certificate_reference.environment is not self.scope.environment:
             raise FiscalValidationError("certificate reference environment does not match scope")
+        if self.issuer_cnpj is not None and not isinstance(self.issuer_cnpj, Cnpj):
+            raise FiscalValidationError("issuer_cnpj must be Cnpj")
         workload = self.workload_id.strip()
         if not workload:
             raise FiscalValidationError("workload_id must not be blank")
