@@ -256,7 +256,10 @@ def _key_reader(environ: Mapping[str, str], name: str) -> Callable[[], str | Non
 
 
 def build_model_from_environ(
-    environ: Mapping[str, str], *, transport: HttpTransport | None = None
+    environ: Mapping[str, str],
+    *,
+    transport: HttpTransport | None = None,
+    key_readers: Mapping[str, Callable[[], str | None]] | None = None,
 ) -> AdvisoryModelPort | None:
     """Product-owned providers from ``NFCORE_COGNITIVE_AI_{PRIMARY,SECONDARY}_*``.
 
@@ -278,10 +281,17 @@ def build_model_from_environ(
             )
         except ValueError:
             continue
+        key_name = prefix + "API_KEY"
+        if key_readers is not None and key_name in key_readers:
+            if environ.get(key_name):
+                return None  # Cannot mix raw environment material with vault authority.
+            reader = key_readers[key_name]
+        else:
+            reader = _key_reader(environ, key_name)
         clients.append(
             OpenAICompatibleAdvisoryClient(
                 config=config,
-                api_key=_key_reader(environ, prefix + "API_KEY"),
+                api_key=reader,
                 transport=transport,
             )
         )
