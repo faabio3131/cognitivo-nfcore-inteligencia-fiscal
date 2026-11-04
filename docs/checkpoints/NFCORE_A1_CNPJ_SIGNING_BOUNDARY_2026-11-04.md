@@ -34,3 +34,11 @@
 5. Official SEFAZ/NFS-e homologation using companies' own credentials and evidence, followed by separate human production approval.
 
 Status: **IMPLEMENTED_NOT_CERTIFIED** until remote gates succeed. Fiscal production remains **BLOCKED_EXTERNAL**.
+
+
+
+## Regulatory guardrails confirmed 2026-11-04 (not implemented by this signer increment)
+
+- SEFAZ-SP NFC-e official notice: since 2026-11-01, requests to inutilize NF-e model 55 and NFC-e model 65 numbering no longer apply in SP under Ajustes SINIEF 40/2026 and 38/2026. The pilot operation selector and provider routing must fail closed for these cells: https://portal.fazenda.sp.gov.br/servicos/nfce/
+- National NFS-e notice dated 2026-10-29: current **production** layout uses NT 004 with the `tpRetPisCofins` domain of NT 007; NT 009 release 1 is in production-restricted testing and must not silently replace production layout. See https://www.gov.br/nfse/pt-br/noticias/nfs-e-nacional-confira-oas-rientacoes-sobre-leiaute-em-producao-regras-de-preenchimento-de-ibs-cbs-e-status-da-nota-tecnica-009
+- These observations are **requirements to verify at the subsequent provider/operation gates**, not proof that official adapters have been implemented or homologated.
