@@ -8,6 +8,7 @@ from enum import StrEnum
 from typing import Protocol
 
 from kordena_fiscal.control_plane import SecretReference, SecretReferenceKind
+from kordena_fiscal.documents import CanonicalFiscalDocument
 from kordena_fiscal.domain import (
     ExecutionScope,
     FiscalDocumentKind,
@@ -95,6 +96,28 @@ class FiscalSignatureRequest:
             "<FiscalSignatureRequest "
             f"document_kind={self.document_kind.value} "
             f"reference={self.certificate_reference.reference_id}>"
+        )
+
+
+    @classmethod
+    def from_canonical_document(
+        cls,
+        *,
+        document: CanonicalFiscalDocument,
+        canonical_content: bytes,
+        certificate_reference: SecretReference,
+        workload_id: str,
+    ) -> FiscalSignatureRequest:
+        """Bind signing to the persisted issuer snapshot, never a browser CNPJ."""
+        if not isinstance(document, CanonicalFiscalDocument):
+            raise FiscalValidationError("document must be CanonicalFiscalDocument")
+        return cls(
+            scope=document.scope,
+            document_kind=document.document_kind,
+            canonical_content=canonical_content,
+            certificate_reference=certificate_reference,
+            workload_id=workload_id,
+            issuer_cnpj=document.issuer.cnpj,
         )
 
 

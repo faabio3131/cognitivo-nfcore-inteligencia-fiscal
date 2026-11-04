@@ -11,7 +11,8 @@
 
 - Before: the generic detached signer checked the PKCS#12 identity and certificate validity but did not bind the A1 certificate's ICP-Brasil SAN CNPJ to an issuing CNPJ.
 - Increment: `FiscalSignatureRequest.issuer_cnpj` is an explicit optional `Cnpj` value; `CryptographyFiscalDocumentSigner(require_issuer_cnpj=True)` rejects unsigned issuer context and verifies that the **same Vault material used for signing** has valid certificate metadata and exactly the expected SAN CNPJ.
-- Default mode remains backward compatible for historical detached-signature callers. For any accountant pilot operation, trusted runtime composition MUST enable `require_issuer_cnpj=True` and obtain `issuer_cnpj` from the canonical persisted fiscal issuer, never a client-supplied header or form field.
+- `FiscalSignatureRequest.from_canonical_document(...)` binds the issuing CNPJ directly to `CanonicalFiscalDocument.issuer.cnpj` and the same document's scope, rejecting any cross-scope certificate reference. This is the approved issuer source for future trusted preparation paths, not a browser-supplied CNPJ.
+- Default mode remains backward compatible for historical detached-signature callers. For any accountant pilot operation, trusted runtime composition MUST enable `require_issuer_cnpj=True` and construct requests from the canonical persisted document, never a client-supplied header or form field.
 - The preflight does not certify ICP-Brasil chain trust/revocation, legal representation, SEFAZ registration, official mTLS, XMLDSig schema profiles or authorization to issue.
 - This increment does not provision a certificate into the external Vault: existing Vault adapters are read-only. A governed onboarding/rotation/revocation write workflow remains a separate blocked dependency.
 
@@ -21,7 +22,7 @@
 - No issuer CNPJ when required: fail-closed before resolving the secret.
 - Wrong CNPJ, absent SAN/keyUsage, and cross-tenant secret: fail-closed with sanitized errors.
 - Existing signer/vault/gateway behavior preserved.
-- Locally verified (Python 3.12, `PYTHONPATH=src`): 45 directed tests PASS, Ruff PASS. Mypy and remote CI/Governance to be captured on the final candidate SHA.
+- Locally verified (Python 3.12, `PYTHONPATH=src`): 45 initial Vault/gateway/signing tests PASS; expanded Vault/gateway/signing/issuance regression suite PASS. Ruff PASS and Mypy strict PASS on changed code. New PR CI/Governance must still be captured at the final SHA.
 - No real certificate, real customer data, fiscal provider traffic, migration, Contabo deploy, production activation or `main` merge in this increment.
 
 ## Outstanding build and external gates
