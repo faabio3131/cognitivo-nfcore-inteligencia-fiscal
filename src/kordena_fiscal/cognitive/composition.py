@@ -49,6 +49,7 @@ def build_cognitive_routers(
     audit_uow_factory: Callable[[], AbstractContextManager[Any]] | None = None,
     runtime_environment: str | None = None,
     quota_store: DurableTokenQuotaStore | None = None,
+    model_key_readers: Mapping[str, Callable[[], str | None]] | None = None,
 ) -> list[APIRouter]:
     """Portal advisory route plus the Command metrics route; empty unless explicitly enabled.
 
@@ -74,7 +75,11 @@ def build_cognitive_routers(
         and audit_uow_factory is not None
     )
     model = (
-        build_model_from_environ(environ)
+        (
+            build_model_from_environ(environ, key_readers=model_key_readers)
+            if model_key_readers
+            else build_model_from_environ(environ)
+        )
         if (allow_pilot_model or allow_paid_model)
         else None
     )
@@ -123,6 +128,7 @@ def build_cognitive_router(
     audit_uow_factory: Callable[[], AbstractContextManager[Any]] | None = None,
     runtime_environment: str | None = None,
     quota_store: DurableTokenQuotaStore | None = None,
+    model_key_readers: Mapping[str, Callable[[], str | None]] | None = None,
 ) -> APIRouter | None:
     """One router mounting the Portal advisory route and the Command metrics route."""
     routers = build_cognitive_routers(
@@ -130,6 +136,7 @@ def build_cognitive_router(
         audit_uow_factory=audit_uow_factory,
         runtime_environment=runtime_environment,
         quota_store=quota_store,
+        model_key_readers=model_key_readers,
     )
     if not routers:
         return None
