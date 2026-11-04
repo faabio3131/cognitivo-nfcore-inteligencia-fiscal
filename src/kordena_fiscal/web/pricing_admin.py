@@ -68,9 +68,7 @@ def _public_catalog(
             "plan_id": plan.plan_id,
             "display_name": plan.display_name,
             "edition_id": plan.edition_id,
-            "price_ids": [
-                price_id for price_id in plan.price_ids if price_id in active_price_ids
-            ],
+            "price_ids": [price_id for price_id in plan.price_ids if price_id in active_price_ids],
             "trial_days": plan.trial_days,
             "tags": list(plan.tags),
         }
@@ -101,6 +99,31 @@ def create_pricing_router(
                 "message": "Commercial pricing has not been published yet",
             }
         return {"status": "published", "catalog": _public_catalog(current)}
+
+    @router.get("/v1/admin/pricing/candidate")
+    async def candidate_pricing(request: Request) -> dict[str, object]:
+        # Read-only. Platform authority is the existing signed human session,
+        # never a tenant-supplied header. No publication, checkout or billing.
+        _platform_actor(request, identity)
+        from kordena_fiscal.product.commercial_plan_candidate import (
+            build_canonical_candidate,
+        )
+
+        try:
+            configuration = build_canonical_candidate()
+        except CommercialPricingError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "code": "PRICING_CANDIDATE_UNAVAILABLE",
+                    "message": "Approved candidate is unavailable for review",
+                },
+            ) from exc
+        return {
+            "status": "candidate_not_published",
+            "catalog": configuration.to_mapping(),
+            "current_version": (None if pricing.current is None else pricing.current.version),
+        }
 
     @router.get("/v1/admin/pricing")
     async def admin_pricing(request: Request) -> dict[str, object]:
@@ -154,8 +177,7 @@ def create_pricing_router(
                 actor=actor,
                 configuration=configuration,
                 expected_version=expected_version,
-                correlation_id=request.headers.get("X-Correlation-Id", "").strip()
-                or uuid4().hex,
+                correlation_id=request.headers.get("X-Correlation-Id", "").strip() or uuid4().hex,
             )
         except CommercialPricingError as exc:
             code = (
