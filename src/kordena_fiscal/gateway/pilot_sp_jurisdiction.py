@@ -6,16 +6,25 @@ No credentials, endpoint selection, authorization or provider I/O occurs here.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
-from typing import Literal
+from datetime import date, datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Literal
 
-from kordena_fiscal.domain import BrazilianJurisdiction, FiscalValidationError
+from kordena_fiscal.domain import (
+    BrazilianJurisdiction,
+    FiscalDocumentKind,
+    FiscalValidationError,
+)
 from kordena_fiscal.domain.profile import TaxRegimeCode
+
+if TYPE_CHECKING:
+    from .provider import ProviderOperation
 
 PilotDocument = Literal["nfe", "nfce", "nfse"]
 PilotChannel = Literal["sefaz-sp-nfe", "sefaz-sp-nfce", "nfse-national"]
 _SP_IBGE = frozenset({"3509205", "3548708", "3550308"})
 _NFSE_CUTOVER = date(2026, 11, 1)
+_SP_INUTILIZATION_END = date(2026, 11, 1)
+_SP_FIXED_OFFSET_2026 = timezone(timedelta(hours=-3))
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,4 +75,78 @@ def resolve_sp_pilot_route(
         municipality_ibge_code=jurisdiction.municipality_ibge_code,
         document=document,
         channel=channel,
+    )
+
+
+
+def require_sp_jurisdiction_operation_policy(
+    *,
+    jurisdiction: BrazilianJurisdiction,
+    document_kind: FiscalDocumentKind,
+    operation: ProviderOperation,
+    requested_at: datetime,
+) -> None:
+    """Enforce state-level SP fiscal operation policy before provider I/O.
+
+    This negative-only gate applies to every SP municipality and cannot grant
+    provider capability, production authority, or fiscal homologation.
+    """
+    from .provider import ProviderOperation
+
+    if (
+        not isinstance(jurisdiction, BrazilianJurisdiction)
+        or not isinstance(document_kind, FiscalDocumentKind)
+        or type(operation) is not ProviderOperation
+        or not isinstance(requested_at, datetime)
+        or requested_at.tzinfo is None
+        or requested_at.utcoffset() is None
+    ):
+        raise FiscalValidationError("invalid SP provider operation context")
+    if (
+        jurisdiction.state_code == "SP"
+        and document_kind in (FiscalDocumentKind.NFE, FiscalDocumentKind.NFCE)
+        and operation is ProviderOperation.INUTILIZE
+        and requested_at.astimezone(_SP_FIXED_OFFSET_2026).date() >= _SP_INUTILIZATION_END
+    ):
+        raise FiscalValidationError(
+            "SP NF-e/NFC-e inutilization no longer applies from 2026-11-01"
+        )
+
+
+def require_sp_pilot_operation_policy(
+    *,
+    route: SpPilotRoute,
+    operation: ProviderOperation,
+    requested_at: datetime,
+) -> None:
+    """Negative gate only: never grants provider or fiscal execution authority.
+
+    The Nov-2026 São Paulo rule stops inutilization of models 55/65. Using an
+    aware timestamp (rather than NFS-e competence) prevents historical-competence
+    documents from bypassing the current execution policy.
+    """
+    from .provider import ProviderOperation
+
+    if (
+        type(route) is not SpPilotRoute
+        or route.municipality_ibge_code not in _SP_IBGE
+        or route.document not in ("nfe", "nfce", "nfse")
+        or route.channel != {
+            "nfe": "sefaz-sp-nfe",
+            "nfce": "sefaz-sp-nfce",
+            "nfse": "nfse-national",
+        }[route.document]
+        or type(operation) is not ProviderOperation
+        or not isinstance(requested_at, datetime)
+        or requested_at.tzinfo is None
+        or requested_at.utcoffset() is None
+    ):
+        raise FiscalValidationError("invalid SP pilot operation context")
+    if operation is ProviderOperation.INUTILIZE and route.document == "nfse":
+        raise FiscalValidationError("NFS-e inutilization is not a supported operation")
+    require_sp_jurisdiction_operation_policy(
+        jurisdiction=BrazilianJurisdiction("SP", route.municipality_ibge_code),
+        document_kind=FiscalDocumentKind(route.document),
+        operation=operation,
+        requested_at=requested_at,
     )
