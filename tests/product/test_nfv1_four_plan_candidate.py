@@ -19,6 +19,9 @@ def test_four_plans_are_unpublished_and_share_same_edition() -> None:
     assert len(candidate.prices) == 8
     assert all(not plan.enabled for plan in candidate.plans)
     assert {p.edition_id for p in candidate.plans} == {"nfcore-total-feature-parity"}
+    # Included docs/RPM are NOT hard period quotas: overage is allowed
+    # as commercial policy; rate limiting belongs to the runtime.
+    assert all(not p.periodic_quotas for p in candidate.plans)
 
 
 def test_trial_is_not_fiscal_activation() -> None:

@@ -10,7 +10,6 @@ import json
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
-from kordena_fiscal.product.billing import UsageQuota
 from kordena_fiscal.product.pricing import (
     BillingCadence,
     CommercialPricingConfiguration,
@@ -101,7 +100,7 @@ def build_canonical_candidate(
     for key, item in raw_plans.items():
         if not isinstance(item, dict) or not isinstance(item.get("name"), str):
             raise CommercialPricingError("plan entry invalid")
-        doc_limit = _positive_int(item.get("included_documents"), "included documents")
+        _positive_int(item.get("included_documents"), "included documents")
         _money(item.get("overage_unit_price_brl"))
         cnpj_limit = item.get("max_cnpjs")
         if cnpj_limit is not None:
@@ -129,11 +128,10 @@ def build_canonical_candidate(
                     per_document_amount=_money(item.get("overage_unit_price_brl")),
                 )
             )
-        quotas = [UsageQuota("documents", doc_limit)]
-        if cnpj_limit is not None:
-            quotas.append(UsageQuota("cnpjs", cnpj_limit))
-        if rpm is not None:
-            quotas.append(UsageQuota("requests_per_minute", rpm))
+        # Included volume and per-minute throttling are NOT period-hard quotas:
+        # publishing UsageQuota documents=300 would silently disable overage
+        # after document 300, and RPM is not a monthly quota.
+        # Dedicated durable metering/rate-limiter integration must enforce them.
         plans.append(
             PlanDefinition(
                 plan_id=key,
@@ -146,7 +144,7 @@ def build_canonical_candidate(
                 trial_days=14,
                 tags=("unpublished", "director-proposal-20261103"),
                 enabled=False,
-                periodic_quotas=tuple(quotas),
+                periodic_quotas=(),
             )
         )
     return CommercialPricingConfiguration(
@@ -173,7 +171,11 @@ def estimate_monthly_charge(
         raise CommercialPricingError("unknown plan")
     cadence = BillingCadence.ANNUAL if annual_contract else BillingCadence.MONTHLY
     price = next(p for p in config.prices if p.price_id in plan.price_ids and p.cadence == cadence)
-    included = plan.periodic_quotas[0].limit
+    raw_plans = read_candidate(path)["plans"]
+    assert isinstance(raw_plans, dict)
+    raw_plan = raw_plans[plan_key]
+    assert isinstance(raw_plan, dict)
+    included = _positive_int(raw_plan["included_documents"], "included documents")
     excess = max(0, docs_emitted - included)
     base = price.base_amount / 12 if annual_contract else price.base_amount
     charge = (Decimal(excess) * price.per_document_amount).quantize(_CENT, rounding=ROUND_HALF_UP)
