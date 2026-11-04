@@ -21,3 +21,20 @@
 - Pending real provider operation composer wiring to use this negative gate; until then do not claim runtime enforces it.
 
 Status: **IMPLEMENTED_NOT_CERTIFIED**, external homologation **BLOCKED_EXTERNAL**.
+
+## Atualização — bloqueio efetivo no gateway canônico (04/11/2026)
+
+A regra negativa de inutilização de NF-e/NFC-e paulista foi ligada ao
+`ProviderGatewayService.execute`, **antes** de readiness, seleção de provider,
+resolução de segredos e I/O. A aplicação da vedação é estadual, não limitada aos
+três municípios do piloto. O mesmo instante do clock governado é usado na
+avaliação da regra e no gate de capacidade. Casos sintéticos de duas classes
+(modelos 55/65), município do piloto e fora dele, ausência de transporte,
+consulta e cancelamento cobrem regressão.
+
+Fonte oficial: https://portal.fazenda.sp.gov.br/servicos/nfe
+(Ajustes SINIEF 40/2026 e 38/2026, vigência 01/11/2026).
+
+**Escopo limitado:** essa composição só atua quando o fluxo usa o
+`ProviderGatewayService` canônico. O runtime API Web continua sem transporte
+oficial e sem credenciais, portanto isso não homologa nem habilita emissão real.
