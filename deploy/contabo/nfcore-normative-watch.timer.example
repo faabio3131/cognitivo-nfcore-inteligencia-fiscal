@@ -1,0 +1,12 @@
+# EXAMPLE ONLY. Requires service review and authorized installation.
+[Unit]
+Description=Daily read-only NFCore normative portal observation
+
+[Timer]
+OnCalendar=*-*-* 04:15:00
+Persistent=true
+RandomizedDelaySec=30m
+Unit=nfcore-normative-watch.service
+
+[Install]
+WantedBy=timers.target

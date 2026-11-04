@@ -154,7 +154,12 @@ class OpenAICompatibleAdvisoryClient:
         except ModelProviderError:
             raise
         except (
-            UnicodeDecodeError, ValueError, KeyError, IndexError, TypeError, AttributeError
+            UnicodeDecodeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            TypeError,
+            AttributeError,
         ) as exc:
             raise ModelProviderMalformed("response does not match the expected shape") from exc
         return ProviderAnswer(
@@ -174,8 +179,10 @@ class OpenAICompatibleAdvisoryClient:
         text = item["text"]
         if kind not in _ALLOWED_KINDS:
             raise ModelProviderMalformed("model may only author hypothesis or action")
-        if not isinstance(text, str) or not isinstance(ids, list) or not all(
-            isinstance(i, str) for i in ids
+        if (
+            not isinstance(text, str)
+            or not isinstance(ids, list)
+            or not all(isinstance(i, str) for i in ids)
         ):
             raise ModelProviderMalformed("invalid section fields")
         return ProviderSection(kind, text, tuple(ids))
@@ -207,6 +214,38 @@ class FallbackAdvisoryClient:
             except ModelProviderError as exc:
                 last = exc
         raise last
+
+
+class TierRoutedAdvisoryClient:
+    """Route trusted capabilities between existing model ports, reusing fallback."""
+
+    def __init__(self, *, fast: AdvisoryModelPort, deep: AdvisoryModelPort) -> None:
+        self._fast = fast
+        self._deep = deep
+
+    def advise(self, prompt: ModelPrompt, *, deadline_seconds: float) -> ProviderAnswer:
+        from ..contracts import Capability
+        from ..routing_policy import AdvisoryTier, suggest_advisory_tier
+
+        high_risk = prompt.capability in {
+            Capability.ANSWER_ACCOUNTANT_QUESTION,
+            Capability.SUGGEST_CLASSIFICATION,
+        }
+        decision = suggest_advisory_tier(
+            capability=prompt.capability,
+            risk="high" if high_risk else "low",
+            evidence_complete=bool(prompt.trusted_facts.strip()),
+        )
+        first, second = (
+            (self._deep, self._fast)
+            if decision.tier is AdvisoryTier.DEEP_REASONING
+            else (self._fast, self._deep)
+        )
+        # The existing FallbackAdvisoryClient owns the single deadline and
+        # typed provider failure semantics. No success is fabricated.
+        return FallbackAdvisoryClient((first, second)).advise(
+            prompt, deadline_seconds=deadline_seconds
+        )
 
 
 def _key_reader(environ: Mapping[str, str], name: str) -> Callable[[], str | None]:
@@ -241,10 +280,23 @@ def build_model_from_environ(
             continue
         clients.append(
             OpenAICompatibleAdvisoryClient(
-                config=config, api_key=_key_reader(environ, prefix + "API_KEY"),
+                config=config,
+                api_key=_key_reader(environ, prefix + "API_KEY"),
                 transport=transport,
             )
         )
     if not clients:
+        return None
+    if environ.get("NFCORE_COGNITIVE_AI_TIER_ROUTING_ENABLED", "").lower() == "true":
+        # A two-provider declaration is mandatory: never silently replace a
+        # requested high-risk model with an unrelated single-model route.
+        if len(clients) != 2:
+            return None
+        tier_primary = environ.get("NFCORE_COGNITIVE_AI_PRIMARY_TIER")
+        tier_secondary = environ.get("NFCORE_COGNITIVE_AI_SECONDARY_TIER")
+        if (tier_primary, tier_secondary) == ("FAST_ECONOMIC", "DEEP_REASONING"):
+            return TierRoutedAdvisoryClient(fast=clients[0], deep=clients[1])
+        if (tier_primary, tier_secondary) == ("DEEP_REASONING", "FAST_ECONOMIC"):
+            return TierRoutedAdvisoryClient(fast=clients[1], deep=clients[0])
         return None
     return clients[0] if len(clients) == 1 else FallbackAdvisoryClient(clients)
