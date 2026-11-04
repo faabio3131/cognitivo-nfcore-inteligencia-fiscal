@@ -134,7 +134,11 @@ def _onboard_and_bind(database: SqliteFiscalDatabase) -> SecretReference:
     return reference
 
 
-def _synthetic_pkcs12() -> bytes:
+def _synthetic_pkcs12(
+    *,
+    valid_before_offset: timedelta = timedelta(minutes=-1),
+    valid_after_offset: timedelta = timedelta(days=1),
+) -> bytes:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     subject = issuer = x509.Name(
         [x509.NameAttribute(NameOID.COMMON_NAME, "FM Fiscal Synthetic Signer Test")]
@@ -146,8 +150,8 @@ def _synthetic_pkcs12() -> bytes:
         .issuer_name(issuer)
         .public_key(private_key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(naive_now - timedelta(minutes=1))
-        .not_valid_after(naive_now + timedelta(days=1))
+        .not_valid_before(naive_now + valid_before_offset)
+        .not_valid_after(naive_now + valid_after_offset)
         .sign(private_key, hashes.SHA256())
     )
     return pkcs12.serialize_key_and_certificates(
@@ -417,3 +421,27 @@ def test_signer_has_no_readiness_authority_or_persistence_port() -> None:
     assert "unit_of_work_factory" not in constructor_parameters
     assert "readiness" not in result_fields
     assert "production_approved" not in result_fields
+
+
+def test_expired_certificate_rejected_before_signing(tmp_path) -> None:
+    database = _database(tmp_path)
+    reference = _onboard_and_bind(database)
+    old = _synthetic_pkcs12(
+        valid_before_offset=timedelta(days=-2),
+        valid_after_offset=timedelta(minutes=-1),
+    )
+    signer = _signer(database, reference, pkcs12_bytes=old)
+    with pytest.raises(InvalidCertificateMaterialError, match="validity period"):
+        signer.sign(_request(reference))
+
+
+def test_certificate_not_yet_valid_rejected_before_signing(tmp_path) -> None:
+    database = _database(tmp_path)
+    reference = _onboard_and_bind(database)
+    future = _synthetic_pkcs12(
+        valid_before_offset=timedelta(minutes=1),
+        valid_after_offset=timedelta(days=2),
+    )
+    signer = _signer(database, reference, pkcs12_bytes=future)
+    with pytest.raises(InvalidCertificateMaterialError, match="validity period"):
+        signer.sign(_request(reference))

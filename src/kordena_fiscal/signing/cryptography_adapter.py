@@ -78,6 +78,18 @@ class CryptographyFiscalDocumentSigner:
         self._require_document_kind(request.document_kind)
         material = self._resolve_certificate(request)
         private_key, certificate = self._load_identity(material)
+        # Reject expired or not-yet-valid identities BEFORE using the private key.
+        # Do not apply this gate to verify(): historical signatures remain verifiable.
+        signed_at = self._clock.now()
+        if (
+            signed_at.tzinfo is None
+            or signed_at.utcoffset() is None
+            or not certificate.not_valid_before_utc <= signed_at
+            < certificate.not_valid_after_utc
+        ):
+            raise InvalidCertificateMaterialError(
+                "certificate validity period does not include signing time"
+            )
 
         try:
             if isinstance(private_key, rsa.RSAPrivateKey):
@@ -108,7 +120,7 @@ class CryptographyFiscalDocumentSigner:
             algorithm=algorithm,
             certificate_reference_id=material.reference_id,
             certificate_fingerprint_sha256=certificate.fingerprint(hashes.SHA256()).hex(),
-            signed_at=self._clock.now(),
+            signed_at=signed_at,
             document_kind=request.document_kind,
         )
 
