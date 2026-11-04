@@ -18,7 +18,7 @@ from kordena_fiscal.product.pricing import (
     PriceDefinition,
 )
 
-_DEFAULT = Path(__file__).resolve().parents[3] / "config" / "commercial" / "plans.json"
+_DEFAULT = Path.cwd() / "config" / "commercial" / "plans.json"
 _CENT = Decimal("0.01")
 
 

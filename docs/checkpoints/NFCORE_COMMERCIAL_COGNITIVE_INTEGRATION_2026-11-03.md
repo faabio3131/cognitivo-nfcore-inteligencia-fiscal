@@ -31,3 +31,4 @@
 Pytest local dirigido, Ruff, Mypy, GitHub CI/Gov, revisão de diff, integração na main com autorização, CI pós-merge, testes E2E comercial/IA e preflight Contabo. Para produção real: release/go-no-go, migração aplicável, aprovação de deploy, credenciais autorizadas e homologação fiscal. Expor UI premium/comercial não implica billing habilitado.
 
 **Correção de semântica de quotas:** franquia incluída e RPM NÃO foram inseridos em CommercialPlan.periodic_quotas, pois isso bloquearia excedentes e interpretaria requisições/minuto como uso mensal. Permanecem especificações aprovadas dependentes dos medidores/limitadores canônicos; não publicar sem integração de enforcement.
+Empacotamento: Dockerfile.api copia a configuracao candidata para /app/config/commercial/plans.json, e o loader resolve a partir do WORKDIR /app; nao publica plano automaticamente.
