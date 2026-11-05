@@ -1,3 +1,30 @@
+## CURRENT reconciliado — continuidade 05/11/2026
+
+Este registro prevalece sobre o snapshot de planejamento abaixo, sem promover estados globais.
+
+- Repositório atual: faabio3131/nf-core-v001; main 3f56084041fc9cd441af9a61dcc9532ba6090a85.
+- PRs #355/#356/#359 MERGED; #358 OPEN, destino production, sem merge nesta execução.
+- PR #360 OPEN/DRAFT, base deste incremento feedf8b41085914b831c9585bec1b34675742008:
+  inventário prioritário, bindings negativos e catálogo MG 55/65; Governança #1120 SUCCESS;
+  CI #1689 ainda em execução na consulta inicial. Não presumir certificação.
+- Branch deste incremento: feat/nfcore-nat03-mg-provenance, baseada no HEAD da #360.
+- NAT-00 AUDITED (reconciliação interna; production não promovida).
+- NAT-01 IMPLEMENTING: pesquisa/inventário em #360; contrato/ADRs globais ainda pendentes.
+- NAT-03/04 IMPLEMENTING: autorização MG NF-e 55 reutiliza transporte SOAP e Vault;
+  requer validador XSD confiável. Não registra provider/binding nem modifica runtime.
+- NAT-UF-MG IMPLEMENTING/PARTIAL; RJ/PR/MT/MS sem módulos internos completos.
+- Detalhes, mapa de impacto e critérios:
+  docs/NFV1_NAT03_MG_AUTHORIZATION_CONTINUITY_2026-11-05.md.
+- Ruff global PASS; Mypy direcionado PASS. Mypy global Windows encontrou 8 erros
+  em 5 arquivos fora desta mudança: APIs POSIX ausentes no Windows e dependência
+  brazilfiscalreport.danfe ausente. Não desabilitar verificações; CI Linux é gate obrigatório.
+- Nenhuma transmissão fiscal real, credencial nova, migration, deploy ou homologação.
+- Próxima ação: certificar CI desta candidata; congelar XSD/WSDL reais e composição
+  com autoridade XmlSchemaValidator; depois demais operações MG, NFC-e e NFS-e BH.
+- Merge main e promoção production aguardam autorização específica.
+
+---
+
 # NFCore National Expansion — Ledger de Estado e Continuidade
 
 **Documento:** NFV1-NAT-LEDGER-001  
@@ -86,3 +113,59 @@ Próximo bloco:
 ```
 
 **Nunca marcar CHECKED/CONCLUÍDO apenas por documentação, PR aberta, health 200 ou teste sintético.**
+
+## NAT-03/04 — evidência incremental na PR #361
+
+- Branch: feat/nfcore-nat03-mg-provenance. Primeiro commit a027b967c26af6869f3cb21f3be97df055653628.
+- PR base #360: CI #1689 SUCCESS e Governança #1120 SUCCESS confirmadas.
+- PR #361: Governança #1121 SUCCESS no primeiro commit; CI #1690 iniciada no SHA.
+- Regressão local do primeiro incremento: 178 PASS; 18 testes MG PASS; Ruff global e Mypy direcionado PASS.
+- Segundo incremento: download oficial PL_010g v1.03, cinco XSD NFe exatos, manifesto com hash,
+  loader offline via SchemaResource/SchemaSet/XmlSchemaValidator, composição explícita MG com
+  validação real da NFe assinada e negativa de XML incompleto antes de transporte.
+- Testes XML + transporte MG após o incremento: 34 PASS; Ruff global PASS; Mypy dos dois módulos PASS.
+- Zip original: b329ecbe7e4c05a41bfbc1527f105defb7047328acfeada7c77e1666da485eaf.
+- Limite: não contém schema completo de envelope/eventos/WSDL; não representa vigência homologada,
+  golden case autorizado, provider ativado, tributação/RTC certificada ou integração estadual completa.
+- Evidência final de SHA/CI e packaging: registrar na PR #361; estados globais permanecem IMPLEMENTING.
+- Próximo bloco: pacote completo enviNFe e operações, vigência por tpAmb e golden cases oficiais MG;
+  em seguida NFC-e MG e NFS-e BH, depois RJ → PR → MT → MS.
+
+### NAT-04 — incompatibilidade de assinatura identificada e correção MG
+
+O XMLDSig do pacote oficial exige RSA-SHA1/SHA1; default anterior gera SHA256.
+Perfil explícito NFE4_OFFICIAL_RSA_SHA1 adicionado ao assinador existente e
+selecionado apenas no alvo MG homologação. Signature validada contra XSD real
+e verificada criptograficamente em teste. Default SP e eventos não foram alterados;
+sua compatibilidade oficial permanece PENDÊNCIA, sem homologação declarada.
+Wheel e hashes exatos dos cinco XSD no índice/distribuição PASS.
+Mypy dirigido de três módulos PASS. Não promover estados globais.
+
+Regressão final do segundo incremento: **196 PASS em 60,31s**, zero falhas,
+abrangendo XML, gateways, control_plane e A1 sintético. Ruff global PASS,
+Mypy dirigido PASS, plano 59 IDs PASS. CI Linux no SHA final continua gate pendente.
+
+## Continuidade MG — branch feat/nfcore-mg-lifecycle-20261105
+
+Base 7739fd1587f2cb59f07032523b282c218da6a210, PR #361, CI #1691 e Governança #1122 SUCCESS.
+CURRENT main permanece 3f56084041fc9cd441af9a61dcc9532ba6090a85.
+Escopo NAT-03/04 / NAT-UF-MG-T03/T04 parcial:
+consulta, cancelamento e inutilização MG55 no transporte compartilhado, XSD
+offline completo de operações/envelope e verificação criptográfica após SOAP.
+Snapshot interno composto MG_LIFECYCLE_20261105 possui fontes e hashes por arquivo;
+não representa homologação oficial ou vigência aprovada por contribuinte.
+44 testes dirigidos de operações/schema passaram antes da regressão ampliada.
+Teste positivo: NF-e sintética completa → assinatura → XSD enviNFe → SOAP com
+digest/assinatura verificados → resposta local → nfeProc validado por XSD.
+Bugs de causa raiz corrigidos: literal CONSULTAR, SOAPAction e namespaces SOAP
+que alteravam a canonicalização. Detalhes e gaps internos:
+docs/NFV1_MG_LIFECYCLE_CONTINUITY_2026-11-05.md.
+Estados globais NAT-UF-MG e transversais continuam IMPLEMENTING.
+Próximo bloco: runtime governado e preparação/recuperação Web; resolver ano explícito
+de inutilização, seguir NFC-e MG e NFS-e BH antes de promover MG como completa.
+PR/SHA/CI final devem constar na PR deste incremento. Sem merge/deploy nesta execução.
+
+Gate local da continuidade MG: **265 PASS em 97,55s**; Ruff global, Mypy dirigido
+(cinco módulos), plano de 59 tarefas e validação BUILD PASS. Wheel construída.
+Cenário positivo de NF-e completa assinada e nfeProc validado é sintético e
+comprova contrato estrutural/criptográfico; não comprova tributação ou homologação.
