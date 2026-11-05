@@ -128,7 +128,7 @@ class SefazSpHomologationGateway:
     def __init__(
         self,
         *,
-        resolve_certificate: Callable[[ExecutionScope], EphemeralCertificateMaterial],
+        resolve_certificate: Callable[[ExecutionScope, str], EphemeralCertificateMaterial],
         timeout_seconds: float = 20.0,
         exchange: Callable[[bytes, ssl.SSLContext, float], bytes] | None = None,
     ) -> None:
@@ -168,7 +168,7 @@ class SefazSpHomologationGateway:
         if not isinstance(request, AuthorizationRequest):
             raise OfficialNfeTransportError("Solicitação de autorização fiscal inválida")
         xml = _signed_homologation_xml(request)
-        material = self._resolve_certificate(request.scope)
+        material = self._resolve_certificate(\n            request.scope, request.access_key.issuer_identifier\n        )
         if not isinstance(material, EphemeralCertificateMaterial):
             raise OfficialNfeTransportError("Certificado A1 não cadastrado para o CNPJ emitente")
         validate_a1_for_issuer(
