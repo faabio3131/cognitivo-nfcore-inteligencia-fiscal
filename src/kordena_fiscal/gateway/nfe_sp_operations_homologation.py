@@ -32,9 +32,9 @@ _BASE_URL = "https://homologacao.nfe.fazenda.sp.gov.br/ws/"
 _PROVIDER = GatewayProviderMetadata("sefaz-sp-homologacao-nfe4", "1.0")
 _MAX_RESPONSE_BYTES = 2_097_152
 _SERVICES = {
-    "NFeConsultaProtocolo4": "nfeconsultaprotocolo4.asmx",
-    "NFeRecepcaoEvento4": "nferecepcaoevento4.asmx",
-    "NFeInutilizacao4": "nfeinutilizacao4.asmx",
+    "NFeConsultaProtocolo4": ("nfeconsultaprotocolo4.asmx", "nfeConsultaNF"),
+    "NFeRecepcaoEvento4": ("nferecepcaoevento4.asmx", "nfeRecepcaoEvento"),
+    "NFeInutilizacao4": ("nfeinutilizacao4.asmx", "nfeInutilizacaoNF"),
 }
 
 
@@ -68,7 +68,8 @@ def _post_official(
 ) -> bytes:
     if service not in _SERVICES:
         raise OfficialNfeOperationsError("Unsupported SP fiscal service")
-    endpoint = _BASE_URL + _SERVICES[service]
+    path, operation = _SERVICES[service]
+    endpoint = _BASE_URL + path
     request = Request(
         endpoint, method="POST", data=payload,
         headers={
