@@ -1,11 +1,7 @@
-"""R16 SP municipal resolver: scope, IBGE, approval and provider routing tests.
-
-All integrations are synthetic: no municipal system, A1, or official taxpayer
-credentials are invoked by these tests.
-"""
+"""SP R16 provider selection: canonical persistence is the only authority."""
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from dataclasses import dataclass, field
 
 import pytest
 
@@ -14,159 +10,158 @@ from kordena_fiscal.domain import (
     ExecutionScope,
     FiscalDocumentKind,
     FiscalEnvironment,
-    FiscalValidationError,
 )
 from kordena_fiscal.gateway.municipal_sp_routing import (
     SP_MUNICIPAL_CANDIDATES,
-    ApprovedMunicipalProviderBinding,
     GovernedSpMunicipalProviderResolver,
 )
 from kordena_fiscal.gateway.provider import (
-    ProviderOperation,
     ProviderSelectionResolver,
     UnsupportedProviderError,
 )
 
 
 def _scope(
-    tenant_id: str = "tenant-1",
-    unit_id: str = "unit-1",
-    environment: FiscalEnvironment = FiscalEnvironment.HOMOLOGATION,
+    tenant: str = "tenant-1", unit: str = "unit-1",
+    env: FiscalEnvironment = FiscalEnvironment.HOMOLOGATION,
+    host: str | None = "nfcore",
 ) -> ExecutionScope:
     return ExecutionScope(
-        host_namespace="nfcore", tenant_id=tenant_id, unit_id=unit_id,
-        environment=environment, correlation_id="r16-test",
+        host_namespace=host, tenant_id=tenant, unit_id=unit,
+        environment=env, correlation_id="r16",
     )
 
 
-def _binding(
-    scope: ExecutionScope, code: str, provider: str = "nota-paulistana",
-) -> ApprovedMunicipalProviderBinding:
-    assert scope.host_namespace is not None
-    return ApprovedMunicipalProviderBinding(
-        host_namespace=scope.host_namespace, tenant_id=scope.tenant_id,
-        unit_id=scope.unit_id, environment=scope.environment,
-        issuer_municipality_ibge=code, provider_id=provider,
-        version=3, approved_by="platform-admin", approved_at=datetime.now(UTC),
-        enabled=True, permitted_operations=frozenset(
-            {ProviderOperation.AUTHORIZE, ProviderOperation.QUERY}
-        ),
-    )
+@dataclass
+class _CanonicalBindingResolver:
+    """Test double for existing DurableProviderBindingResolver contract."""
+
+    approved: dict[tuple[str, str, FiscalEnvironment, str, str], str]
+    calls: list[tuple[str, str, FiscalEnvironment, str, str]] = field(default_factory=list)
+
+    def resolve_provider_id(
+        self, *, scope: ExecutionScope, document_kind: FiscalDocumentKind,
+        jurisdiction: BrazilianJurisdiction, operation: str,
+    ) -> str:
+        assert document_kind is FiscalDocumentKind.NFSE
+        assert jurisdiction.municipality_ibge_code is not None
+        key = (scope.tenant_id, scope.unit_id, scope.environment,
+               jurisdiction.municipality_ibge_code, operation)
+        self.calls.append(key)
+        if key not in self.approved:
+            raise UnsupportedProviderError("no durable binding")
+        return self.approved[key]
 
 
 def _resolve(
-    resolver: GovernedSpMunicipalProviderResolver,
-    scope: ExecutionScope,
-    code: str = "3550308",
-    kind: FiscalDocumentKind = FiscalDocumentKind.NFSE,
-    operation: str = "authorize",
+    router: GovernedSpMunicipalProviderResolver, scope: ExecutionScope,
+    ibge: str = "3550308", kind: FiscalDocumentKind = FiscalDocumentKind.NFSE,
+    operation: str = "authorize", state: str = "SP",
 ) -> str:
-    return resolver.resolve_provider_id(
-        scope=scope,
-        document_kind=kind,
-        jurisdiction=BrazilianJurisdiction("SP", code),
-        operation=operation,
+    return router.resolve_provider_id(
+        scope=scope, document_kind=kind,
+        jurisdiction=BrazilianJurisdiction(state, ibge), operation=operation,
     )
 
 
-def test_catalog_covers_all_22_requested_ibge_codes() -> None:
-    expected = {
+def test_all_22_municipal_ibge_codes_are_registered() -> None:
+    assert set(SP_MUNICIPAL_CANDIDATES) == {
         "3505708", "3550308", "3509502", "3552205", "3518800",
         "3548500", "3548807", "3525904", "3552502", "3547304",
         "3534401", "3522505", "3525003", "3528502", "3503901",
         "3527306", "3556206", "3523909", "3545209", "3531803",
         "3518701", "3551009",
     }
-    assert set(SP_MUNICIPAL_CANDIDATES) == expected
-    assert len(SP_MUNICIPAL_CANDIDATES) == 22
 
 
-def test_resolver_implements_existing_canonical_provider_port() -> None:
-    scope = _scope()
-    resolver = GovernedSpMunicipalProviderResolver(
-        load_approved_binding=lambda s, code: _binding(s, code)
-    )
-    selector: ProviderSelectionResolver = resolver
-    assert _resolve(resolver, scope) == "nota-paulistana"
-    assert selector.resolve_provider_id(
-        scope=scope, document_kind=FiscalDocumentKind.NFSE,
+def test_routes_via_existing_provider_selection_protocol() -> None:
+    canonical = _CanonicalBindingResolver({
+        ("tenant-1", "unit-1", FiscalEnvironment.HOMOLOGATION,
+         "3550308", "authorize"): "nota-paulistana"
+    })
+    router = GovernedSpMunicipalProviderResolver(canonical_resolver=canonical)
+    selected: ProviderSelectionResolver = router
+    assert selected.resolve_provider_id(
+        scope=_scope(), document_kind=FiscalDocumentKind.NFSE,
         jurisdiction=BrazilianJurisdiction("SP", "3550308"),
-        operation="query",
+        operation="authorize",
     ) == "nota-paulistana"
+    assert len(canonical.calls) == 1
 
 
-def test_provider_is_not_derived_from_advisory_city_catalog() -> None:
-    scope = _scope()
-    resolver = GovernedSpMunicipalProviderResolver(
-        load_approved_binding=lambda s, code: _binding(s, code, "governed-2026-adapter")
-    )
-    assert _resolve(resolver, scope, code="3505708") == "governed-2026-adapter"
+def test_no_provider_is_selected_from_catalog_without_a_durable_binding() -> None:
+    canonical = _CanonicalBindingResolver({})
+    router = GovernedSpMunicipalProviderResolver(canonical_resolver=canonical)
+    with pytest.raises(UnsupportedProviderError, match="durable"):
+        _resolve(router, _scope())
+    assert len(canonical.calls) == 1
+
+
+def test_candidate_family_never_overrides_governed_provider_choice() -> None:
+    canonical = _CanonicalBindingResolver({
+        ("tenant-1", "unit-1", FiscalEnvironment.HOMOLOGATION,
+         "3505708", "authorize"): "future-vetted-transport"
+    })
+    router = GovernedSpMunicipalProviderResolver(canonical_resolver=canonical)
+    assert _resolve(router, _scope(), ibge="3505708") == "future-vetted-transport"
 
 
 @pytest.mark.parametrize(
-    ("scope", "code", "kind", "operation"),
+    "scope",
     [
-        (_scope(), "3550308", FiscalDocumentKind.NFE, "authorize"),
-        (_scope(), "9999999", FiscalDocumentKind.NFSE, "authorize"),
-        (_scope(), "3550308", FiscalDocumentKind.NFSE, "cancel"),
-        (_scope(tenant_id="other-tenant"), "3550308", FiscalDocumentKind.NFSE, "authorize"),
-        (_scope(unit_id="other-unit"), "3550308", FiscalDocumentKind.NFSE, "authorize"),
-        (
-            _scope(environment=FiscalEnvironment.PRODUCTION),
-            "3550308", FiscalDocumentKind.NFSE, "authorize",
-        ),
+        _scope(tenant="other-tenant"),
+        _scope(unit="other-unit"),
+        _scope(env=FiscalEnvironment.PRODUCTION),
     ],
 )
-def test_routing_fails_closed_on_invalid_scope_kind_or_operation(
-    scope: ExecutionScope, code: str, kind: FiscalDocumentKind, operation: str,
+def test_tenant_unit_environment_isolation(scope: ExecutionScope) -> None:
+    canonical = _CanonicalBindingResolver({
+        ("tenant-1", "unit-1", FiscalEnvironment.HOMOLOGATION,
+         "3550308", "authorize"): "nota-paulistana"
+    })
+    router = GovernedSpMunicipalProviderResolver(canonical_resolver=canonical)
+    with pytest.raises(UnsupportedProviderError):
+        _resolve(router, scope)
+
+
+@pytest.mark.parametrize(
+    ("municipality", "kind", "operation", "state"),
+    [
+        ("3550308", FiscalDocumentKind.NFE, "authorize", "SP"),
+        ("0000000", FiscalDocumentKind.NFSE, "authorize", "SP"),
+        ("3550308", FiscalDocumentKind.NFSE, "invalid", "SP"),
+        ("3550308", FiscalDocumentKind.NFSE, "authorize", "RJ"),
+    ],
+)
+def test_rejects_out_of_scope_municipality_kind_operation_and_state(
+    municipality: str, kind: FiscalDocumentKind, operation: str, state: str,
 ) -> None:
-    approved = _scope()
-    binding = _binding(approved, "3550308")
-    resolver = GovernedSpMunicipalProviderResolver(
-        load_approved_binding=lambda _scope, _code: binding
-    )
+    canonical = _CanonicalBindingResolver({})
+    router = GovernedSpMunicipalProviderResolver(canonical_resolver=canonical)
     with pytest.raises(UnsupportedProviderError):
-        _resolve(resolver, scope, code=code, kind=kind, operation=operation)
+        _resolve(router, _scope(), municipality, kind, operation, state)
+    assert canonical.calls == []
 
 
-def test_unknown_municipality_and_no_approval_never_fall_back() -> None:
-    resolver = GovernedSpMunicipalProviderResolver(
-        load_approved_binding=lambda _scope, _code: None
-    )
+def test_missing_host_authority_rejected_before_db_lookup() -> None:
+    canonical = _CanonicalBindingResolver({})
+    router = GovernedSpMunicipalProviderResolver(canonical_resolver=canonical)
     with pytest.raises(UnsupportedProviderError):
-        _resolve(resolver, _scope())
+        _resolve(router, _scope(host=None))
+    assert canonical.calls == []
+
+
+def test_taker_municipality_cannot_change_issuer_binding() -> None:
+    canonical = _CanonicalBindingResolver({
+        ("tenant-1", "unit-1", FiscalEnvironment.HOMOLOGATION,
+         "3550308", "authorize"): "nota-paulistana"
+    })
+    router = GovernedSpMunicipalProviderResolver(canonical_resolver=canonical)
+    assert _resolve(router, _scope(), ibge="3550308") == "nota-paulistana"
     with pytest.raises(UnsupportedProviderError):
-        _resolve(resolver, _scope(), code="3500000")
+        _resolve(router, _scope(), ibge="3509502")
 
 
-def test_taker_location_cannot_override_issuer_routing() -> None:
-    scope = _scope()
-    resolver = GovernedSpMunicipalProviderResolver(
-        load_approved_binding=lambda s, _code: _binding(s, "3550308")
-    )
-    assert _resolve(resolver, scope, "3550308") == "nota-paulistana"
-    with pytest.raises(UnsupportedProviderError):
-        _resolve(resolver, scope, "3509502")
-
-
-def test_disabled_and_unapproved_operations_are_rejected() -> None:
-    scope = _scope()
-    record = _binding(scope, "3550308")
-    from dataclasses import replace
-
-    resolver = GovernedSpMunicipalProviderResolver(
-        load_approved_binding=lambda _s, _code: replace(record, enabled=False)
-    )
-    with pytest.raises(UnsupportedProviderError):
-        _resolve(resolver, scope)
-
-
-def test_invalid_approval_metadata_fails_before_routing() -> None:
-    with pytest.raises(FiscalValidationError):
-        ApprovedMunicipalProviderBinding(
-            host_namespace="nfcore", tenant_id="t", unit_id="u",
-            environment=FiscalEnvironment.HOMOLOGATION,
-            issuer_municipality_ibge="bad", provider_id="dsf",
-            version=1, approved_by="admin", approved_at=datetime.now(UTC),
-            enabled=True, permitted_operations=frozenset({ProviderOperation.AUTHORIZE}),
-        )
+def test_cannot_construct_without_canonical_authority() -> None:
+    with pytest.raises(TypeError):
+        GovernedSpMunicipalProviderResolver(canonical_resolver=None)  # type: ignore[arg-type]
