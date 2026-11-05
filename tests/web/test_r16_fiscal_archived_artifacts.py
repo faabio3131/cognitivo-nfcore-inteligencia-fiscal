@@ -75,3 +75,43 @@ def test_xml_danfe_and_tenant_isolation() -> None:
     with pytest.raises(HTTPException) as forbidden_kind:
         read("tenant-a", FiscalArchiveKind.OTHER)
     assert forbidden_kind.value.status_code == 400
+
+
+def test_danfe_is_rendered_only_after_scoped_authorized_xml_lookup() -> None:
+    scope = ExecutionScope(
+        host_namespace="fm-nfcore", tenant_id="tenant-a", unit_id="unit-a",
+        environment=FiscalEnvironment.HOMOLOGATION, correlation_id="pdf-test",
+    )
+    archive = InMemoryFiscalArchiveStore()
+    xml = b"<nfeProc versao='4.00'/>"
+    archive.append(FiscalArchiveEntry.build(
+        scope=scope, document_reference="NF-123",
+        kind=FiscalArchiveKind.AUTHORIZED_XML,
+        content=xml, media_type="application/xml",
+        archived_at=datetime.now(UTC),
+        retention=RetentionPolicyMetadata(policy_id="test", policy_version=1),
+    ))
+    observed: list[bytes] = []
+
+    def mock_renderer(document: bytes) -> bytes:
+        observed.append(document)
+        return b"%PDF-1.7\\nNFCore test"
+
+    executor = DurableHumanPortalExecutor(
+        cast(FiscalUnitOfWorkFactory, lambda: _Uow(archive)),
+        danfe_renderer=mock_renderer,
+    )
+
+    def render(tenant: str) -> tuple[bytes, str]:
+        return executor.fiscal_artifact(
+            authority=cast(AuthenticatedHuman, _Authorized(tenant)),
+            unit_id="unit-a", environment=FiscalEnvironment.HOMOLOGATION,
+            document_reference="NF-123", kind=FiscalArchiveKind.DANFE,
+        )
+
+    assert render("tenant-a") == (b"%PDF-1.7\\nNFCore test", "application/pdf")
+    assert observed == [xml]
+    with pytest.raises(HTTPException) as foreign:
+        render("different-tenant")
+    assert foreign.value.status_code == 404
+    assert observed == [xml]
