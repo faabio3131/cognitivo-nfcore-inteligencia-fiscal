@@ -133,7 +133,7 @@ class SefazSpHomologationGateway:
         self,
         *,
         resolve_certificate: Callable[[ExecutionScope, str], EphemeralCertificateMaterial],
-        timeout_seconds: float = 20.0,
+        timeout_seconds: float = 15.0,
         exchange: Callable[[bytes, ssl.SSLContext, float], bytes] | None = None,
     ) -> None:
         if not callable(resolve_certificate) or not 0 < timeout_seconds <= 60:
