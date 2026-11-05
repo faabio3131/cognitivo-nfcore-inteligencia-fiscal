@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 
 from kordena_fiscal.domain import (
     BrazilianJurisdiction,
@@ -78,16 +78,16 @@ class ApprovedMunicipalProviderBinding:
     def __post_init__(self) -> None:
         if not self.host_namespace or not self.tenant_id or not self.unit_id:
             raise FiscalValidationError("Municipal routing requires bound host/tenant/unit")
-        if self.environment not in FiscalEnvironment:
+        if not isinstance(self.environment, FiscalEnvironment):
             raise FiscalValidationError("Invalid routing environment")
         code = self.issuer_municipality_ibge
         if not isinstance(code, str) or len(code) != 7 or not code.isdecimal():
             raise FiscalValidationError("Issuer municipality requires seven-digit IBGE code")
         if not isinstance(self.provider_id, str) or not self.provider_id.strip():
             raise FiscalValidationError("Municipal provider id is required")
-        if self.version < 1 or not self.approved_by:
+        if not isinstance(self.version, int) or isinstance(self.version, bool) or self.version < 1 or not self.approved_by:
             raise FiscalValidationError("Routing approval metadata is required")
-        if self.approved_at.tzinfo is None or self.approved_at.utcoffset() is None:
+        if not isinstance(self.approved_at, datetime) or self.approved_at.tzinfo is None or self.approved_at.utcoffset() is None:
             raise FiscalValidationError("Routing approval timestamp requires timezone")
         if not isinstance(self.enabled, bool) or not self.permitted_operations:
             raise FiscalValidationError("Routing requires explicit enabled/operation permissions")
