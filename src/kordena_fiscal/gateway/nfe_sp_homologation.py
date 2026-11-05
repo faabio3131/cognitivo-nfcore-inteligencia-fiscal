@@ -162,7 +162,7 @@ class SefazSpHomologationGateway:
                 raw = response.read(_MAX_RESPONSE_BYTES + 1)
             if len(raw) > _MAX_RESPONSE_BYTES:
                 raise OfficialNfeTransportError("Resposta fiscal excede limite")
-            return raw
+            return bytes(raw)
         except (HTTPError, URLError, TimeoutError, OSError, ssl.SSLError):
             raise OfficialNfeTransportError(
                 "Comunicação com a SEFAZ-SP indisponível; verifique o resultado antes de reenviar"
