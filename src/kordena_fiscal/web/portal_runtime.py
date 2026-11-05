@@ -15,7 +15,11 @@ from typing import Any, Protocol
 
 from fastapi import HTTPException, status
 
-from kordena_fiscal.archive import FiscalArchiveKind, FiscalArchiveVerifier
+from kordena_fiscal.archive import (
+    ArchiveIntegrityError,
+    FiscalArchiveKind,
+    FiscalArchiveVerifier,
+)
 from kordena_fiscal.application.commercial_portal import (
     CommercialPortalReader,
     CommercialPortalReadError,
@@ -859,7 +863,13 @@ class DurableHumanPortalExecutor:
                 413, "FISCAL_ARTIFACT_TOO_LARGE", "Fiscal file exceeds allowed size"
             )
         # Verify stored content rather than trusting a projected archive flag.
-        FiscalArchiveVerifier().verify_entry(entry)
+        try:
+            FiscalArchiveVerifier().verify_entry(entry)
+        except ArchiveIntegrityError as exc:
+            raise _portal_error(
+                409, "FISCAL_ARTIFACT_INTEGRITY_FAILED",
+                "Stored fiscal document failed integrity verification",
+            ) from exc
         allowed_media = {
             FiscalArchiveKind.AUTHORIZED_XML: frozenset(
                 {"application/xml", "text/xml"}
