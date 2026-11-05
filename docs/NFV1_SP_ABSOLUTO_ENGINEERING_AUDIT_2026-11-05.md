@@ -184,3 +184,44 @@ mas não existe evidência para afirmar prontidão de emissão fiscal SP absolut
 - **Merge, produção e deploy:** proibido declarar encerramento 100% até a
   matriz de CI/E2E passar, a operação fiscal ser real e o benchmark de
   latência sub-400 ms ser medido e aprovado.
+
+## 7. Benchmark repetido e entrega XML/DANFE — 05/11/2026
+
+**Execução verificada na Contabo, antes do deploy das otimizações desta PR:**
+`git show FETCH_HEAD:scripts/bench/nfcore_readiness_load.py` em
+`/tmp/nfcore_readiness_bench_r16.py`; GET somente leitura
+`https://api.nfcore.com.br/health/ready`, duas fases independentes com
+100 requisições cada e 50/100 concorrentes. Nenhuma nota foi emitida.
+
+| Medição | 50 concorrentes | 100 concorrentes |
+| --- | ---: | ---: |
+| HTTP 200 / total | 100 / 100 | 100 / 100 |
+| Falhas | 0 | 0 |
+| Latência média (ms) | 1.197,799 | 607,366 |
+| P95 (ms) | 2.328,829 | 854,918 |
+| P99 (ms) | 2.449,957 | 950,589 |
+| Vazão (req/s) | 31,83 | 55,63 |
+| Média inferior a 400 ms | NÃO | NÃO |
+
+O benchmark mede o acesso via hostname público a partir da própria VPS,
+incluindo proxy, rede/TLS e concorrência. Não é medida isolada do handler
+nem validação de performance de emissão fiscal. O contêiner implantado
+não contém a configuração de quatro workers e keep-alive da PR #355;
+é obrigatório repetir esse benchmark depois de um deploy aprovado.
+
+**Jornada de arquivo fiscal:** a API da sessão humana passou a expor
+`GET /v1/portal/documents/{document_reference}/artifacts/{kind}`, limitada
+a `authorized_xml` e `danfe`, com unidade/ambiente filtrados por RBAC,
+isolamento por tenant, hash de integridade do arquivo canônico, MIME estrito,
+`Cache-Control: no-store` e download XML/visualização PDF. A listagem do
+Portal só apresenta links quando o item já está efetivamente arquivado.
+A ausência do artefato responde com 404 controlado (não substitui
+o documento por conteúdo simulado).
+
+**Lacuna de emissão:** o adaptador SEFAZ-SP atual retorna apenas metadados
+de autorização (número de protocolo), e a aplicação não cria automaticamente
+um artefato `AUTHORIZED_XML` contendo `nfeProc` nem um arquivo
+`DANFE` após confirmar a emissão. A preparação de DPS assinada,
+o formulário completo de tomador/serviço/ISS e a geração de DANFE a partir
+do XML protocolado permanecem pendentes. Portanto esta entrega
+**não certifica a jornada ponta a ponta de emissão e download**.
