@@ -11,6 +11,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 
+from kordena_fiscal.archive.danfe_pdf import render_authorized_nfe_danfe
 from kordena_fiscal.application.commercial_activation import (
     CommercialCustomerActivationService,
 )
@@ -214,6 +215,7 @@ def build_postgres_runtime_composition(
         capability_readiness=capability_readiness,
         user_administration=human_administration,
         commercial_reader=commercial_portal_read,
+        danfe_renderer=render_authorized_nfe_danfe,
     )
     return RuntimeComposition(
         human_identity=identity,
