@@ -44,15 +44,23 @@ def build_nfse_dps_request(signed_dps_xml: bytes) -> bytes:
         raise OfficialNfseTransportError("XML da DPS inválido") from None
     if etree.QName(root).localname != "DPS":
         raise OfficialNfseTransportError("Envelope exige raiz DPS")
-    infos = root.xpath("./*[local-name()='infDPS']")
+    infos = [
+        child for child in root if etree.QName(child).localname == "infDPS"
+    ]
     if len(infos) != 1:
         raise OfficialNfseTransportError("infDPS obrigatória")
     if not infos[0].get("Id"):
         raise OfficialNfseTransportError("Identificador de infDPS obrigatório")
-    environments = root.xpath(".//*[local-name()='tpAmb']")
+    environments = [
+        child for child in root.iter() if etree.QName(child).localname == "tpAmb"
+    ]
     if len(environments) != 1 or environments[0].text != "2":
         raise OfficialNfseTransportError("DPS exige tpAmb=2")
-    signatures = root.xpath("./*[local-name()='Signature' and namespace-uri()='http://www.w3.org/2000/09/xmldsig#']")
+    signatures = [
+        child for child in root
+        if etree.QName(child).localname == "Signature"
+        and etree.QName(child).namespace == "http://www.w3.org/2000/09/xmldsig#"
+    ]
     if len(signatures) != 1:
         raise OfficialNfseTransportError("DPS exige assinatura XMLDSig")
     return json.dumps(
@@ -132,7 +140,7 @@ class NfseNationalHomologationTransport:
             ) from None
         if len(raw) > _MAX_RESPONSE_BYTES:
             raise OfficialNfseTransportError("Resposta da NFS-e Nacional excede limite")
-        return raw
+        return bytes(raw)
 
     def submit_signed_dps(self, signed_dps_xml: bytes) -> dict[str, str]:
         """Send only homologation DPS, without changing business authorization."""
