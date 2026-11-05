@@ -5,13 +5,16 @@ import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
-from cryptography.hazmat.primitives.serialization import Encoding, pkcs12
+from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import NameOID, ObjectIdentifier
 from lxml import etree
 
 from kordena_fiscal.domain import ExecutionScope, FiscalEnvironment
 from kordena_fiscal.gateway.nfe_sp_homologation import (
-    NFE_NAMESPACE, SOAP12_NAMESPACE, _parse_xml, _soap_envelope,
+    NFE_NAMESPACE,
+    SOAP12_NAMESPACE,
+    _parse_xml,
+    _soap_envelope,
 )
 from kordena_fiscal.signing.nfe_xmldsig import sign_nfe_envi_xml
 from kordena_fiscal.vault import EphemeralCertificateMaterial
@@ -32,7 +35,10 @@ def test_a1():
         .not_valid_before(now - timedelta(days=1))
         .not_valid_after(now + timedelta(days=30))
         .add_extension(x509.SubjectAlternativeName([
-            x509.OtherName(ObjectIdentifier("2.16.76.1.3.3"), bytes.fromhex("0c0e") + b"11222333000181"),
+            x509.OtherName(
+                ObjectIdentifier("2.16.76.1.3.3"),
+                bytes.fromhex("0c0e") + b"11222333000181",
+            ),
         ]), critical=False)
         .add_extension(x509.KeyUsage(
             digital_signature=True, content_commitment=True, key_encipherment=True,
