@@ -165,3 +165,15 @@ def test_taker_municipality_cannot_change_issuer_binding() -> None:
 def test_cannot_construct_without_canonical_authority() -> None:
     with pytest.raises(TypeError):
         GovernedSpMunicipalProviderResolver(canonical_resolver=None)  # type: ignore[arg-type]
+
+
+def test_new_sp_city_is_onboarded_without_code_change() -> None:
+    """R16 must not require a deploy to connect an IBGE outside the pilot catalog."""
+    new_code = "3500105"  # Adamantina/SP
+    assert new_code not in SP_MUNICIPAL_CANDIDATES
+    canonical = _CanonicalBindingResolver({
+        ("tenant-1", "unit-1", FiscalEnvironment.HOMOLOGATION,
+         new_code, "authorize"): "approved-next-city"
+    })
+    router = GovernedSpMunicipalProviderResolver(canonical_resolver=canonical)
+    assert _resolve(router, _scope(), ibge=new_code) == "approved-next-city"
