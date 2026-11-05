@@ -56,6 +56,7 @@ from .ai_secrets import build_production_openai_key_readers
 from .alert_rules import InternalAlertMonitor, OperationalSignals
 from .api_staging_gsm_probe import staging_probe_verifier
 from .cakto import build_cakto_webhook_router
+from .canonical_fiscal_composition import build_runtime_fiscal_handler_factory
 from .composition import (
     FiscalOperationHandlerFactory,
     RuntimeComposition,
@@ -902,6 +903,11 @@ app = create_runtime_app(
     fiscal_operation_handlers=(
         development_fiscal_ingress(_entrypoint_settings, os.environ)
         if _entrypoint_settings.environment.value in {"development", "test"}
+        else None
+    ),
+    fiscal_operation_handler_factory=(
+        build_runtime_fiscal_handler_factory()
+        if _entrypoint_settings.environment.value in {"staging", "production"}
         else None
     ),
     commercial_acquisition_security=_development_ingress.get(
