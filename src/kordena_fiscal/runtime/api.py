@@ -24,6 +24,7 @@ from kordena_fiscal.persistence.commercial_fulfillment import (
 )
 from kordena_fiscal.persistence.commercial_period_schema import COMMERCIAL_PERIOD_VERSION
 from kordena_fiscal.persistence.postgres import PostgresFiscalDatabase
+from kordena_fiscal.vault.encrypted_a1 import EncryptedA1Vault
 from kordena_fiscal.product.cakto import CaktoWebhookReceiver
 from kordena_fiscal.product.checkout import (
     CommercialCheckoutProjector,
@@ -201,6 +202,7 @@ def create_runtime_app(
     security_audit_sink: SecurityAuditSink | None = None,
     fiscal_operation_handlers: Mapping[str, FiscalOperationHandler] | None = None,
     fiscal_operation_handler_factory: FiscalOperationHandlerFactory | None = None,
+    certificate_vault: EncryptedA1Vault | None = None,
 ) -> FastAPI:
     resolved = settings or RuntimeSettings.from_environ()
     runtime_metrics = metrics or MetricsRegistry()
@@ -840,6 +842,7 @@ def create_runtime_app(
             password_reset_delivery=password_reset_delivery,
             password_reset_completed=commercial_activation_completed,
             portal_executor=portal_executor,
+            certificate_vault=certificate_vault,
             pricing_administration=pricing_administration,
             commercial_release_administration=commercial_release_administration,
             commercial_checkout=selected_checkout,
@@ -893,10 +896,12 @@ def create_runtime_app(
 
 
 _entrypoint_settings = RuntimeSettings.from_environ()
+_entrypoint_certificate_vault = EncryptedA1Vault.from_environ()
 _development_ingress = development_commercial_ingress(_entrypoint_settings, os.environ)
 app = create_runtime_app(
     _entrypoint_settings,
     password_reset_delivery=build_activation_delivery_from_environ(),
+    certificate_vault=_entrypoint_certificate_vault,
     command_secret_resolver=development_command_resolver(
         _entrypoint_settings, os.environ
     ),
@@ -906,7 +911,7 @@ app = create_runtime_app(
         else None
     ),
     fiscal_operation_handler_factory=(
-        build_runtime_fiscal_handler_factory()
+        build_runtime_fiscal_handler_factory(certificate_vault=_entrypoint_certificate_vault)
         if _entrypoint_settings.environment.value in {"staging", "production"}
         else None
     ),
