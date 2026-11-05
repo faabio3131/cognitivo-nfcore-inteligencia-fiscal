@@ -17,9 +17,9 @@ from kordena_fiscal.domain import (
     FiscalValidationError,
 )
 from kordena_fiscal.gateway.municipal_sp_routing import (
+    SP_MUNICIPAL_CANDIDATES,
     ApprovedMunicipalProviderBinding,
     GovernedSpMunicipalProviderResolver,
-    SP_MUNICIPAL_CANDIDATES,
 )
 from kordena_fiscal.gateway.provider import (
     ProviderOperation,
@@ -111,7 +111,10 @@ def test_provider_is_not_derived_from_advisory_city_catalog() -> None:
         (_scope(), "3550308", FiscalDocumentKind.NFSE, "cancel"),
         (_scope(tenant_id="other-tenant"), "3550308", FiscalDocumentKind.NFSE, "authorize"),
         (_scope(unit_id="other-unit"), "3550308", FiscalDocumentKind.NFSE, "authorize"),
-        (_scope(environment=FiscalEnvironment.PRODUCTION), "3550308", FiscalDocumentKind.NFSE, "authorize"),
+        (
+            _scope(environment=FiscalEnvironment.PRODUCTION),
+            "3550308", FiscalDocumentKind.NFSE, "authorize",
+        ),
     ],
 )
 def test_routing_fails_closed_on_invalid_scope_kind_or_operation(
