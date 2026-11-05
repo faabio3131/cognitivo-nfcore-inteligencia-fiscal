@@ -30,7 +30,7 @@ from kordena_fiscal.vault import EphemeralCertificateMaterial
 from kordena_fiscal.vault.a1_preflight import validate_a1_for_issuer
 
 NACIONAL_HOMOLOGATION_NFSE_URL = (
-    "https://sefin.producaorestrita.nfse.gov.br/SefinNacional/nfse"
+    "https://sefin.producaorestrita.nfse.gov.br/API/SefinNacional/nfse"
 )
 _MAX_DPS = 2_097_152
 _MAX_RESPONSE = 2_097_152
@@ -94,7 +94,7 @@ class NfseNacionalHomologationGateway:
         resolve_certificate: Callable[[ExecutionScope, str], EphemeralCertificateMaterial],
         build_signed_dps: Callable[[NfseAuthorizationRequest, EphemeralCertificateMaterial], bytes],
         exchange: Callable[[bytes, ssl.SSLContext, float], bytes] | None = None,
-        timeout_seconds: float = 20,
+        timeout_seconds: float = 15,
     ) -> None:
         if not callable(resolve_certificate) or not callable(build_signed_dps):
             raise ValueError("NFS-e requires trusted certificate and DPS preparation ports")
@@ -124,7 +124,7 @@ class NfseNacionalHomologationGateway:
             raise OfficialNfseTransportError("Resposta SEFIN inválida")
         try:
             result = json.loads(response)
-            if not isinstance(result, dict) or result.get("tipoAmbiente") != 2:
+            if not isinstance(result, dict) or result.get("tipoAmbiente", 2) != 2:
                 raise ValueError
         except (ValueError, UnicodeDecodeError):
             raise OfficialNfseTransportError("Resposta SEFIN sem homologação válida") from None
