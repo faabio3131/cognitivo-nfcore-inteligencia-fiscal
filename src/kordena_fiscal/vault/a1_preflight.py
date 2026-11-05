@@ -19,7 +19,6 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import ObjectIdentifier
 
 from kordena_fiscal.domain.identifiers import Cnpj
-from kordena_fiscal.signing.contracts import InvalidCertificateMaterialError
 
 _CNPJ_OTHER_NAME: Final = ObjectIdentifier("2.16.76.1.3.3")
 _MAX_PKCS12_BYTES: Final = 2 * 1024 * 1024
@@ -70,6 +69,7 @@ def validate_a1_for_issuer(
 
     This performs structural and issuer checks, not PKI trust/revocation checks.
     """
+    from kordena_fiscal.signing.contracts import InvalidCertificateMaterialError
     if (
         not isinstance(pkcs12_bytes, bytes)
         or not pkcs12_bytes
