@@ -15,14 +15,14 @@ from typing import Any, Protocol
 
 from fastapi import HTTPException, status
 
+from kordena_fiscal.application.commercial_portal import (
+    CommercialPortalReader,
+    CommercialPortalReadError,
+)
 from kordena_fiscal.archive import (
     ArchiveIntegrityError,
     FiscalArchiveKind,
     FiscalArchiveVerifier,
-)
-from kordena_fiscal.application.commercial_portal import (
-    CommercialPortalReader,
-    CommercialPortalReadError,
 )
 from kordena_fiscal.compliance import CapabilityReadinessService, JurisdictionCapabilityError
 from kordena_fiscal.compliance.capability_api import CapabilityReadinessError
