@@ -582,6 +582,17 @@ function fiscalRowElement(row) {
       artifact.rel = "noopener noreferrer";
     }
     wrapper.append(artifact);
+    if (kind === "authorized_xml") {
+      const danfe = document.createElement("a");
+      danfe.className = "ghost";
+      danfe.textContent = "Visualizar DANFE/PDF";
+      danfe.href = `/v1/portal/documents/${encodeURIComponent(reference)}/artifacts/danfe?${new URLSearchParams({
+        unit_id: unit, environment,
+      })}`;
+      danfe.target = "_blank";
+      danfe.rel = "noopener noreferrer";
+      wrapper.append(danfe);
+    }
   }
   return wrapper;
 }
