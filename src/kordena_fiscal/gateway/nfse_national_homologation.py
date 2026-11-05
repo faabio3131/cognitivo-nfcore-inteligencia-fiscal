@@ -82,9 +82,13 @@ def parse_nfse_homologation_response(raw: bytes) -> dict[str, str]:
                 document = stream.read(_MAX_RESPONSE_BYTES + 1)
             if len(document) > _MAX_RESPONSE_BYTES:
                 raise ValueError
-            etree.fromstring(document, parser=etree.XMLParser(resolve_entities=False, no_network=True))
+            etree.fromstring(
+                document, parser=etree.XMLParser(resolve_entities=False, no_network=True)
+            )
         except (ValueError, OSError, etree.XMLSyntaxError):
-            raise OfficialNfseTransportError("XML retornado pela NFS-e Nacional é inválido") from None
+            raise OfficialNfseTransportError(
+                "XML retornado pela NFS-e Nacional é inválido"
+            ) from None
         return {"status": "authorized", "chaveAcesso": access_key, "xml": document.decode("utf-8")}
     raise OfficialNfseTransportError(
         "NFS-e Nacional não autorizou a DPS; consulte as rejeições no retorno oficial"
@@ -118,7 +122,8 @@ class NfseNationalHomologationTransport:
             headers={"Content-Type": "application/json", "Accept": "application/json"},
         )
         try:
-            with build_opener(HTTPSHandler(context=context)).open(request, timeout=timeout) as response:
+            opener = build_opener(HTTPSHandler(context=context))
+            with opener.open(request, timeout=timeout) as response:
                 raw = response.read(_MAX_RESPONSE_BYTES + 1)
         except (HTTPError, URLError, TimeoutError, OSError, ssl.SSLError):
             raise OfficialNfseTransportError(
