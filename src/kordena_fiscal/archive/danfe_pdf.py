@@ -10,7 +10,7 @@ from lxml import etree
 from kordena_fiscal.domain import FiscalValidationError
 
 _NFE = "http://www.portalfiscal.inf.br/nfe"
-_NS = {"n": _NFE}
+_DS = "http://www.w3.org/2000/09/xmldsig#"
 _MAX_XML_BYTES = 2_097_152
 _MAX_PDF_BYTES = 8_388_608
 
@@ -25,19 +25,15 @@ def render_authorized_nfe_danfe(xml_bytes: bytes) -> bytes:
         )
     except etree.XMLSyntaxError:
         raise FiscalValidationError("XML NF-e inválido") from None
-    if root.getroottree().docinfo.doctype or root.tag != f"{{{_NFE}}}nfeProc":
+    if getattr(root.getroottree().docinfo, "doctype", "") or root.tag != f"{{{_NFE}}}nfeProc":
         raise FiscalValidationError("DANFE requer nfeProc autorizado, sem DTD")
     if root.get("versao") != "4.00":
         raise FiscalValidationError("DANFE exige leiaute NF-e 4.00")
-    invoices = root.xpath("./n:NFe/n:infNFe", namespaces=_NS)
-    protocols = root.xpath("./n:protNFe/n:infProt", namespaces=_NS)
+    invoices = root.findall(f"{{{_NFE}}}NFe/{{{_NFE}}}infNFe")
+    protocols = root.findall(f"{{{_NFE}}}protNFe/{{{_NFE}}}infProt")
     if len(invoices) != 1 or len(protocols) != 1:
         raise FiscalValidationError("NF-e protocolada exige nota e protocolo únicos")
-    signature = root.xpath(
-        "./n:NFe/*[local-name()='Signature' "
-        "and namespace-uri()='http://www.w3.org/2000/09/xmldsig#']",
-        namespaces=_NS,
-    )
+    signature = root.findall(f"{{{_NFE}}}NFe/{{{_DS}}}Signature")
     model = invoices[0].findtext(f"{{{_NFE}}}ide/{{{_NFE}}}mod")
     if len(signature) != 1 or model != "55":
         raise FiscalValidationError("DANFE exige NF-e modelo 55 com XMLDSig")
@@ -55,7 +51,7 @@ def render_authorized_nfe_danfe(xml_bytes: bytes) -> bytes:
     ):
         raise FiscalValidationError("DANFE bloqueado: protocolo NF-e não autorizado")
     try:
-        from brazilfiscalreport.danfe import Danfe
+        from brazilfiscalreport.danfe import Danfe  # type: ignore[import-untyped]
 
         document = Danfe(xml=xml_bytes.decode("utf-8"))
         rendered = document.output(dest="S")
