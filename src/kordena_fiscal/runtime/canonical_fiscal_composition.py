@@ -13,6 +13,7 @@ from kordena_fiscal.archive import RetentionPolicyMetadata
 from kordena_fiscal.domain import FiscalValidationError
 from kordena_fiscal.gateway import FiscalGatewayClient
 from kordena_fiscal.gateway.nfe_sp_homologation import SefazSpHomologationGateway
+from kordena_fiscal.gateway.nfe_sp_operations_homologation import SefazSpHomologationOperationsGateway
 from kordena_fiscal.vault.encrypted_a1 import EncryptedA1Vault
 from kordena_fiscal.operations import FiscalOperationsClient
 
@@ -54,7 +55,14 @@ def build_runtime_fiscal_handler_factory(
     Real official adapters can be supplied by the deployment composition.
     The default boundary is intentionally non-transmitting.
     """
-    operations = FiscalOperationsClient(operations_gateway or UnprovisionedFiscalGateway())
+    selected_operations = operations_gateway
+    if selected_operations is None and certificate_vault is not None:
+        selected_operations = SefazSpHomologationOperationsGateway(
+            resolve_certificate=lambda scope, cnpj: certificate_vault.resolve(
+                scope=scope, issuer_cnpj=cnpj
+            )
+        )
+    operations = FiscalOperationsClient(selected_operations or UnprovisionedFiscalGateway())
     selected_authorization = authorization_gateway
     if selected_authorization is None and certificate_vault is not None:
         selected_authorization = SefazSpHomologationGateway(
