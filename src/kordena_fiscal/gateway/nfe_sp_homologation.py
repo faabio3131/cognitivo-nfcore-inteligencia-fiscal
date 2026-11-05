@@ -111,7 +111,7 @@ def _authorized_nfe_proc(
         or not _text(info, "digVal")
     ):
         raise OfficialNfeTransportError("Protocolo SEFAZ não corresponde à NF-e assinada")
-    proc = etree.Element("{" + NFE_NAMESPACE + "}nfeProc", nsmap={None: NFE_NAMESPACE},
+    proc = etree.Element("{" + NFE_NAMESPACE + "}nfeProc", nsmap={None: NFE_NAMESPACE},  # type: ignore[dict-item]
                          versao="4.00")
     proc.append(etree.fromstring(etree.tostring(invoices[0])))
     proc.append(etree.fromstring(etree.tostring(protocol)))
