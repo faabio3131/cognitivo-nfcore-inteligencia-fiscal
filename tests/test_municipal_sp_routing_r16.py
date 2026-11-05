@@ -142,7 +142,7 @@ def test_unknown_municipality_and_no_approval_never_fall_back() -> None:
 def test_taker_location_cannot_override_issuer_routing() -> None:
     scope = _scope()
     resolver = GovernedSpMunicipalProviderResolver(
-        load_approved_binding=lambda s, code: _binding(s, code)
+        load_approved_binding=lambda s, _code: _binding(s, "3550308")
     )
     assert _resolve(resolver, scope, "3550308") == "nota-paulistana"
     with pytest.raises(UnsupportedProviderError):
