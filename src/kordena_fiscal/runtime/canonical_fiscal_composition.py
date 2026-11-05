@@ -28,6 +28,34 @@ from .fiscal_runtime import FiscalOperationHandler
 from .provider_operation_wiring import build_provider_operation_handlers
 
 
+def fiscal_external_dependency_snapshot(
+    *, certificate_vault: EncryptedA1Vault | None,
+    trusted_signed_dps_builder: Callable[
+        [NfseAuthorizationRequest, EphemeralCertificateMaterial], bytes
+    ] | None = None,
+) -> dict[str, bool]:
+    """Configuration status only; never assert taxpayer-specific issuance readiness.
+
+    A configured Vault is not proof that a tenant has uploaded a valid certificate.
+    Both SP NF-e and National NFS-e require a trustworthy signed-document
+    preparation boundary; until that is provisioned, external execution is NOT ready.
+    """
+    vault_ready = isinstance(certificate_vault, EncryptedA1Vault)
+    nfe_transport_ready = vault_ready
+    nfse_transport_ready = vault_ready and callable(trusted_signed_dps_builder)
+    # Python signer and A1 mTLS are imported at composition time, but a signing
+    # capability is only configured when an A1 Vault exists.
+    signer_ready = vault_ready
+    return {
+        "fiscal_provider_transport_real_configured": nfe_transport_ready,
+        "fiscal_external_secret_client_configured": vault_ready,
+        "fiscal_signer_configured": signer_ready,
+        "fiscal_runtime_external_execution_ready": (
+            nfe_transport_ready and nfse_transport_ready and signer_ready
+        ),
+    }
+
+
 class UnprovisionedFiscalGateway:
     """Concrete deny-by-default boundary until a tenant-scoped official adapter is bound."""
 
