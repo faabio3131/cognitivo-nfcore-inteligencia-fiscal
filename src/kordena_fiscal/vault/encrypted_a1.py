@@ -6,6 +6,7 @@ A deployment-owned 256-bit AES-GCM key is mandatory; no generated fallback key.
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import json
 import os
@@ -50,7 +51,7 @@ class EncryptedA1Vault:
             raise A1VaultUnavailable("A1 Vault exige diretório e chave externa")
         try:
             master_key = base64.b64decode(key_string, validate=True)
-        except (ValueError, base64.binascii.Error):
+        except (ValueError, binascii.Error):
             raise A1VaultUnavailable("Chave de proteção do A1 inválida") from None
         return cls(directory=directory, master_key=master_key)
 
