@@ -569,12 +569,11 @@ def create_runtime_app(
             # their concrete adapters are composed in the owning phases.
             # These are dependency-configuration indicators, not a declaration
             # that any tenant's real fiscal documents are officially homologated.
-            **(fiscal_dependency_probe() if fiscal_dependency_probe is not None else {
-                "fiscal_provider_transport_real_configured": False,
-                "fiscal_external_secret_client_configured": False,
-                "fiscal_signer_configured": False,
-                "fiscal_runtime_external_execution_ready": False,
-            }),
+            **(
+                fiscal_dependency_probe()
+                if fiscal_dependency_probe is not None
+                else fiscal_external_dependency_snapshot(certificate_vault=certificate_vault)
+            ),
             "password_recovery_configured": composition is not None,
             "password_reset_delivery_configured": password_reset_delivery is not None,
             "commercial_activation_configured": (
