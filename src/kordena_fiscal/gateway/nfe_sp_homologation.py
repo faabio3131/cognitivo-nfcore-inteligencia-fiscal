@@ -178,6 +178,9 @@ class _RejectFiscalRedirects(HTTPRedirectHandler):
         return None
 
 
+MG_NFE_HOMOLOGATION_PROVIDER_ID = "sefaz-mg-homologacao-nfe4"
+
+
 class HomologationAuthorizationTarget(StrEnum):
     """Engineering configuration only; never an HTTP/provider binding authority."""
 
@@ -246,7 +249,7 @@ class SefazHomologationAuthorizationGateway:
                 environment=FiscalEnvironment.HOMOLOGATION,
                 operation=ConfiguredFiscalOperation.AUTHORIZE,
             ).url
-            self._provider = GatewayProviderMetadata("sefaz-mg-homologacao-nfe4", "1.0")
+            self._provider = GatewayProviderMetadata(MG_NFE_HOMOLOGATION_PROVIDER_ID, "1.0")
         self._resolve_certificate = resolve_certificate
         self._timeout = timeout_seconds
         self._exchange = exchange or self._https_exchange
