@@ -558,7 +558,32 @@ function fiscalRowElement(row) {
   const primary = row.document_id || row.document_reference || row.source_id || row.entry_id || row.reference_id || row.binding_id || row.destination_id || row.module_id || row.policy_id || row.document_kind || "Registro";
   const state = row.readiness || row.state || row.status || row.kind || "registrado";
   const display = {registro: primary, escopo: `${text(row.unit_id)} · ${text(row.environment)} · ${text(row.record_type || row.code || "capability")}`, state};
-  return appendRecordDetails(rowElement(display), row);
+  const wrapper = appendRecordDetails(rowElement(display), row);
+  // Render artifact actions only when this authorized scope actually contains
+  // an immutable PDF or XML entry. An issuance attempt is not an authorized note.
+  const kind = String(row.kind || "");
+  const reference = String(row.document_reference || "");
+  const unit = String(row.unit_id || "");
+  const environment = String(row.environment || "");
+  if (row.record_type === "archive" && reference && unit
+      && ["homologation", "production"].includes(environment)
+      && ["authorized_xml", "danfe"].includes(kind)) {
+    const artifact = document.createElement("a");
+    artifact.className = "ghost";
+    artifact.href = `/v1/portal/documents/${encodeURIComponent(reference)}/artifacts/${kind}?${new URLSearchParams({
+      unit_id: unit, environment,
+    })}`;
+    if (kind === "authorized_xml") {
+      artifact.textContent = "Baixar XML autorizado";
+      artifact.download = "nfcore-documento.xml";
+    } else {
+      artifact.textContent = "Visualizar DANFE/PDF";
+      artifact.target = "_blank";
+      artifact.rel = "noopener noreferrer";
+    }
+    wrapper.append(artifact);
+  }
+  return wrapper;
 }
 
 /** Show the complete authorized projection instead of dropping commercial fields. */
