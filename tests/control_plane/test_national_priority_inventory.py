@@ -6,6 +6,7 @@ import pytest
 from kordena_fiscal.control_plane.national_priority_inventory import (
     NAT_PRIORITY_PILOTS,
     IntegrationEvidence,
+    NfseIssuerChannel,
     PriorityStatePilot,
     priority_pilot,
 )
@@ -69,3 +70,18 @@ def test_no_duplicate_generic_provider_selection_is_added() -> None:
     # still resolves through DurableProviderBindingResolver and readiness.
     assert isinstance(priority_pilot("MG"), PriorityStatePilot)
     assert not hasattr(priority_pilot("MG"), "resolve_provider_id")
+
+
+def test_official_nfse_capital_channel_is_research_only() -> None:
+    assert [priority_pilot(uf).nfse_channel for uf in ("MG", "RJ", "PR", "MT")] == [
+        NfseIssuerChannel.NATIONAL,
+    ] * 4
+    assert priority_pilot("MS").nfse_channel is NfseIssuerChannel.MUNICIPAL_HYBRID_REVIEW
+    for pilot in NAT_PRIORITY_PILOTS:
+        assert pilot.nfse_evidence is IntegrationEvidence.RESEARCH_REQUIRED
+        assert not hasattr(pilot, "fiscal_issuance_enabled")
+
+
+def test_unrecognized_nfse_channel_fails_closed() -> None:
+    with pytest.raises(FiscalValidationError, match="NFS-e"):
+        replace(priority_pilot("MG"), nfse_channel="national")  # type: ignore[arg-type]
