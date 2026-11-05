@@ -117,8 +117,15 @@ def sign_nfe_event_xml(
     root_name: str,
     signed_name: str,
     parent_name: str,
+    profile: NfeSignatureProfile = NfeSignatureProfile.RSA_SHA256,
 ) -> bytes:
     """Sign an official SEFAZ infEvento/infInut by Id using RSA-SHA256 XMLDSig."""
+    if not isinstance(profile, NfeSignatureProfile):
+        raise FiscalValidationError("Unknown fiscal event signature profile")
+    legacy_nfe4 = profile is NfeSignatureProfile.NFE4_OFFICIAL_RSA_SHA1
+    signing_hash = hashes.SHA1() if legacy_nfe4 else hashes.SHA256()
+    signature_uri = "http://www.w3.org/2000/09/xmldsig#rsa-sha1" if legacy_nfe4 else _RSA_SHA256
+    digest_uri = "http://www.w3.org/2000/09/xmldsig#sha1" if legacy_nfe4 else _SHA256
     if (root_name, signed_name, parent_name) not in {
         ("envEvento", "infEvento", "evento"),
         ("inutNFe", "infInut", "inutNFe"),
@@ -142,6 +149,8 @@ def sign_nfe_event_xml(
         raise FiscalValidationError("Event reference Id is required")
     if parent.find(f"{{{_DS}}}Signature") is not None:
         raise FiscalValidationError("Event already signed")
+    if legacy_nfe4 and info.findtext(f"{{{_NFE}}}tpAmb") != "2":
+        raise FiscalValidationError("Official event profile requires homologation")
     key, cert, _ = pkcs12.load_key_and_certificates(
         certificate_material.pkcs12_bytes, certificate_material.password
     )
@@ -150,20 +159,20 @@ def sign_nfe_event_xml(
     signature = etree.Element(f"{{{_DS}}}Signature", nsmap={"ds": _DS})
     signed_info = etree.SubElement(signature, f"{{{_DS}}}SignedInfo")
     etree.SubElement(signed_info, f"{{{_DS}}}CanonicalizationMethod", Algorithm=_C14N)
-    etree.SubElement(signed_info, f"{{{_DS}}}SignatureMethod", Algorithm=_RSA_SHA256)
+    etree.SubElement(signed_info, f"{{{_DS}}}SignatureMethod", Algorithm=signature_uri)
     reference = etree.SubElement(
         signed_info, f"{{{_DS}}}Reference", URI="#" + identifier
     )
     transforms = etree.SubElement(reference, f"{{{_DS}}}Transforms")
     etree.SubElement(transforms, f"{{{_DS}}}Transform", Algorithm=_ENVELOPED)
     etree.SubElement(transforms, f"{{{_DS}}}Transform", Algorithm=_C14N)
-    etree.SubElement(reference, f"{{{_DS}}}DigestMethod", Algorithm=_SHA256)
+    etree.SubElement(reference, f"{{{_DS}}}DigestMethod", Algorithm=digest_uri)
     etree.SubElement(reference, f"{{{_DS}}}DigestValue").text = base64.b64encode(
-        sha256(_c14n(info)).digest()
+        sha1(_c14n(info)).digest() if legacy_nfe4 else sha256(_c14n(info)).digest()
     ).decode("ascii")
     parent.append(signature)
     etree.SubElement(signature, f"{{{_DS}}}SignatureValue").text = base64.b64encode(
-        key.sign(_c14n(signed_info), padding.PKCS1v15(), hashes.SHA256())
+        key.sign(_c14n(signed_info), padding.PKCS1v15(), signing_hash)
     ).decode("ascii")
     info_node = etree.SubElement(signature, f"{{{_DS}}}KeyInfo")
     cert_node = etree.SubElement(info_node, f"{{{_DS}}}X509Data")

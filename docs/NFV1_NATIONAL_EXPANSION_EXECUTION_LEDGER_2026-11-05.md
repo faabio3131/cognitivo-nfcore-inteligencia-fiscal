@@ -144,3 +144,28 @@ Mypy dirigido de três módulos PASS. Não promover estados globais.
 Regressão final do segundo incremento: **196 PASS em 60,31s**, zero falhas,
 abrangendo XML, gateways, control_plane e A1 sintético. Ruff global PASS,
 Mypy dirigido PASS, plano 59 IDs PASS. CI Linux no SHA final continua gate pendente.
+
+## Continuidade MG — branch feat/nfcore-mg-lifecycle-20261105
+
+Base 7739fd1587f2cb59f07032523b282c218da6a210, PR #361, CI #1691 e Governança #1122 SUCCESS.
+CURRENT main permanece 3f56084041fc9cd441af9a61dcc9532ba6090a85.
+Escopo NAT-03/04 / NAT-UF-MG-T03/T04 parcial:
+consulta, cancelamento e inutilização MG55 no transporte compartilhado, XSD
+offline completo de operações/envelope e verificação criptográfica após SOAP.
+Snapshot interno composto MG_LIFECYCLE_20261105 possui fontes e hashes por arquivo;
+não representa homologação oficial ou vigência aprovada por contribuinte.
+44 testes dirigidos de operações/schema passaram antes da regressão ampliada.
+Teste positivo: NF-e sintética completa → assinatura → XSD enviNFe → SOAP com
+digest/assinatura verificados → resposta local → nfeProc validado por XSD.
+Bugs de causa raiz corrigidos: literal CONSULTAR, SOAPAction e namespaces SOAP
+que alteravam a canonicalização. Detalhes e gaps internos:
+docs/NFV1_MG_LIFECYCLE_CONTINUITY_2026-11-05.md.
+Estados globais NAT-UF-MG e transversais continuam IMPLEMENTING.
+Próximo bloco: runtime governado e preparação/recuperação Web; resolver ano explícito
+de inutilização, seguir NFC-e MG e NFS-e BH antes de promover MG como completa.
+PR/SHA/CI final devem constar na PR deste incremento. Sem merge/deploy nesta execução.
+
+Gate local da continuidade MG: **265 PASS em 97,55s**; Ruff global, Mypy dirigido
+(cinco módulos), plano de 59 tarefas e validação BUILD PASS. Wheel construída.
+Cenário positivo de NF-e completa assinada e nfeProc validado é sintético e
+comprova contrato estrutural/criptográfico; não comprova tributação ou homologação.

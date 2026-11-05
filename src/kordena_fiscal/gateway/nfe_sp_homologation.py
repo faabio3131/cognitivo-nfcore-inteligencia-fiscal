@@ -132,10 +132,12 @@ def _authorized_nfe_proc(
 def _soap_envelope(invoice_batch: etree._Element) -> bytes:
     envelope = etree.Element(
         "{" + SOAP12_NAMESPACE + "}Envelope",
-        nsmap={"soap12": SOAP12_NAMESPACE},
+        nsmap={None: SOAP12_NAMESPACE},  # type: ignore[dict-item]
     )
     body = etree.SubElement(envelope, "{" + SOAP12_NAMESPACE + "}Body")
-    data = etree.SubElement(body, "{" + SERVICE_NAMESPACE + "}nfeDadosMsg")
+    data = etree.SubElement(
+        body, "{" + SERVICE_NAMESPACE + "}nfeDadosMsg", nsmap={None: SERVICE_NAMESPACE}  # type: ignore[dict-item]
+    )
     data.append(invoice_batch)
     return etree.tostring(envelope, encoding="utf-8", xml_declaration=True)
 
@@ -393,12 +395,17 @@ def build_mg_nfe_homologation_gateway(
     exchange: Callable[[bytes, ssl.SSLContext, float], bytes] | None = None,
 ) -> SefazHomologationAuthorizationGateway:
     """Compose MG with the pinned canonical invoice XSD validator, without activation."""
-    from kordena_fiscal.xml.official_nfe_schema import OfficialNfeEnvelopeValidator
+    from kordena_fiscal.xml.official_operation_schema import OfficialOperationXmlValidator
+
+    validator = OfficialOperationXmlValidator(("NFeAutorizacao4",))
+
+    def validate_envelope(xml: bytes) -> None:
+        validator("NFeAutorizacao4", xml)
 
     return SefazHomologationAuthorizationGateway(
         target=HomologationAuthorizationTarget.MG_NFE,
         resolve_certificate=resolve_certificate,
-        validate_schema=OfficialNfeEnvelopeValidator(),
+        validate_schema=validate_envelope,
         timeout_seconds=timeout_seconds,
         exchange=exchange,
     )
