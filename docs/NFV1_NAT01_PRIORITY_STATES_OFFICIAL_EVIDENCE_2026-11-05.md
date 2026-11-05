@@ -30,6 +30,20 @@
 - [NFS-e Nacional — municípios conveniados](https://www.gov.br/nfse/pt-br/municipios/municipios-conveniados): contexto histórico de adesão, não certificado de emissão.
 - [Governo Federal — pendências municipais de parametrização](https://www.gov.br/nfse/pt-br/noticias/municipios-sem-adesao-ou-parametrizacao-da-nfs-e-ja-estao-sujeitos-a-bloqueio-de-transferencias) (28/05/2026): adesão e parametrização são exigências distintas.
 
+## Descoberta municipal importante (05/11/2026): quatro rotas nacionais, uma distinta
+
+Fontes oficiais atuais alteram a hipótese inicial de que seria preciso construir um adaptador local diferente por capital:
+
+- **Belo Horizonte/MG:** aviso BHISS da prefeitura aponta NFS-e via Emissor Nacional e parâmetros próprios do ISS, IM e regimes municipais: https://prefeitura.pbh.gov.br/fazenda/bhiss/avisos.
+- **Rio de Janeiro/RJ:** prefeitura determina padrão nacional desde 01/01/2026, mantendo Nota Carioca apenas para documentos de competências anteriores: https://fazenda.prefeitura.rio/noticias/emissao-do-iss-na-prefeitura-do-rio-tera-mudanca-a-partir-de-1o-de-janeiro-de-2026/.
+- **Curitiba/PR:** guia oficial e Portaria municipal descrevem migração integral ao Emissor Nacional em 01/01/2026: https://lp.curitiba.pr.gov.br/notanacional/.
+- **Cuiabá/MT:** comunicado da prefeitura de 24/08/2026 adia obrigatoriedade exclusiva do Emissor Nacional para **01/11/2026**, após encerramento do Free Nota/WS municipal: https://www.cuiaba.mt.gov.br/noticias/cuiaba-prorroga-prazo-para-emissao-de-nfs-e-pelo-emissor-nacional.
+- **Campo Grande/MS:** comunicação da prefeitura indica **emissor próprio integrado ao padrão nacional**, portanto requer verificação de WSDL/API municipal, política de trânsito via ADN ou emissão pelo ambiente nacional. **Não presumir** o mesmo endpoint dos quatro anteriores: https://www.campogrande.ms.gov.br/cgnoticias/noticia/novo-sistema-de-nota-fiscal-trara-mais-agilidade-seguranca-e-estabilidade/.
+
+**Decisão técnica de desenho:** implementar **um** adaptador canônico NFS-e Nacional (DPS, assinatura, comunicação, consulta, eventos, correlação e armazenamento) e parametrizar ISS/IM/competência por município; Campo Grande fica `MUNICIPAL_HYBRID_REVIEW` até evidência oficial de contrato. A classificação do catálogo é SOMENTE evidência de pesquisa, não `PRODUCTION_APPROVED` nem binding de cliente.
+
+**Blocker:** obter e validar XSD, contratos de DPS/API, códigos de serviço, parametrização ISS e evidência de habilitação por CNPJ, município e tpAmb antes de transmitir.
+
 ## Implementação interna NAT-01 entregue nesta PR
 
 - `src/kordena_fiscal/control_plane/national_priority_inventory.py`: estrutura imutável, 5 UFs exatas, IBGE das cidades iniciais, fonte pública para cada documento; validação cruzada UF/IBGE e HTTPS público, sem estado de produção declarado.
