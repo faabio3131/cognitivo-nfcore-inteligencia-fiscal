@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from kordena_fiscal.application.command_commercial import CommandCommercialReceiver
 from kordena_fiscal.application.commercial_acquisition import CommercialAcquisitionService
 from kordena_fiscal.cognitive.composition import build_cognitive_router
+from kordena_fiscal.cognitive.durable_usage import DurableTokenQuotaStore
 from kordena_fiscal.gateway.production_activation import ProductionExecutionAuthority
 from kordena_fiscal.persistence.command_commercial import CommandCommercialStore
 from kordena_fiscal.persistence.commercial_fulfillment import (
@@ -51,10 +52,15 @@ from kordena_fiscal.web.staging_webhook_approval import create_staging_webhook_e
 from kordena_fiscal.web.staging_webhook_probe import create_staging_webhook_probe_router
 
 from .activation_email import build_activation_delivery_from_environ
+from .ai_secrets import build_production_openai_key_readers
 from .alert_rules import InternalAlertMonitor, OperationalSignals
 from .api_staging_gsm_probe import staging_probe_verifier
 from .cakto import build_cakto_webhook_router
-from .composition import RuntimeComposition, build_postgres_runtime_composition
+from .composition import (
+    FiscalOperationHandlerFactory,
+    RuntimeComposition,
+    build_postgres_runtime_composition,
+)
 from .config import RuntimeConfigurationError, RuntimeSettings
 from .development_commercial_ingress import (
     development_command_resolver,
@@ -70,6 +76,7 @@ from .observability import (
     TraceContext,
 )
 from .otel_trace_sink import build_trace_sink
+from .production_command_ingress import production_command_resolver
 from .production_gsm import production_api_verifier
 from .public_trial_abuse import PostgresPublicTrialAbuseGate
 from .secret_manager import SecretBindingAdministration
@@ -87,6 +94,7 @@ class RuntimeApi:
         workload_credentials: tuple[WorkloadCredentialRecord, ...] = (),
         security_audit_sink: SecurityAuditSink | None = None,
         fiscal_operation_handlers: Mapping[str, FiscalOperationHandler] | None = None,
+        fiscal_operation_handler_factory: FiscalOperationHandlerFactory | None = None,
         metrics: MetricsRegistry | None = None,
     ) -> None:
         self.settings = settings
@@ -115,6 +123,7 @@ class RuntimeApi:
                         workload_credentials=workload_credentials,
                         security_audit_sink=security_audit_sink,
                         fiscal_operation_handlers=fiscal_operation_handlers,
+                        fiscal_operation_handler_factory=fiscal_operation_handler_factory,
                         metrics=metrics,
                         enable_cakto_checkout=(
                             settings.commercial_checkout_provider == "cakto"
@@ -190,6 +199,7 @@ def create_runtime_app(
     workload_credentials: tuple[WorkloadCredentialRecord, ...] = (),
     security_audit_sink: SecurityAuditSink | None = None,
     fiscal_operation_handlers: Mapping[str, FiscalOperationHandler] | None = None,
+    fiscal_operation_handler_factory: FiscalOperationHandlerFactory | None = None,
 ) -> FastAPI:
     resolved = settings or RuntimeSettings.from_environ()
     runtime_metrics = metrics or MetricsRegistry()
@@ -198,6 +208,7 @@ def create_runtime_app(
         workload_credentials=workload_credentials,
         security_audit_sink=security_audit_sink,
         fiscal_operation_handlers=fiscal_operation_handlers,
+        fiscal_operation_handler_factory=fiscal_operation_handler_factory,
         metrics=runtime_metrics,
     )
     runtime_logger = logger or StructuredLogger(
@@ -214,10 +225,24 @@ def create_runtime_app(
         and runtime.database is not None
     ):
         staging_probe_security = staging_probe_verifier(runtime.database)
-    if resolved.environment.value == "production" and runtime.database is not None:
-        # Optional; if explicitly enabled, startup must verify the production
-        # service account, durable binding and real GSM read before readiness.
-        production_api_verifier(runtime.database)
+    if resolved.environment.value == "production":
+        # Separate, explicitly approved Command signing scope. A configured
+        # production channel may never downgrade to development HMAC material.
+        if runtime.database is None:
+            if os.getenv("NFCORE_PRODUCTION_COMMAND_MODE"):
+                raise RuntimeConfigurationError(
+                    "production Command requires canonical PostgreSQL"
+                )
+        else:
+            # Optional API identity probe, validating the existing GSM authority.
+            production_api_verifier(runtime.database)
+            approved_command = production_command_resolver(runtime.database)
+            if approved_command is not None:
+                if command_secret_resolver is not None:
+                    raise RuntimeConfigurationError(
+                        "duplicate production Command secret authority"
+                    )
+                command_secret_resolver = approved_command
     if resolved.environment.value == "staging" and runtime.database is not None:
         # Separate channel-specific GSM bindings, validated against the same
         # canonical external vault and existing nfcore-api identity.
@@ -354,6 +379,7 @@ def create_runtime_app(
     )
     app.state.nfcore_command_commercial = command_receiver
     app.state.nfcore_commercial_acquisition = commercial_acquisition
+    app.state.nfcore_public_trial_configured = False
     app.state.nfcore_commercial_trial = (
         composition.commercial_trial
         if composition is not None
@@ -595,6 +621,8 @@ def create_runtime_app(
             "commercial_trial_configured": (
                 app.state.nfcore_commercial_trial is not None
             ),
+            # Separate the anonymous HTTPS trial route from signed S2S trial.
+            "public_trial_configured": app.state.nfcore_public_trial_configured,
             "cakto_checkout_admin_configured": (
                 cakto_checkout_administration is not None
             ),
@@ -743,6 +771,29 @@ def create_runtime_app(
                 commercially_authorized=trial_release_authorized,
             )
         )
+        app.state.nfcore_public_trial_configured = True
+
+    def public_trial_operational_readiness() -> bool:
+        """Read-only, fail-closed availability of the independent browser trial."""
+        if (
+            not app.state.nfcore_public_trial_configured
+            or runtime.database is None
+            or composition is None
+            or composition.commercial_trial is None
+            or password_reset_delivery is None
+            or not commercial_delivery_readiness.ready
+        ):
+            return False
+        try:
+            if not runtime.ready()[0]:
+                return False
+            with runtime.database.connection() as connection:
+                row = connection.execute(
+                    "SELECT to_regclass('fm_public_trial_rate_windows')"
+                ).fetchone()
+            return row is not None and row[0] is not None
+        except Exception:
+            return False
 
     human_identity = None if composition is None else composition.human_identity
     password_recovery = None if composition is None else composition.password_recovery
@@ -800,12 +851,18 @@ def create_runtime_app(
             commercial_trial_ingress_configured=(
                 app.state.nfcore_commercial_trial is not None
             ),
+            commercial_public_trial_configured=(
+                app.state.nfcore_public_trial_configured
+            ),
             # Explicitly operator-attested FM Site S2S route. Never infer
             # channel readiness from a secret existing on the API.
             commercial_trial_site_channel_configured=(
                 os.getenv("NFCORE_SITE_TRIAL_CHANNEL_READY", "") == "true"
             ),
             commercial_operational_readiness=commercial_operational_readiness,
+            commercial_trial_operational_readiness=(
+                public_trial_operational_readiness
+            ),
             cakto_checkout_administration=cakto_checkout_administration,
             runtime_metrics=runtime_metrics,
             cognitive_router=build_cognitive_router(
@@ -813,6 +870,21 @@ def create_runtime_app(
                 portal_executor,
                 os.environ,
                 audit_uow_factory=runtime.database,
+                runtime_environment=resolved.environment.value,
+                quota_store=(
+                    DurableTokenQuotaStore(runtime.database.connection)
+                    if runtime.database is not None else None
+                ),
+                model_key_readers=(
+                    build_production_openai_key_readers(os.environ)
+                    if (
+                        resolved.environment.value == "production"
+                        and os.environ.get("NFCORE_COGNITIVE_ENABLED") == "true"
+                        and os.environ.get("NFCORE_COGNITIVE_DURABLE_AI_ENABLED") == "true"
+                        and runtime.database is not None
+                    )
+                    else None
+                ),
             ),
         ),
     )

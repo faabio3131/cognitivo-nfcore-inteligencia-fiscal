@@ -19,6 +19,17 @@ from kordena_fiscal.security.s2s import (
     WebhookSignatureError,
 )
 
+MAX_ACQUISITION_BODY_BYTES = 64 * 1024
+
+
+def _unique_json_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
 
 def create_commercial_acquisition_router(
     service: CommercialAcquisitionService,
@@ -31,7 +42,17 @@ def create_commercial_acquisition_router(
     @router.post("/v1/commercial/acquisitions")
     async def begin_acquisition(request: Request) -> JSONResponse:
         now = datetime.now(UTC)
-        body = await request.body()
+        # Bound untrusted bodies before signature verification or JSON parsing.
+        # Reading the complete request here permits unbounded memory allocation.
+        body_buffer = bytearray()
+        async for chunk in request.stream():
+            if len(body_buffer) + len(chunk) > MAX_ACQUISITION_BODY_BYTES:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "commercial acquisition body too large"},
+                )
+            body_buffer.extend(chunk)
+        body = bytes(body_buffer)
         raw_signature = request.headers.get("X-NFCore-Signature", "").strip()
         if not raw_signature:
             return JSONResponse(
@@ -58,9 +79,18 @@ def create_commercial_acquisition_router(
                 status_code=400,
                 content={"detail": "Idempotency-Key is required"},
             )
+        if not (
+            16 <= len(idempotency_key) <= 128
+            and idempotency_key.isascii()
+            and idempotency_key.isprintable()
+        ):
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Idempotency-Key is invalid"},
+            )
         try:
-            payload = json.loads(body)
-        except (UnicodeDecodeError, json.JSONDecodeError):
+            payload = json.loads(body, object_pairs_hook=_unique_json_pairs)
+        except (UnicodeDecodeError, ValueError):
             return JSONResponse(
                 status_code=400,
                 content={"detail": "commercial acquisition body must be valid JSON"},

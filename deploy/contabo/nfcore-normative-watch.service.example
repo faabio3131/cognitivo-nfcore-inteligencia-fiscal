@@ -1,0 +1,23 @@
+# EXAMPLE ONLY — do not install or start without Director's explicit deployment approval.
+# Adapt the checkout paths, service account, outbound egress and durable state directory
+# to the verified CURRENT Contabo host. No normative auto-promotion.
+[Unit]
+Description=NFCore Normative Portal Observation (read-only evidence)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=nfcore
+Group=nfcore
+WorkingDirectory=/opt/nfcore/current
+Environment=PYTHONPATH=/opt/nfcore/current/src
+Environment=NFCORE_NORMATIVE_WATCH_ENABLED=true
+StateDirectory=nfcore
+ExecStart=/usr/bin/python3 /opt/nfcore/current/scripts/nfcore_normative_watch_once.py --state-file /var/lib/nfcore/normative-watch.json --acknowledge-network
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/nfcore
+TimeoutStartSec=65

@@ -197,11 +197,14 @@ def test_platform_admin_version_conflict_is_fail_closed() -> None:
     csrf = web.cookies.get(CSRF_COOKIE)
     assert csrf
     first = _configuration(1)
-    assert web.post(
-        "/v1/admin/pricing",
-        headers={CSRF_HEADER: csrf},
-        json={"configuration": first.to_mapping(), "expected_version": None},
-    ).status_code == 200
+    assert (
+        web.post(
+            "/v1/admin/pricing",
+            headers={CSRF_HEADER: csrf},
+            json={"configuration": first.to_mapping(), "expected_version": None},
+        ).status_code
+        == 200
+    )
 
     conflict = web.post(
         "/v1/admin/pricing",
@@ -226,3 +229,21 @@ def test_portal_bootstrap_exposes_pricing_workspace_only_to_platform_admin() -> 
     assert platform_bootstrap.status_code == 200
     assert platform_bootstrap.json()["platform_admin"] is True
     assert "pricing-admin" in platform_bootstrap.json()["projection"]["available_surfaces"]
+
+
+def test_candidate_pricing_preview_requires_platform_admin() -> None:
+    with _client(platform_admin=False) as web:
+        response = web.get("/v1/admin/pricing/candidate")
+        assert response.status_code in (401, 403)
+        _login(web, platform_admin=False)
+        assert web.get("/v1/admin/pricing/candidate").status_code == 403
+    with _client(platform_admin=True) as web:
+        _login(web, platform_admin=True)
+        result = web.get("/v1/admin/pricing/candidate")
+        assert result.status_code == 200
+        body = result.json()
+        assert body["status"] == "candidate_not_published"
+        assert body["current_version"] is None
+        assert len(body["catalog"]["plans"]) == 4
+        assert all(not plan["enabled"] for plan in body["catalog"]["plans"])
+        assert web.get("/v1/commercial/pricing").json()["status"] == "unpriced"

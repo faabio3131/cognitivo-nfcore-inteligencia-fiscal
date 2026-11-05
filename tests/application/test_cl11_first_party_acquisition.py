@@ -35,7 +35,10 @@ from kordena_fiscal.security.s2s import (
     InMemoryWebhookKeyRing,
     WebhookSecurity,
 )
-from kordena_fiscal.web.commercial_acquisition import create_commercial_acquisition_router
+from kordena_fiscal.web.commercial_acquisition import (
+    MAX_ACQUISITION_BODY_BYTES,
+    create_commercial_acquisition_router,
+)
 
 NOW = datetime(2026, 9, 28, 13, 0, tzinfo=UTC)
 SECRET = b"first-party-site-secret-key-material-2026"
@@ -426,3 +429,87 @@ def test_http_boundary_rate_limits_authenticated_site_key() -> None:
         },
     )
     assert second.status_code == 429
+
+
+@pytest.mark.parametrize("authenticated", [False, True])
+def test_acquisition_http_rejects_oversized_body_before_authentication_or_effect(
+    authenticated: bool,
+) -> None:
+    database = MemoryAcquisitionDatabase()
+    client, security = signed_client(database)
+    body = b"x" * (MAX_ACQUISITION_BODY_BYTES + 1)
+    headers = {"Idempotency-Key": "oversized-acquisition-test-0001"}
+    if authenticated:
+        headers["X-NFCore-Signature"] = security.sign(
+            body, now=datetime.now(UTC)
+        ).header_value
+    response = client.post(
+        "/v1/commercial/acquisitions", content=body, headers=headers,
+    )
+    assert response.status_code == 413
+    assert database.store.acquisitions == {}
+
+
+def test_acquisition_http_accepts_normal_signed_body_after_bounding() -> None:
+    database = MemoryAcquisitionDatabase()
+    client, security = signed_client(database)
+    body = acquisition_body()
+    assert len(body) < MAX_ACQUISITION_BODY_BYTES
+    response = client.post(
+        "/v1/commercial/acquisitions",
+        content=body,
+        headers={
+            "Idempotency-Key": "normal-acquisition-bounded-0001",
+            "X-NFCore-Signature": security.sign(
+                body, now=datetime.now(UTC)
+            ).header_value,
+        },
+    )
+    assert response.status_code == 201
+    assert len(database.store.acquisitions) == 1
+
+
+@pytest.mark.parametrize(
+    "body",
+    (
+        b'{"plan_id":"growth","plan_id":"forged","price_id":"growth-monthly","buyer_email":"owner@example.com","legal_name":"ACME"}',
+        b'{"plan_id":"growth","price_id":"growth-monthly","buyer_email":"owner@example.com","legal_name":"ACME","extra":{"id":"a","id":"b"}}',
+    ),
+)
+def test_signed_acquisition_duplicate_json_is_denied_without_side_effect(body: bytes) -> None:
+    database = MemoryAcquisitionDatabase()
+    client, security = signed_client(database)
+    response = client.post(
+        "/v1/commercial/acquisitions",
+        content=body,
+        headers={
+            "Content-Type": "application/json",
+            "Idempotency-Key": "signed-duplicate-json-0001",
+            "X-NFCore-Signature": security.sign(body, now=datetime.now(UTC)).header_value,
+        },
+    )
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "commercial acquisition body must be valid JSON"
+    }
+    assert database.store.acquisitions == {}
+
+
+@pytest.mark.parametrize("idempotency_key", ("short", " " * 16, "a" * 129))
+def test_signed_acquisition_invalid_idempotency_denied_before_mutation(
+    idempotency_key: str,
+) -> None:
+    database = MemoryAcquisitionDatabase()
+    client, security = signed_client(database)
+    body = acquisition_body()
+    response = client.post(
+        "/v1/commercial/acquisitions",
+        content=body,
+        headers={
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotency_key,
+            "X-NFCore-Signature": security.sign(body, now=datetime.now(UTC)).header_value,
+        },
+    )
+    assert response.status_code == 400
+    assert database.store.acquisitions == {}
