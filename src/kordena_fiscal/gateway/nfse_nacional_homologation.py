@@ -78,7 +78,7 @@ def _exchange_http(payload: bytes, context: ssl.SSLContext, timeout: float) -> b
             data = response.read(_MAX_RESPONSE + 1)
         if len(data) > _MAX_RESPONSE:
             raise OfficialNfseTransportError("Resposta nacional excede limite")
-        return data
+        return bytes(data)
     except (HTTPError, URLError, TimeoutError, OSError, ssl.SSLError):
         raise OfficialNfseTransportError(
             "Comunicação com SEFIN Nacional indisponível; consulte antes de retransmitir"
