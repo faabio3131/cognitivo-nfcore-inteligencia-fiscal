@@ -20,7 +20,7 @@ const safetyStates = {
 const descriptions = {
   overview: "Visão governada da operação fiscal e da prontidão comprovada da organização.",
   documents: "Ciclo de vida documental, consulta, arquivo e correlação.",
-  issuances: "Emissões idempotentes e rastreáveis.",
+  issuances: "Emissões idempotentes e rastreáveis. Para transmitir, configure o certificado A1 do CNPJ emitente e o provedor fiscal autorizado.",
   inutilizations: "Solicitação governada de inutilização de faixa e acompanhamento do processamento interno.",
   errors: "Falhas operacionais sem exposição de segredo.",
   reconciliation: "Convergência segura entre estado interno e provedor.",
@@ -30,7 +30,7 @@ const descriptions = {
   units: "Unidades permitidas para o usuário autenticado.",
   environments: "Homologação e produção com autoridade segregada.",
   capabilities: "Capacidades e prontidão fiscal baseadas em evidência.",
-  certificates: "Referências de certificado; material secreto nunca é exibido.",
+  certificates: "Configuração de certificados do emitente. O cadastro de referência não substitui o provisionamento seguro do arquivo A1 (.pfx).",
   providers: "Vínculos de provedores por documento, operação e jurisdição.",
   users: "Usuários, papéis e permissões da organização.",
   webhooks: "Destinos e estado de entrega governada.",
