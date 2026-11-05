@@ -72,7 +72,9 @@ def test_dps_signature_is_verifiable_and_envelope_is_gzipped() -> None:
     )
     digest = signature.findtext(f".//{{{_DS}}}DigestValue")
     assert digest == base64.b64encode(
-        hashlib.sha256(etree.tostring(info, method="c14n", exclusive=False, with_comments=False)).digest()
+        hashlib.sha256(
+            etree.tostring(info, method="c14n", exclusive=False, with_comments=False)
+        ).digest()
     ).decode("ascii")
     payload = json.loads(build_nfse_dps_request(signed))
     assert gzip.decompress(base64.b64decode(payload["dpsXmlGZipB64"])) == signed
