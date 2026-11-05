@@ -93,7 +93,7 @@ def _post_official(
             result = answer.read(_MAX_RESPONSE_BYTES + 1)
         if len(result) > _MAX_RESPONSE_BYTES:
             raise OfficialNfeOperationsError("Resposta SEFAZ excede limite")
-        return result
+        return bytes(result)
     except (HTTPError, URLError, TimeoutError, OSError, ssl.SSLError):
         raise OfficialNfeOperationsError(
             "SEFAZ-SP indisponível; consulte resultado antes de retransmitir"
