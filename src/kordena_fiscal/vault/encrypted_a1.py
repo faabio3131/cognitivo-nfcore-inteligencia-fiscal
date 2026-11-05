@@ -95,7 +95,10 @@ class EncryptedA1Vault:
         )
         try:
             with os.fdopen(descriptor, "wb") as output:
-                os.fchmod(output.fileno(), 0o600)
+                if hasattr(os, "fchmod"):
+                    os.fchmod(output.fileno(), 0o600)
+                else:
+                    os.chmod(temporary, 0o600)
                 output.write(sealed)
                 output.flush()
                 os.fsync(output.fileno())
