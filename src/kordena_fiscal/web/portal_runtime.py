@@ -15,6 +15,7 @@ from typing import Any, Protocol
 
 from fastapi import HTTPException, status
 
+from kordena_fiscal.archive import FiscalArchiveKind, FiscalArchiveVerifier
 from kordena_fiscal.application.commercial_portal import (
     CommercialPortalReader,
     CommercialPortalReadError,
@@ -806,6 +807,75 @@ class DurableHumanPortalExecutor:
             payload=payload,
             idempotency_key=idempotency_key,
         )
+
+    def fiscal_artifact(
+        self,
+        *,
+        authority: AuthenticatedHuman,
+        unit_id: str,
+        environment: FiscalEnvironment,
+        document_reference: str,
+        kind: FiscalArchiveKind,
+    ) -> tuple[bytes, str]:
+        """Read the real immutable XML/PDF by the signed-in unit authority.
+
+        No artifact is generated, inferred from metadata or taken from a
+        browser-supplied external URL. A missing archive returns a normal 404.
+        """
+        try:
+            authority.assert_permission(
+                PortalPermission.DOCUMENT_QUERY, unit_id=unit_id
+            )
+        except HumanAuthorizationError as exc:
+            raise _portal_error(
+                403, "FISCAL_ARTIFACT_FORBIDDEN", "Document access denied"
+            ) from exc
+        if kind not in {FiscalArchiveKind.AUTHORIZED_XML, FiscalArchiveKind.DANFE}:
+            raise _portal_error(
+                400, "FISCAL_ARTIFACT_KIND_INVALID", "Unsupported fiscal file"
+            )
+        if not document_reference or len(document_reference) > 256:
+            raise _portal_error(
+                400, "FISCAL_ARTIFACT_REFERENCE_INVALID", "Invalid document reference"
+            )
+        scope = ExecutionScope(
+            host_namespace="fm-nfcore",
+            tenant_id=authority.tenant_id,
+            unit_id=unit_id,
+            environment=environment,
+            correlation_id="fiscal-artifact-read",
+        )
+        with self._unit_of_work_factory() as uow:
+            entries = uow.archive.list_for_document(scope, document_reference)
+        matches = [entry for entry in entries if entry.kind is kind]
+        if len(matches) != 1:
+            raise _portal_error(
+                404, "FISCAL_ARTIFACT_NOT_AVAILABLE",
+                "XML autorizado ou DANFE ainda não disponível para esta nota",
+            )
+        entry = matches[0]
+        if len(entry.content) > 8 * 1024 * 1024:
+            raise _portal_error(
+                413, "FISCAL_ARTIFACT_TOO_LARGE", "Fiscal file exceeds allowed size"
+            )
+        # Verify stored content rather than trusting a projected archive flag.
+        FiscalArchiveVerifier().verify_entry(entry)
+        allowed_media = {
+            FiscalArchiveKind.AUTHORIZED_XML: frozenset(
+                {"application/xml", "text/xml"}
+            ),
+            FiscalArchiveKind.DANFE: frozenset({"application/pdf"}),
+        }
+        if entry.media_type not in allowed_media[kind]:
+            raise _portal_error(
+                409, "FISCAL_ARTIFACT_MEDIA_INVALID",
+                "Archived fiscal file has unexpected content type",
+            )
+        if kind is FiscalArchiveKind.DANFE and not entry.content.startswith(b"%PDF-"):
+            raise _portal_error(
+                409, "FISCAL_ARTIFACT_MEDIA_INVALID", "Archived DANFE is not a PDF"
+            )
+        return entry.content, entry.media_type
 
     def _register_fiscal_profile(
         self,
