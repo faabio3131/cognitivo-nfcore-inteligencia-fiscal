@@ -123,7 +123,7 @@ def sign_nfe_event_xml(
     parent = parents[0]
     info = parent.find(f"{{{_NFE}}}{signed_name}")
     identifier = info.get("Id") if info is not None else None
-    if not isinstance(identifier, str) or not identifier.startswith("ID"):
+    if info is None or not isinstance(identifier, str) or not identifier.startswith("ID"):
         raise FiscalValidationError("Event reference Id is required")
     if parent.find(f"{{{_DS}}}Signature") is not None:
         raise FiscalValidationError("Event already signed")
