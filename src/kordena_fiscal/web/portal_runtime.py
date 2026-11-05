@@ -825,6 +825,7 @@ class DurableHumanPortalExecutor:
             Cnpj,
             FiscalAddress,
             FiscalProfile,
+            MunicipalRegistration,
             StateRegistration,
             TaxRegimeCode,
         )
@@ -835,9 +836,14 @@ class DurableHumanPortalExecutor:
             "district", "municipality_name", "state_code", "municipality_ibge_code",
             "postal_code",
         }
+        optional = {"municipal_registration"}
         try:
-            if set(payload) != required:
+            if not required.issubset(payload) or set(payload) - required - optional:
                 raise ValueError("invalid issuer profile command fields")
+            if "municipal_registration" in payload and not isinstance(
+                payload["municipal_registration"], str
+            ):
+                raise ValueError("municipal registration must be a string")
             key = (idempotency_key or "").strip()
             if not key or len(key) > 256:
                 raise ValueError("idempotency key required")
@@ -877,6 +883,11 @@ class DurableHumanPortalExecutor:
                     exempt=payload["state_registration_exempt"],
                 ),
                 primary_cnae=CnaeCode(payload["primary_cnae"]),
+                municipal_registration=(
+                    MunicipalRegistration(payload["municipal_registration"])
+                    if payload.get("municipal_registration", "").strip()
+                    else None
+                ),
                 address=FiscalAddress(
                     street=payload["street"],
                     number=payload["number"],
@@ -909,6 +920,7 @@ class DurableHumanPortalExecutor:
                     or existing.tax_regime != profile.tax_regime
                     or existing.state_registration != profile.state_registration
                     or existing.primary_cnae != profile.primary_cnae
+                    or existing.municipal_registration != profile.municipal_registration
                     or existing.address != profile.address
                     or existing.scope.tenant_id != authority.tenant_id
                     or existing.scope.unit_id != unit_id
