@@ -1,10 +1,11 @@
 # FM NFCORE V1 — Ledger da trilha BUILD-ONLY
 
-**Estado:** EM_EXECUCAO (trilha subordinada ao cronograma mestre de 59 IDs).  
-**Decisão:** autorização explícita do proprietário em 18/10/2026 para construir/corrigir autonomamente e **mergear PRs BUILD-ONLY 100% verdes**, preservando decisões humanas para credenciais, custos, preço, segurança nova, deploy, produção e atos irreversíveis.  
-**Cronograma de escopo:** `docs/NFCORE_V1_BUILD_INTEGRATION_EXECUTION_2026-10-18.md` — anexo, **não substitui** `docs/NFCORE_V1_EXECUTION_LEDGER.md`.  
-**Próximo delta de construção elegível (reconciliado em 31/10/2026):** `NFV1-BLD-03` — verificar CI/Gov pós-merge da PR #279 já integrada; PR #237 fechada sem merge porque seu teste PostgreSQL foi substituído por versão segura na main. **Não recriar formulário trial** integrado pela PR #260. Em paralelo, BLD-04 PR #281 já está aberta; site BLD-07 PR #12 está aberta no repo `fm-site-novo`.  
-**CURRENT auditado em 31/10/2026:** `main=d68c62d9c7e90581ad5efd387927f83c40a59ba2`, CI #41167507102 e Governança #41167507147 SUCCESS. PR #260 BLD-03 MERGED neste SHA (ingresso/cadastro Web), PR #278 RTC-09 MERGED previamente em `a01414853cdad9cc4ade8886b8a53074a57a2568` com CI #41166087218 e Governança #41166087207 pós-merge SUCCESS. BLD-03 segue `IN_PROGRESS` até certificar gates pós-merge da #279 e completar o aceite interno; **a PR #279 foi integrada em `9564406e2c2af6cee99266301309f045dbbd878a`, com Governança pós-merge SUCCESS e CI pós-merge #41198490385 e Governança #41198490371 SUCCESS**. PR #237 CLOSED/SUPERSEDED (não mergear). Não declarar DONE integral nem ativar trial público por reflexo. BLD-00/01/02 seguem DONE internos. `production` está divergente e **não foi promovida**. Prova detalhada e anti-retrabalho: `docs/checkpoints/NFV1_CROSS_REPO_ANTI_REWORK_2026-10-31.md`.  
+**Estado:** EM_EXECUCAO (trilha subordinada ao cronograma mestre de 59 IDs).
+**Decisão:** autorização explícita do proprietário em 18/10/2026 para construir/corrigir autonomamente e **mergear PRs BUILD-ONLY 100% verdes**, preservando decisões humanas para credenciais, custos, preço, segurança nova, deploy, produção e atos irreversíveis.
+**Cronograma de escopo:** `docs/NFCORE_V1_BUILD_INTEGRATION_EXECUTION_2026-10-18.md` — anexo, **não substitui** `docs/NFCORE_V1_EXECUTION_LEDGER.md`.
+**CURRENT de continuidade (02/11/2026):** trilha BUILD é **secundária à construção fiscal RTC-04**, não é o próximo bloco a iniciar. `main@2e388071af68c63d63cdbf258b58c7fe4113f7d5`, CI #1466/Gov #897 SUCCESS. BLD-00/01/02 DONE internamente; BLD-03 já possui formulário/serviço de trial (#234/#235/#260/#279/#292); BLD-04 possui aquisição/checkout/fulfillment/Command (#281/#285/#293); BLD-06 possui infraestrutura de Worker e PG isolado (#294/#295); BLD-05..08 dependem de delta de contrato/prova/ambiente específicos, e não de reconstrução. Evidência parcial não equivale a certificação comercial ou implantação.
+**Trabalhos abertos, não escolher como retomada fiscal:** #297 correção comercial histórica (176 commits atrás da `main` no último compare), #298 integração comercial opt-in, #299 decisão documental de planos, #313 teste documental RTC e #314 patch BLD-04, todos não integrados; #302 preflight Contabo e #296 release NO-GO de `production` também não são elegíveis para merge/deploy nesta trilha. Confirmar novamente o HEAD/estado antes de tratá-los. **Próxima ação principal: RTC-04 (Reforma Tributária / Simples Nacional), após PR #312, conforme cronograma RTC.**
+**Histórico BUILD de 31/10/2026:** as instruções antigas abaixo são registros de seu momento, não CURRENT. PR #279 e #281 já foram integradas e não devem voltar à fila. Não criar segundo trial, checkout, API, tenant, Worker nem formulário.
 **Snapshot histórico substituído:** em 27/10 a main era `aa04c8b2b63384880e3d6a98f41771b2f0415c8f` e o próximo era iniciar BLD-03; tal instrução não deve disparar reconstrução após o merge #260.
 
 ## Semântica de estado e prova
@@ -54,12 +55,12 @@ Cada `Evidência` abaixo é levantamento de baseline, **não certificação do b
 - **Pendência / decisão humana:** se surgir, registrar o bloqueio exato com decisão necessária, sem gerar novo serviço, preço ou credencial.
 
 ### NFV1-BLD-04 — Comercial interno e integração Command
-- **Estado:** PENDING
+- **Estado:** BLOCKED_HUMAN_ACTION
 - **Depende de:** BLD-03 contratos, ou interfaces canônicas já verificadas; não ativar pagamentos
-- **CURRENT:** Pricing/release e aquisição/fulfillment internos existem; #281 (testes HTTP autenticados do FM Command) MERGED em `5d894ffcf34c8a9ee6d66876ee35c2c9273ee32a` após CI pré-merge #41168608800 e Governança #41168608803 SUCCESS. CI pós-merge #41199329018 e Governança #41199328979 aguardam conclusão no momento desta anotação. Este incremento não encerra BLD-04: catálogo/release/checkout runtime sem readiness e E2E comercial integral ainda exigem evidência. Backend multi-tenant é autoridade; simular somente entrada de provedor em testes.
+- **CURRENT:** Pricing/release e aquisição/fulfillment internos existem; #281 (testes HTTP autenticados do FM Command) MERGED em `5d894ffcf34c8a9ee6d66876ee35c2c9273ee32a` após CI pré-merge #41168608800 e Governança #41168608803 SUCCESS. Os gates registrados neste parágrafo pertencem ao snapshot de 31/10; não afirmam o status CURRENT. Checar eventual evidência de CI pós-merge se necessária ao aceite. Este incremento não encerra BLD-04: catálogo/release/checkout runtime sem readiness e E2E comercial integral ainda exigem evidência. Backend multi-tenant é autoridade; simular somente entrada de provedor em testes.
 - **Target e aceite:** seção `NFV1-BLD-04` do anexo de execução.
 - **Evidência final:** PENDENTE para fechamento integral de BLD-04. Evidência parcial: #281 merge `5d894ffcf34c8a9ee6d66876ee35c2c9273ee32a`, CI da PR #41168608800 e Gov #41168608803 SUCCESS; pós-merge em andamento. Não confundir testes de contrato com a cadeia inteira.
-- **Pendência / decisão humana:** revisar gaps reais de checkout, billing/Command e E2E interno sem preço/pagamento real; credenciais, publicações e ativação seguem decisão humana.
+- **Pendência / decisão humana:** a ativação comercial real depende de aprovação de planos/checkout, credenciais, publicação e pagamentos; isso bloqueia o ACEITE integral do bloco, não sua implementação interna já existente. Deltas internos específicos ainda podem ser executados de forma independente, sem recomeçar. Classificação BLOCKED_HUMAN_ACTION atende à ordem estrutural do ledger e não equivale a trabalho não iniciado.
 
 ### NFV1-BLD-05 — Fiscal adapter/contratos para homologação futura
 - **Estado:** PENDING
@@ -72,7 +73,7 @@ Cada `Evidência` abaixo é levantamento de baseline, **não certificação do b
 ### NFV1-BLD-06 — Persistência e Worker das jornadas Web
 - **Estado:** PENDING
 - **Depende de:** BLD-02/BLD-04/BLD-05 contratos relevantes
-- **CURRENT:** Worker staging online e DB existem, mas prova de outbox externo não é construção interna. Reusar Worker, idempotência e recovery existentes; corrigir somente wiring faltante.
+- **CURRENT:** Worker, PostgreSQL, outbox, retries, idempotência e recuperação preexistem; PRs #294/#295 foram integradas com isolamento do teste de claim e composição opt-in do Worker, sem ativação produtiva. Falta prova E2E específica e configuração externa, não reconstrução do Worker.
 - **Target e aceite:** seção `NFV1-BLD-06` do anexo de execução.
 - **Evidência final:** PENDENTE (registrar PR + HEAD + merge SHA + CI/Gov PR e main + prova funcional apropriada).
 - **Pendência / decisão humana:** se surgir, registrar o bloqueio exato com decisão necessária, sem gerar novo serviço, preço ou credencial.
@@ -80,7 +81,7 @@ Cada `Evidência` abaixo é levantamento de baseline, **não certificação do b
 ### NFV1-BLD-07 — Conectar site novo e jornada NFCore
 - **Estado:** PENDING
 - **Depende de:** BLD-03 ingresso seguro e catálogo quando aprovado; separar canal interno de liberação pública
-- **CURRENT:** Site novo faabio3131/fm-site-novo PR #10 integrou acesso Portal. Trial Web comercial ainda não disponível; Next.js PR #33 legada fechada SEM merge.
+- **CURRENT:** site canônico `faabio3131/fm-site-novo` PR #10 integrou acesso ao Portal; PR #12 contém proposta de trial/CTA e exigia reconciliação no último checkpoint cruzado (31/10). Este ledger não certifica o HEAD atual de outro repositório nem publicação de oferta; verificar antes de implementar.
 - **Target e aceite:** seção `NFV1-BLD-07` do anexo de execução.
 - **Evidência final:** PENDENTE (registrar PR + HEAD + merge SHA + CI/Gov PR e main + prova funcional apropriada).
 - **Pendência / decisão humana:** se surgir, registrar o bloqueio exato com decisão necessária, sem gerar novo serviço, preço ou credencial.
