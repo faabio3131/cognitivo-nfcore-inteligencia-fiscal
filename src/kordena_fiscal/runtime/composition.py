@@ -11,7 +11,6 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 
-from kordena_fiscal.archive.danfe_pdf import render_authorized_nfe_danfe
 from kordena_fiscal.application.commercial_activation import (
     CommercialCustomerActivationService,
 )
@@ -20,6 +19,7 @@ from kordena_fiscal.application.commercial_fulfillment import CommercialFulfillm
 from kordena_fiscal.application.commercial_portal import CommercialPortalReadService
 from kordena_fiscal.application.commercial_trial import GovernedTrialService
 from kordena_fiscal.application.service import FiscalApplicationService
+from kordena_fiscal.archive.danfe_pdf import render_authorized_nfe_danfe
 from kordena_fiscal.compliance import CapabilityReadinessService
 from kordena_fiscal.control_plane.cakto_checkout import (
     CaktoCheckoutAdministrationService,
