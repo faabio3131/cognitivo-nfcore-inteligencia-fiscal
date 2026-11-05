@@ -90,3 +90,65 @@ def sign_nfe_envi_xml(
         cert.public_bytes(Encoding.DER)
     ).decode("ascii")
     return etree.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
+def sign_nfe_event_xml(
+    unsigned_xml: bytes,
+    certificate_material: EphemeralCertificateMaterial,
+    *,
+    root_name: str,
+    signed_name: str,
+    parent_name: str,
+) -> bytes:
+    """Sign an official SEFAZ infEvento/infInut by Id using RSA-SHA256 XMLDSig."""
+    if (root_name, signed_name, parent_name) not in {
+        ("envEvento", "infEvento", "evento"),
+        ("inutNFe", "infInut", "inutNFe"),
+    }:
+        raise FiscalValidationError("Unsupported fiscal event signing target")
+    try:
+        root = etree.fromstring(
+            unsigned_xml, parser=etree.XMLParser(resolve_entities=False, no_network=True),
+        )
+    except etree.XMLSyntaxError:
+        raise FiscalValidationError("Invalid fiscal event XML") from None
+    if root.tag != f"{{{_NFE}}}{root_name}":
+        raise FiscalValidationError("Unexpected fiscal event root")
+    parents = [root] if parent_name == root_name else root.findall(f"{{{_NFE}}}{parent_name}")
+    if len(parents) != 1:
+        raise FiscalValidationError("Exactly one fiscal event is required")
+    parent = parents[0]
+    info = parent.find(f"{{{_NFE}}}{signed_name}")
+    if info is None or not (info.get("Id") or "").startswith("ID"):
+        raise FiscalValidationError("Event reference Id is required")
+    if parent.find(f"{{{_DS}}}Signature") is not None:
+        raise FiscalValidationError("Event already signed")
+    key, cert, _ = pkcs12.load_key_and_certificates(
+        certificate_material.pkcs12_bytes, certificate_material.password
+    )
+    if not isinstance(key, rsa.RSAPrivateKey) or cert is None:
+        raise FiscalValidationError("Event XMLDSig requires RSA A1 certificate")
+    signature = etree.Element(f"{{{_DS}}}Signature", nsmap={"ds": _DS})
+    signed_info = etree.SubElement(signature, f"{{{_DS}}}SignedInfo")
+    etree.SubElement(signed_info, f"{{{_DS}}}CanonicalizationMethod", Algorithm=_C14N)
+    etree.SubElement(signed_info, f"{{{_DS}}}SignatureMethod", Algorithm=_RSA_SHA256)
+    reference = etree.SubElement(
+        signed_info, f"{{{_DS}}}Reference", URI="#" + info.get("Id")
+    )
+    transforms = etree.SubElement(reference, f"{{{_DS}}}Transforms")
+    etree.SubElement(transforms, f"{{{_DS}}}Transform", Algorithm=_ENVELOPED)
+    etree.SubElement(transforms, f"{{{_DS}}}Transform", Algorithm=_C14N)
+    etree.SubElement(reference, f"{{{_DS}}}DigestMethod", Algorithm=_SHA256)
+    etree.SubElement(reference, f"{{{_DS}}}DigestValue").text = base64.b64encode(
+        sha256(_c14n(info)).digest()
+    ).decode("ascii")
+    parent.append(signature)
+    etree.SubElement(signature, f"{{{_DS}}}SignatureValue").text = base64.b64encode(
+        key.sign(_c14n(signed_info), padding.PKCS1v15(), hashes.SHA256())
+    ).decode("ascii")
+    info_node = etree.SubElement(signature, f"{{{_DS}}}KeyInfo")
+    cert_node = etree.SubElement(info_node, f"{{{_DS}}}X509Data")
+    etree.SubElement(cert_node, f"{{{_DS}}}X509Certificate").text = base64.b64encode(
+        cert.public_bytes(Encoding.DER)
+    ).decode("ascii")
+    return etree.tostring(root, encoding="utf-8", xml_declaration=True)
