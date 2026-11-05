@@ -218,10 +218,15 @@ Portal só apresenta links quando o item já está efetivamente arquivado.
 A ausência do artefato responde com 404 controlado (não substitui
 o documento por conteúdo simulado).
 
-**Lacuna de emissão:** o adaptador SEFAZ-SP atual retorna apenas metadados
-de autorização (número de protocolo), e a aplicação não cria automaticamente
-um artefato `AUTHORIZED_XML` contendo `nfeProc` nem um arquivo
-`DANFE` após confirmar a emissão. A preparação de DPS assinada,
-o formulário completo de tomador/serviço/ISS e a geração de DANFE a partir
-do XML protocolado permanecem pendentes. Portanto esta entrega
-**não certifica a jornada ponta a ponta de emissão e download**.
+**Evolução posterior à medição:** o adaptador SEFAZ-SP passou a
+montar `nfeProc` somente após confirmar `cStat=100`, chave coincidente,
+protocolo e `tpAmb=2`. O serviço fiscal persiste `AUTHORIZED_XML` na mesma
+transação que marca a emissão como autorizada (sem novo envio fiscal).
+Para o DANFE/PDF, o Portal agora pode renderizar localmente o arquivo
+a partir do `nfeProc` autenticado, usando BrazilFiscalReport 1.3.1
+(LGPL-3.0), sem transmitir XML à biblioteca remota; PDF já arquivado
+continua sendo preferido. A geração só ocorre sob sessão, escopo e arquivo
+autorizado efetivos. **Ainda faltam E2E com NF-e homologada real,
+verificação independente de XMLDSig após o `nfeProc`, validação visual de
+DANFE e a jornada completa de preparação da DPS/tomador/serviço/ISS.
+Portanto, não está certificada emissão fiscal integral NFS-e/NF-e.**
