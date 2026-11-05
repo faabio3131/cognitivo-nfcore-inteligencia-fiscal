@@ -85,9 +85,18 @@ class ApprovedMunicipalProviderBinding:
             raise FiscalValidationError("Issuer municipality requires seven-digit IBGE code")
         if not isinstance(self.provider_id, str) or not self.provider_id.strip():
             raise FiscalValidationError("Municipal provider id is required")
-        if not isinstance(self.version, int) or isinstance(self.version, bool) or self.version < 1 or not self.approved_by:
+        if (
+            not isinstance(self.version, int)
+            or isinstance(self.version, bool)
+            or self.version < 1
+            or not self.approved_by
+        ):
             raise FiscalValidationError("Routing approval metadata is required")
-        if not isinstance(self.approved_at, datetime) or self.approved_at.tzinfo is None or self.approved_at.utcoffset() is None:
+        if (
+            not isinstance(self.approved_at, datetime)
+            or self.approved_at.tzinfo is None
+            or self.approved_at.utcoffset() is None
+        ):
             raise FiscalValidationError("Routing approval timestamp requires timezone")
         if not isinstance(self.enabled, bool) or not self.permitted_operations:
             raise FiscalValidationError("Routing requires explicit enabled/operation permissions")
@@ -126,7 +135,9 @@ class GovernedSpMunicipalProviderResolver(ProviderSelectionResolver):
             raise UnsupportedProviderError("Municipal provider router is limited to SP")
         code = jurisdiction.municipality_ibge_code
         if code is None or code not in SP_MUNICIPAL_CANDIDATES:
-            raise UnsupportedProviderError("Issuer municipality is not registered in the SP catalog")
+            raise UnsupportedProviderError(
+                "Issuer municipality is not registered in the SP catalog"
+            )
         if scope.host_namespace is None:
             raise UnsupportedProviderError("Fiscal scope requires a trusted host namespace")
         try:
@@ -135,7 +146,9 @@ class GovernedSpMunicipalProviderResolver(ProviderSelectionResolver):
             raise UnsupportedProviderError("Unsupported municipal provider operation") from None
         binding = self._load(scope, code)
         if binding is None or not isinstance(binding, ApprovedMunicipalProviderBinding):
-            raise UnsupportedProviderError("Municipal provider is not approved for this fiscal scope")
+            raise UnsupportedProviderError(
+                "Municipal provider is not approved for this fiscal scope"
+            )
         if (
             binding.host_namespace != scope.host_namespace
             or binding.tenant_id != scope.tenant_id
