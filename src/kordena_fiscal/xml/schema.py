@@ -178,8 +178,7 @@ class XmlSchemaValidator:
             raise FiscalValidationError("payload must be NfceXmlPayload")
         document = _parse_xml_document(payload.xml)
         if not self._schema.validate(document):
-            errors = list(self._schema.error_log)
-            message = errors[-1] if errors else None
+            message = getattr(self._schema.error_log, "last_error", None)
             detail = message.message if message is not None else "unknown XSD validation error"
             raise XmlSchemaValidationError(f"XML does not satisfy pinned XSD: {detail}")
         return XmlValidationResult(
