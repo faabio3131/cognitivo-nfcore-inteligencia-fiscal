@@ -14,14 +14,15 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPSHandler, Request, build_opener
 
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
 from lxml import etree
 
 from kordena_fiscal.domain import Cnpj, ExecutionScope, FiscalEnvironment, FiscalValidationError
+from kordena_fiscal.signing.nfe_xmldsig import sign_nfe_envi_xml
 from kordena_fiscal.vault import EphemeralCertificateMaterial
 from kordena_fiscal.vault.a1_preflight import validate_a1_for_issuer
-from kordena_fiscal.signing.nfe_xmldsig import sign_nfe_envi_xml
+
 from .authorization import (
     AuthorizationRequest,
     AuthorizationResult,

@@ -24,7 +24,6 @@ from kordena_fiscal.persistence.commercial_fulfillment import (
 )
 from kordena_fiscal.persistence.commercial_period_schema import COMMERCIAL_PERIOD_VERSION
 from kordena_fiscal.persistence.postgres import PostgresFiscalDatabase
-from kordena_fiscal.vault.encrypted_a1 import EncryptedA1Vault
 from kordena_fiscal.product.cakto import CaktoWebhookReceiver
 from kordena_fiscal.product.checkout import (
     CommercialCheckoutProjector,
@@ -38,6 +37,7 @@ from kordena_fiscal.security.s2s import (
     WorkloadCredentialRecord,
 )
 from kordena_fiscal.security.secrets import SecretResolver
+from kordena_fiscal.vault.encrypted_a1 import EncryptedA1Vault
 from kordena_fiscal.web.app import create_app
 from kordena_fiscal.web.command_commercial import create_command_commercial_router
 from kordena_fiscal.web.commercial_acquisition import (

@@ -11,16 +11,14 @@ from __future__ import annotations
 import base64
 import binascii
 import json
-from uuid import uuid4
-
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Annotated, Any, Protocol, runtime_checkable
+from uuid import uuid4
 
 from fastapi import APIRouter, Body, HTTPException, Request, status
 
 from kordena_fiscal.domain import ExecutionScope, FiscalEnvironment, FiscalValidationError
-from kordena_fiscal.vault.encrypted_a1 import A1VaultUnavailable, EncryptedA1Vault
 from kordena_fiscal.security.human_identity import (
     AuthenticatedHuman,
     CsrfValidationError,
@@ -29,6 +27,7 @@ from kordena_fiscal.security.human_identity import (
     HumanIdentityService,
     PortalPermission,
 )
+from kordena_fiscal.vault.encrypted_a1 import A1VaultUnavailable, EncryptedA1Vault
 from kordena_fiscal.web.human_auth import CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE
 
 

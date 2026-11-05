@@ -13,9 +13,11 @@ from kordena_fiscal.archive import RetentionPolicyMetadata
 from kordena_fiscal.domain import FiscalValidationError
 from kordena_fiscal.gateway import FiscalGatewayClient
 from kordena_fiscal.gateway.nfe_sp_homologation import SefazSpHomologationGateway
-from kordena_fiscal.gateway.nfe_sp_operations_homologation import SefazSpHomologationOperationsGateway
-from kordena_fiscal.vault.encrypted_a1 import EncryptedA1Vault
+from kordena_fiscal.gateway.nfe_sp_operations_homologation import (
+    SefazSpHomologationOperationsGateway,
+)
 from kordena_fiscal.operations import FiscalOperationsClient
+from kordena_fiscal.vault.encrypted_a1 import EncryptedA1Vault
 
 from .fiscal_runtime import FiscalOperationHandler
 from .provider_operation_wiring import build_provider_operation_handlers

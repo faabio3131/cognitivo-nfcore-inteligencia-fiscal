@@ -16,12 +16,20 @@ from lxml import etree
 from kordena_fiscal.domain import Cnpj, ExecutionScope, FiscalEnvironment, FiscalValidationError
 from kordena_fiscal.gateway.authorization import GatewayProviderMetadata
 from kordena_fiscal.gateway.nfe_sp_homologation import (
-    NFE_NAMESPACE, SOAP12_NAMESPACE, _parse_xml, _tls_context,
+    NFE_NAMESPACE,
+    SOAP12_NAMESPACE,
+    _parse_xml,
+    _tls_context,
 )
 from kordena_fiscal.operations import (
-    CancellationRequest, CancellationResult, FiscalEventStatus,
-    FiscalQueryRequest, FiscalQueryResult, FiscalQueryStatus,
-    InutilizationRequest, InutilizationResult,
+    CancellationRequest,
+    CancellationResult,
+    FiscalEventStatus,
+    FiscalQueryRequest,
+    FiscalQueryResult,
+    FiscalQueryStatus,
+    InutilizationRequest,
+    InutilizationResult,
 )
 from kordena_fiscal.signing.nfe_xmldsig import sign_nfe_event_xml
 from kordena_fiscal.vault import EphemeralCertificateMaterial

@@ -18,11 +18,13 @@ from lxml import etree
 
 from kordena_fiscal.domain import Cnpj, ExecutionScope, FiscalEnvironment, FiscalValidationError
 from kordena_fiscal.gateway.authorization import (
-    AuthorizationStatus, GatewayProviderMetadata,
+    AuthorizationStatus,
+    GatewayProviderMetadata,
 )
 from kordena_fiscal.gateway.nfe_sp_homologation import _tls_context
 from kordena_fiscal.issuance.nfe_nfse import (
-    NfseAuthorizationRequest, NfseAuthorizationResult,
+    NfseAuthorizationRequest,
+    NfseAuthorizationResult,
 )
 from kordena_fiscal.vault import EphemeralCertificateMaterial
 from kordena_fiscal.vault.a1_preflight import validate_a1_for_issuer
@@ -137,8 +139,12 @@ class NfseNacionalHomologationGateway:
                 first = errors[0] if isinstance(errors[0], dict) else {}
                 status = AuthorizationStatus.REJECTED
                 kwargs = {
-                    "rejection_code": str(first.get("Codigo", first.get("codigo", "NFSE_REJECTED")))[:512],
-                    "rejection_message": str(first.get("Descricao", first.get("descricao", "DPS rejeitada")))[:512],
+                    "rejection_code": str(
+                        first.get("Codigo", first.get("codigo", "NFSE_REJECTED"))
+                    )[:512],
+                    "rejection_message": str(
+                        first.get("Descricao", first.get("descricao", "DPS rejeitada"))
+                    )[:512],
                 }
             else:
                 status = AuthorizationStatus.PENDING
