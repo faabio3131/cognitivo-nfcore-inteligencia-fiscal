@@ -1,3 +1,30 @@
+## CURRENT reconciliado — continuidade 05/11/2026
+
+Este registro prevalece sobre o snapshot de planejamento abaixo, sem promover estados globais.
+
+- Repositório atual: faabio3131/nf-core-v001; main 3f56084041fc9cd441af9a61dcc9532ba6090a85.
+- PRs #355/#356/#359 MERGED; #358 OPEN, destino production, sem merge nesta execução.
+- PR #360 OPEN/DRAFT, base deste incremento feedf8b41085914b831c9585bec1b34675742008:
+  inventário prioritário, bindings negativos e catálogo MG 55/65; Governança #1120 SUCCESS;
+  CI #1689 ainda em execução na consulta inicial. Não presumir certificação.
+- Branch deste incremento: feat/nfcore-nat03-mg-provenance, baseada no HEAD da #360.
+- NAT-00 AUDITED (reconciliação interna; production não promovida).
+- NAT-01 IMPLEMENTING: pesquisa/inventário em #360; contrato/ADRs globais ainda pendentes.
+- NAT-03/04 IMPLEMENTING: autorização MG NF-e 55 reutiliza transporte SOAP e Vault;
+  requer validador XSD confiável. Não registra provider/binding nem modifica runtime.
+- NAT-UF-MG IMPLEMENTING/PARTIAL; RJ/PR/MT/MS sem módulos internos completos.
+- Detalhes, mapa de impacto e critérios:
+  docs/NFV1_NAT03_MG_AUTHORIZATION_CONTINUITY_2026-11-05.md.
+- Ruff global PASS; Mypy direcionado PASS. Mypy global Windows encontrou 8 erros
+  em 5 arquivos fora desta mudança: APIs POSIX ausentes no Windows e dependência
+  brazilfiscalreport.danfe ausente. Não desabilitar verificações; CI Linux é gate obrigatório.
+- Nenhuma transmissão fiscal real, credencial nova, migration, deploy ou homologação.
+- Próxima ação: certificar CI desta candidata; congelar XSD/WSDL reais e composição
+  com autoridade XmlSchemaValidator; depois demais operações MG, NFC-e e NFS-e BH.
+- Merge main e promoção production aguardam autorização específica.
+
+---
+
 # NFCore National Expansion — Ledger de Estado e Continuidade
 
 **Documento:** NFV1-NAT-LEDGER-001  
