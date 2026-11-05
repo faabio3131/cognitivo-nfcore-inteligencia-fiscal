@@ -19,11 +19,12 @@ from kordena_fiscal.domain import (
     FiscalEnvironment,
     FiscalValidationError,
 )
-from kordena_fiscal.gateway import FiscalGatewayClient
+from kordena_fiscal.gateway import AuthorizationRequest, FiscalGatewayClient
 from kordena_fiscal.gateway.nfe_sp_homologation import (
     MG_NFE_HOMOLOGATION_PROVIDER_ID,
     HomologationAuthorizationTarget,
     SefazSpHomologationGateway,
+    build_mg_nfe_homologation_gateway,
 )
 from kordena_fiscal.gateway.nfe_sp_operations_homologation import (
     SefazHomologationOperationsGateway,
@@ -45,8 +46,10 @@ from kordena_fiscal.operations import (
 )
 from kordena_fiscal.vault import EphemeralCertificateMaterial
 from kordena_fiscal.vault.encrypted_a1 import EncryptedA1Vault
+from kordena_fiscal.xml import NfeAccessKey
 
 from .fiscal_runtime import FiscalOperationHandler
+from .provider_issuance_handler import PreparedXmlGatewaySelector
 from .provider_operation_wiring import build_provider_operation_handlers
 
 
@@ -101,6 +104,30 @@ class UnprovisionedFiscalGateway:
         self._unavailable()
 
 
+def _require_mg_binding(
+    application: FiscalApplicationService, scope: ExecutionScope,
+    access_key: NfeAccessKey, operation: ConfiguredFiscalOperation,
+) -> None:
+    label = (
+        "consulta MG" if operation is ConfiguredFiscalOperation.QUERY else "autorização MG"
+    )
+    if scope.environment is not FiscalEnvironment.HOMOLOGATION:
+        raise FiscalValidationError(f"Operação de {label} disponível apenas em homologação")
+    if access_key.model.value != 55:
+        raise FiscalValidationError(f"Operação de {label} disponível apenas para NF-e modelo 55")
+    try:
+        provider_id = application.resolve_configured_provider_id(
+            scope=scope,
+            document_kind=FiscalDocumentKind.NFE,
+            jurisdiction=BrazilianJurisdiction("MG"),
+            operation=operation.value,
+        )
+    except ControlPlaneNotFoundError as exc:
+        raise FiscalValidationError(f"Vínculo fiscal de {label} indisponível") from exc
+    if provider_id != MG_NFE_HOMOLOGATION_PROVIDER_ID:
+        raise FiscalValidationError(f"Provedor do vínculo de {label} incompatível")
+
+
 class _GovernedMgQueryGateway:
     def __init__(
         self,
@@ -116,22 +143,9 @@ class _GovernedMgQueryGateway:
     def query(self, request: FiscalQueryRequest) -> FiscalQueryResult:
         if request.access_key.value[:2] != "31":
             return self._legacy.query(request)
-        scope = request.scope
-        if scope.environment is not FiscalEnvironment.HOMOLOGATION:
-            raise FiscalValidationError("Consulta MG disponível apenas em homologação")
-        if request.access_key.model.value != 55:
-            raise FiscalValidationError("Consulta MG disponível apenas para NF-e modelo 55")
-        try:
-            provider_id = self._application.resolve_configured_provider_id(
-                scope=scope,
-                document_kind=FiscalDocumentKind.NFE,
-                jurisdiction=BrazilianJurisdiction("MG"),
-                operation=ConfiguredFiscalOperation.QUERY.value,
-            )
-        except ControlPlaneNotFoundError as exc:
-            raise FiscalValidationError("Vínculo fiscal de consulta MG indisponível") from exc
-        if provider_id != MG_NFE_HOMOLOGATION_PROVIDER_ID:
-            raise FiscalValidationError("Provedor do vínculo de consulta MG incompatível")
+        _require_mg_binding(
+            self._application, request.scope, request.access_key, ConfiguredFiscalOperation.QUERY
+        )
         return self._mg.query(request)
 
     def cancel(self, request: CancellationRequest) -> CancellationResult:
@@ -215,10 +229,34 @@ def build_runtime_fiscal_handler_factory(
                 ),
                 application=application,
             )
+        selector: PreparedXmlGatewaySelector | None = None
+        if authorization_gateway is None and certificate_vault is not None:
+            authorization_vault = certificate_vault
+
+            def resolve_authorization_certificate(
+                scope: ExecutionScope, cnpj: str,
+            ) -> EphemeralCertificateMaterial:
+                return authorization_vault.resolve(scope=scope, issuer_cnpj=cnpj)
+
+            mg_authorization = FiscalGatewayClient(build_mg_nfe_homologation_gateway(
+                resolve_certificate=resolve_authorization_certificate,
+            ))
+
+            def select_xml_gateway(request: AuthorizationRequest) -> FiscalGatewayClient:
+                if request.access_key.value[:2] != "31":
+                    return authorization
+                _require_mg_binding(
+                    application, request.scope, request.access_key,
+                    ConfiguredFiscalOperation.AUTHORIZE,
+                )
+                return mg_authorization
+
+            selector = select_xml_gateway
         handlers = build_provider_operation_handlers(
             FiscalOperationsClient(gateway),
             application=application,
             prepared_xml_gateway=authorization,
+            select_xml_gateway=selector,
             prepared_nfse_gateway=selected_nfse,
             archive_retention=retention,
         )

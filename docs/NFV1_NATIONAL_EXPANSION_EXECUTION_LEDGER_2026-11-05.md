@@ -196,3 +196,19 @@ Próximo bloco interno de MG inclui seleção governada para autorização e can
 preparação Web, emissor e ano explícitos na inutilização, NFC-e MG e NFS-e de Belo
 Horizonte. Em seguida, RJ, PR, MT e MS com seus municípios-piloto e expansão pelas
 demais UFs e municípios. NAT-UF-MG permanece em implementação.
+
+
+### NAT-UF-MG-T04 — autorização de NF-e 55 preparada
+
+A PR #364 registrou CI e Governança verdes em a25e0d7 antes deste incremento.
+A composição canônica seleciona MG para autorização somente com o vínculo
+persistente da operação authorize. A seleção ocorre antes de iniciar a
+transmissão durável. O gateway confere XSD, referência, algoritmos,
+digest, assinatura e correspondência com o certificado A1 do Vault antes do
+transporte. A preparação arquivada permanece no formato existente e a
+recuperação consulta o autorizador com seu próprio vínculo.
+
+A prova interna usa documento previamente assinado, SQLite migrado e
+resposta SOAP local. A jornada de criação e preparação pelo Portal, o
+teste autenticado em ambiente publicado e a homologação oficial permanecem
+pendentes. As evidências de CI para o novo SHA estão na PR #364.

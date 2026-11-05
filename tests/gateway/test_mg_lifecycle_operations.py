@@ -357,7 +357,10 @@ def test_fixed_mg_destination_action_and_no_redirect_handler(
     assert any(isinstance(handler, _RejectFiscalRedirects) for handler in build.call_args.args)
 
 
-def test_schema_complete_nfe_authorization_roundtrip_to_official_nfe_proc(material):
+@pytest.mark.parametrize("prepared", [False, True])
+def test_schema_complete_nfe_authorization_roundtrip_to_official_nfe_proc(
+    material, prepared, tmp_path, monkeypatch,
+):
     from mg_golden_fixture import unsigned_golden_request
 
     from kordena_fiscal.gateway.authorization import AuthorizationStatus
@@ -384,6 +387,9 @@ def test_schema_complete_nfe_authorization_roundtrip_to_official_nfe_proc(materi
             '</infProt></protNFe></retEnviNFe>'
         )
     exchange = Mock(side_effect=reply)
+    if prepared:
+        _exercise_prepared_mg_runtime(original, material, exchange, tmp_path, monkeypatch)
+        return
     gateway = build_mg_nfe_homologation_gateway(
         resolve_certificate=Mock(return_value=material), exchange=exchange,
     )
@@ -397,3 +403,69 @@ def test_schema_complete_nfe_authorization_roundtrip_to_official_nfe_proc(materi
     )
     XmlSchemaValidator(proc).validate_document(result.authorized_xml)
     assert exchange.call_count == 1
+
+def _exercise_prepared_mg_runtime(original, material, exchange, tmp_path, monkeypatch):
+    from kordena_fiscal.archive import RetentionPolicyMetadata
+    from kordena_fiscal.gateway.nfe_sp_homologation import SefazHomologationAuthorizationGateway
+    from kordena_fiscal.lifecycle import FiscalDocumentState
+    from kordena_fiscal.signing.nfe_xmldsig import NfeSignatureProfile, sign_nfe_envi_xml
+
+    database = SqliteFiscalDatabase(tmp_path / "fiscal.db")
+    database.initialize()
+    application = FiscalApplicationService(database)
+    scope = original.scope
+    now = datetime.now(UTC)
+    document_id = "mg-prepared-55"
+    request = replace(original, signed_xml=sign_nfe_envi_xml(
+        original.signed_xml, material, profile=NfeSignatureProfile.NFE4_OFFICIAL_RSA_SHA1,
+    ))
+    application.reserve_issuance(
+        scope=scope, key=request.idempotency_key, request_fingerprint=request.request_fingerprint,
+        document_id=document_id, created_at=now,
+    )
+    for state in (
+        FiscalDocumentState.VALIDATING, FiscalDocumentState.READY_TO_SIGN,
+        FiscalDocumentState.SIGNING,
+    ):
+        application.transition_lifecycle(
+            document_id, state, occurred_at=now, reason="synthetic prepared NF-e",
+            correlation_id=scope.correlation_id,
+        )
+    application.persist_prepared_authorization(
+        document_id=document_id, request=request, occurred_at=now,
+        retention=RetentionPolicyMetadata("synthetic-test", 1),
+    )
+    monkeypatch.setattr(SefazHomologationAuthorizationGateway, "_https_exchange", exchange)
+    vault = Mock()
+    vault.resolve.return_value = material
+    handler = build_runtime_fiscal_handler_factory(certificate_vault=vault)(
+        application
+    )["issueFiscalDocument"]
+    payload = {"document_id": document_id}
+    with database() as uow:
+        uow.control_plane.add_organization(FiscalOrganization(scope.tenant_id, "Synthetic MG"))
+        uow.control_plane.add_unit(FiscalUnitRegistration(scope.tenant_id, scope.unit_id, "Pilot"))
+        query_binding = ProviderBinding(
+            binding_id="mg-query", tenant_id=scope.tenant_id, unit_id=scope.unit_id,
+            environment=scope.environment, document_kind=FiscalDocumentKind.NFE,
+            jurisdiction=BrazilianJurisdiction("MG"), operation=ConfiguredFiscalOperation.QUERY,
+            provider_id=MG_NFE_HOMOLOGATION_PROVIDER_ID,
+        )
+        uow.commercial.put_provider_binding(query_binding)
+        uow.commit()
+    with pytest.raises(FiscalValidationError, match="indispon"):
+        handler(scope, payload, "synthetic-http-intent")
+    exchange.assert_not_called()
+    vault.resolve.assert_not_called()
+
+    with database() as uow:
+        uow.commercial.put_provider_binding(replace(
+            query_binding, binding_id="mg-authorize", operation=ConfiguredFiscalOperation.AUTHORIZE,
+        ))
+        uow.commit()
+    assert handler(scope, payload, "synthetic-http-intent")["status"] == "authorized"
+    assert handler(scope, payload, "synthetic-http-intent")["replay"] is True
+    exchange.assert_called_once()
+    vault.resolve.assert_called_once_with(
+        scope=scope, issuer_cnpj=request.access_key.issuer_identifier,
+    )
