@@ -142,3 +142,39 @@ Referência: https://www.gov.br/nfse/pt-br/municipios/produtos-disponiveis
 
 **Conclusão:** há base funcional implantada e roteamento R16 em construção,
 mas não existe evidência para afirmar prontidão de emissão fiscal SP absoluta.
+
+## 6. Execução da ordem de fechamento PR #355 — 05/11/2026
+
+- **NFS-e no runtime:** `canonical_fiscal_composition.py` agora pode compor
+  `NfseNacionalHomologationGateway` e injetá-lo como `prepared_nfse_gateway`
+  de `build_provider_operation_handlers`. A injeção exige um callback confiável
+  `trusted_signed_dps_builder` e Vault A1; não há fallback para XML montado
+  diretamente do browser. **A composição da API em produção ainda não fornece
+  uma autoridade real de montagem/assinatura DPS**, portanto NFS-e Nacional
+  não pode ser classificada como operacional.
+- **Runtime/profile:** os indicadores antes fixos agora derivam da presença de
+  dependências reais via `fiscal_external_dependency_snapshot`, exposto por
+  `fiscal_dependency_probe`. O status de dependências **não** demonstra
+  certificado válido por tenant, autorização da SEFIN ou homologação externa.
+  `fiscal_runtime_external_execution_ready` permanece falso na composição
+  padrão sem preparador DPS.
+- **Escalabilidade:** `Dockerfile.api` contém quatro workers Uvicorn e
+  `--timeout-keep-alive 30`; o proxy `scripts/serve_portal.py` mantém
+  pool limitado de conexões HTTP internas e não retransmite mutações fiscais
+  quando encontra um socket obsoleto. **Benchmarks pós-deploy, limites de memória
+  1 GiB por container e pool PostgreSQL x4 ainda não foram certificados.**
+- **Inscrição municipal:** o formulário do Portal passa `municipal_registration`
+  à autoridade canônica de cadastro fiscal; o backend valida e armazena a IM no
+  `FiscalProfile`, incluindo comparação idempotente em replays. Campo opcional
+  conforme vínculo/capacidade municipal, sem afrouxar IE obrigatória.
+- **XML e DANFE:** não há contrato canônico demonstrado de arquivos autorizados
+  e PDF. Não foram criados links artificiais, endpoints 404 ou botões sem
+  download; exige serviço de artefatos com autorização por tenant, prontidão do
+  documento, XML protocolado e DANFE correspondente.
+- **Tomador/descrição/ISS:** o domínio NFS-e já possui
+  `NfseCanonicalDocument` e `NfseServiceLine`, mas a jornada Web de
+  preparação governada do tomador e tributação ISS ainda precisa de implementação
+  e regras legais municipais validadas.
+- **Merge, produção e deploy:** proibido declarar encerramento 100% até a
+  matriz de CI/E2E passar, a operação fiscal ser real e o benchmark de
+  latência sub-400 ms ser medido e aprovado.
