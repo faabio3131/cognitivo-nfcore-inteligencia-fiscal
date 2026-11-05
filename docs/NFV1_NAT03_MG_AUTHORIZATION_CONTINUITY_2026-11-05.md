@@ -74,3 +74,57 @@ Ausência de XSD real é lacuna interna de construção; A1/credenciamento/trans
 oficial e homologação permanecem dependências externas distintas.
 
 Sequência preservada: MG → RJ → PR → MT → MS. Nenhum município ou UF homologado.
+
+## Incremento posterior na mesma execução — XSD oficial congelado
+
+O download direto com sessão HTTP/cookies do Portal Nacional permitiu obter
+PL_010g v1.03 (49.751 bytes), SHA-256 do ZIP original:
+b329ecbe7e4c05a41bfbc1527f105defb7047328acfeada7c77e1666da485eaf.
+URL: https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=EQhOQMgipXY=
+
+Os cinco XSD do subdiretório NFe foram preservados byte a byte, com manifesto
+ancorado por hash no loader. Eventos do ZIP NÃO foram incorporados nem declarados
+certificados. .gitattributes evita transformação CRLF/LF dos artefatos.
+Package-data inclui os recursos na distribuição Python.
+
+O novo loader offline usa SchemaResource/SchemaSet/XmlSchemaValidator já canônicos.
+build_mg_nfe_homologation_gateway compõe o transporte com validação real da NFe
+assinada; não exige que o integrador escreva outro validador ou carregue schemas
+dinamicamente. A composição foi testada recusando XML sintético incompleto antes
+do transporte. Hash alterado do manifesto ou do XSD impede compilação/execução.
+
+Limite de escopo: o pacote capturado é um subconjunto NFe de atualização e não
+contém o XSD completo enviNFe, WSDL, regras de negócio/RTC, eventos ou prova de
+vigência aplicada por ambiente. O wrapper confere estrutura mínima e documento
+único, mas a validação XSD certificada nesta etapa é da NFe individual.
+Não declarar validação completa de envelope/UF, golden case autorizado, binding
+ativado ou homologação. Os blockers anteriores de ausência absoluta de bytes XSD
+foram parcialmente resolvidos; demais operações/esquemas seguem pendentes.
+
+### Causa raiz descoberta na integração de XMLDSig
+
+O XSD oficial xmldsig-core-schema_v1.01.xsd fixa os algoritmos rsa-sha1 e sha1.
+O assinador existente produzia RSA-SHA256/SHA256, incompatível com esse contrato.
+Foi adicionado NfeSignatureProfile.NFE4_OFFICIAL_RSA_SHA1, selecionado explicitamente
+pelo alvo MG NF-e em homologação. Não há algoritmo arbitrário recebido por HTTP
+nem alteração de hash do manifesto, dos artefatos, certificado ou TLS.
+O default anterior RSA_SHA256 e o assinador de eventos permanecem inalterados.
+A compatibilidade do default SP com schemas oficiais é PENDÊNCIA explícita;
+não declarar SP homologado ou sua assinatura compatível a partir desta entrega.
+
+Teste novo valida a Signature contra o XSD oficial e verifica criptograficamente
+o SignatureValue com RSA/SHA1. O teste também comprova que o default SHA256 não
+satisfaz o mesmo XSD, evitando falso positivo. O perfil desconhecido é recusado.
+O perfil legado se limita ao contrato de homologação já restrito a tpAmb=2.
+
+### Packaging e integridade
+
+Wheel construída com build isolation padrão: PASS. Tentativa inicial sem isolamento
+falhou por setuptools.build_meta ausente no Python local; sem alteração global.
+Os hashes dos cinco arquivos oficiais no índice Git e dentro da wheel conferem
+exatamente com o manifesto. Whitespace original de XSD foi preservado: diff check
+dos artefatos aponta espaços e CRLF do original, não corrigidos para não alterar
+evidência. Diff check do código e da documentação deve permanecer verde.
+
+Mypy dirigido dos três módulos modificados PASS; conjunto XML/transporte/A1
+intermediário 36 PASS. Regressão ampliada final e CI do novo HEAD registradas na PR.

@@ -113,3 +113,34 @@ Próximo bloco:
 ```
 
 **Nunca marcar CHECKED/CONCLUÍDO apenas por documentação, PR aberta, health 200 ou teste sintético.**
+
+## NAT-03/04 — evidência incremental na PR #361
+
+- Branch: feat/nfcore-nat03-mg-provenance. Primeiro commit a027b967c26af6869f3cb21f3be97df055653628.
+- PR base #360: CI #1689 SUCCESS e Governança #1120 SUCCESS confirmadas.
+- PR #361: Governança #1121 SUCCESS no primeiro commit; CI #1690 iniciada no SHA.
+- Regressão local do primeiro incremento: 178 PASS; 18 testes MG PASS; Ruff global e Mypy direcionado PASS.
+- Segundo incremento: download oficial PL_010g v1.03, cinco XSD NFe exatos, manifesto com hash,
+  loader offline via SchemaResource/SchemaSet/XmlSchemaValidator, composição explícita MG com
+  validação real da NFe assinada e negativa de XML incompleto antes de transporte.
+- Testes XML + transporte MG após o incremento: 34 PASS; Ruff global PASS; Mypy dos dois módulos PASS.
+- Zip original: b329ecbe7e4c05a41bfbc1527f105defb7047328acfeada7c77e1666da485eaf.
+- Limite: não contém schema completo de envelope/eventos/WSDL; não representa vigência homologada,
+  golden case autorizado, provider ativado, tributação/RTC certificada ou integração estadual completa.
+- Evidência final de SHA/CI e packaging: registrar na PR #361; estados globais permanecem IMPLEMENTING.
+- Próximo bloco: pacote completo enviNFe e operações, vigência por tpAmb e golden cases oficiais MG;
+  em seguida NFC-e MG e NFS-e BH, depois RJ → PR → MT → MS.
+
+### NAT-04 — incompatibilidade de assinatura identificada e correção MG
+
+O XMLDSig do pacote oficial exige RSA-SHA1/SHA1; default anterior gera SHA256.
+Perfil explícito NFE4_OFFICIAL_RSA_SHA1 adicionado ao assinador existente e
+selecionado apenas no alvo MG homologação. Signature validada contra XSD real
+e verificada criptograficamente em teste. Default SP e eventos não foram alterados;
+sua compatibilidade oficial permanece PENDÊNCIA, sem homologação declarada.
+Wheel e hashes exatos dos cinco XSD no índice/distribuição PASS.
+Mypy dirigido de três módulos PASS. Não promover estados globais.
+
+Regressão final do segundo incremento: **196 PASS em 60,31s**, zero falhas,
+abrangendo XML, gateways, control_plane e A1 sintético. Ruff global PASS,
+Mypy dirigido PASS, plano 59 IDs PASS. CI Linux no SHA final continua gate pendente.

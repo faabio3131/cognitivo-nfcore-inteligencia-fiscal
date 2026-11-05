@@ -227,3 +227,60 @@ def test_inconsistent_official_reply_never_authorizes(material, corruption):
     with pytest.raises(OfficialNfeTransportError):
         _gateway(Mock(return_value=material), exchange).authorize(original)
     assert exchange.call_count == 1
+
+
+def test_mg_official_composition_rejects_incomplete_xml_before_transport(material):
+    from kordena_fiscal.gateway.nfe_sp_homologation import build_mg_nfe_homologation_gateway
+    from kordena_fiscal.xml.schema import XmlSchemaValidationError
+    exchange = Mock()
+    gateway = build_mg_nfe_homologation_gateway(
+        resolve_certificate=Mock(return_value=material), exchange=exchange,
+    )
+    # Synthetic XML is intentionally incomplete: the real official XSD must reject it.
+    with pytest.raises(XmlSchemaValidationError, match="pinned XSD"):
+        gateway.authorize(_request())
+    exchange.assert_not_called()
+
+
+def test_mg_signature_profile_satisfies_official_xmldsig_and_crypto(material):
+    import base64
+
+    from cryptography.hazmat.primitives.asymmetric import padding
+
+    from kordena_fiscal.signing.nfe_xmldsig import NfeSignatureProfile, sign_nfe_envi_xml
+    from kordena_fiscal.xml.official_nfe_schema import load_official_nfe_schema
+    signed = sign_nfe_envi_xml(
+        _request().signed_xml, material,
+        profile=NfeSignatureProfile.NFE4_OFFICIAL_RSA_SHA1,
+    )
+    root = etree.fromstring(signed)
+    signature = root.find(".//{http://www.w3.org/2000/09/xmldsig#}Signature")
+    official = next(
+        resource for resource in load_official_nfe_schema().resources
+        if resource.name == "xmldsig-core-schema_v1.01.xsd"
+    )
+    etree.XMLSchema(etree.fromstring(official.content)).assertValid(signature)
+    info = signature.find("{http://www.w3.org/2000/09/xmldsig#}SignedInfo")
+    value = signature.findtext("{http://www.w3.org/2000/09/xmldsig#}SignatureValue")
+    _, certificate, _ = pkcs12.load_key_and_certificates(
+        material.pkcs12_bytes, material.password,
+    )
+    certificate.public_key().verify(
+        base64.b64decode(value), etree.tostring(info, method="c14n"),
+        padding.PKCS1v15(), hashes.SHA1(),
+    )
+    digest = signature.findtext(".//{http://www.w3.org/2000/09/xmldsig#}DigestValue")
+    assert len(base64.b64decode(digest)) == 20
+    signed256 = sign_nfe_envi_xml(_request().signed_xml, material)
+    signature256 = etree.fromstring(signed256).find(
+        ".//{http://www.w3.org/2000/09/xmldsig#}Signature"
+    )
+    # The existing default remains distinct and cannot be mislabeled official NFe4.
+    assert not etree.XMLSchema(etree.fromstring(official.content)).validate(signature256)
+
+
+def test_unknown_signature_profile_is_rejected(material):
+    from kordena_fiscal.domain import FiscalValidationError
+    from kordena_fiscal.signing.nfe_xmldsig import sign_nfe_envi_xml
+    with pytest.raises(FiscalValidationError, match="protocol profile"):
+        sign_nfe_envi_xml(_request().signed_xml, material, profile="arbitrary")

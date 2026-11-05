@@ -28,7 +28,7 @@ from kordena_fiscal.domain import (
     FiscalEnvironment,
     FiscalValidationError,
 )
-from kordena_fiscal.signing.nfe_xmldsig import sign_nfe_envi_xml
+from kordena_fiscal.signing.nfe_xmldsig import NfeSignatureProfile, sign_nfe_envi_xml
 from kordena_fiscal.vault import EphemeralCertificateMaterial
 from kordena_fiscal.vault.a1_preflight import validate_a1_for_issuer
 
@@ -295,7 +295,14 @@ class SefazHomologationAuthorizationGateway:
         unsigned = _parse_xml(request.signed_xml)
         signed_bytes = request.signed_xml
         if unsigned.find(".//{" + XMLDSIG_NAMESPACE + "}Signature") is None:
-            signed_bytes = sign_nfe_envi_xml(request.signed_xml, material)
+            signed_bytes = sign_nfe_envi_xml(
+                request.signed_xml, material,
+                profile=(
+                    NfeSignatureProfile.NFE4_OFFICIAL_RSA_SHA1
+                    if self._target is HomologationAuthorizationTarget.MG_NFE
+                    else NfeSignatureProfile.RSA_SHA256
+                ),
+            )
         xml = _signed_homologation_xml(request, signed_bytes)
         if self._validate_schema is not None:
             self._validate_schema(signed_bytes)
@@ -377,3 +384,21 @@ class SefazSpHomologationGateway(SefazHomologationAuthorizationGateway):
             exchange=exchange,
             target=HomologationAuthorizationTarget.SP_NFE,
         )
+
+
+def build_mg_nfe_homologation_gateway(
+    *,
+    resolve_certificate: Callable[[ExecutionScope, str], EphemeralCertificateMaterial],
+    timeout_seconds: float = 15.0,
+    exchange: Callable[[bytes, ssl.SSLContext, float], bytes] | None = None,
+) -> SefazHomologationAuthorizationGateway:
+    """Compose MG with the pinned canonical invoice XSD validator, without activation."""
+    from kordena_fiscal.xml.official_nfe_schema import OfficialNfeEnvelopeValidator
+
+    return SefazHomologationAuthorizationGateway(
+        target=HomologationAuthorizationTarget.MG_NFE,
+        resolve_certificate=resolve_certificate,
+        validate_schema=OfficialNfeEnvelopeValidator(),
+        timeout_seconds=timeout_seconds,
+        exchange=exchange,
+    )
