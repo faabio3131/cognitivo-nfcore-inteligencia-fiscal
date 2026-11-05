@@ -1090,6 +1090,77 @@ function configurationInput(form, key, label, kind) {
   return input;
 }
 
+/** Upload encrypted A1 through the canonical session/CSRF portal API.
+ * @param {HTMLElement} article
+ */
+function appendA1UploadForm(article) {
+  if (!bootstrapState?.permissions.includes("certificate.manage")) return;
+  const form = document.createElement("form");
+  form.id = "a1-upload-form";
+  form.className = "panel-form";
+  const heading = document.createElement("h3");
+  heading.textContent = "Cadastrar certificado A1 (.pfx) — homologação";
+  const hint = document.createElement("p");
+  hint.textContent = "O arquivo e a senha são enviados somente via HTTPS para o cofre criptografado. O certificado deve pertencer ao CNPJ informado. Nenhuma emissão é realizada durante o cadastro.";
+  form.append(heading, hint);
+  const cnpj = configurationInput(form, "issuer_cnpj", "CNPJ do emitente (14 dígitos)", "text");
+  cnpj.pattern = "[0-9]{14}";
+  cnpj.maxLength = 14;
+  const file = configurationInput(form, "pfx", "Arquivo A1 (.pfx ou .p12)", "file");
+  file.accept = ".pfx,.p12,application/x-pkcs12";
+  const password = configurationInput(form, "pfx_password", "Senha do certificado A1", "password");
+  password.autocomplete = "new-password";
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "primary";
+  submit.textContent = "Armazenar A1 com segurança";
+  const status = document.createElement("p");
+  status.setAttribute("role", "status");
+  form.append(submit, status);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    if (!selectedFiscalUnit || selectedFiscalEnvironment !== "homologation") {
+      status.textContent = "Selecione uma unidade e o ambiente de homologação.";
+      return;
+    }
+    const chosen = file.files?.[0];
+    if (!chosen || chosen.size === 0 || chosen.size > 2 * 1024 * 1024 ||
+        !/\\.(pfx|p12)$/i.test(chosen.name)) {
+      status.textContent = "Selecione um arquivo A1 .pfx ou .p12 de até 2 MB.";
+      return;
+    }
+    submit.disabled = true;
+    status.textContent = "Validando e gravando o certificado A1...";
+    try {
+      const bytes = new Uint8Array(await chosen.arrayBuffer());
+      let binary = "";
+      for (let index = 0; index < bytes.length; index += 8192) {
+        binary += String.fromCharCode(...bytes.subarray(index, index + 8192));
+      }
+      const result = await api("/v1/portal/certificates/a1", {
+        method: "POST",
+        headers: {"X-CSRF-Token": csrfToken()},
+        body: JSON.stringify({
+          unit_id: selectedFiscalUnit,
+          environment: "homologation",
+          issuer_cnpj: cnpj.value,
+          pfx_base64: btoa(binary),
+          password: password.value,
+        }),
+      });
+      status.textContent = `Certificado A1 armazenado com segurança. Validade: ${result.expires_at}. Identificador de verificação: ${result.fingerprint_sha256}.`;
+      file.value = "";
+      password.value = "";
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : "Falha ao cadastrar A1";
+    } finally {
+      submit.disabled = false;
+    }
+  });
+  article.append(form);
+}
+
 /** @param {HTMLElement} article @param {string} viewId @param {Record<string, unknown>[]} rows */
 function appendCustomerConfiguration(article, viewId, rows) {
   const spec = customerForms[viewId];
@@ -1770,6 +1841,7 @@ async function renderSurface(viewId) {
       notice.className = "form-error";
       notice.textContent = "Referência cadastrada não comprova segredo resolvido, entrega, homologação ou produção. Webhooks exigem aprovação vigente da plataforma.";
       appendCustomerConfiguration(article, viewId, rows);
+      if (viewId === "certificates") appendA1UploadForm(article);
       article.append(notice);
     }
     if (viewId === "onboarding" || viewId === "units") appendOnboardingControls(article);
