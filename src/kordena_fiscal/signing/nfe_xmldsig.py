@@ -122,7 +122,8 @@ def sign_nfe_event_xml(
         raise FiscalValidationError("Exactly one fiscal event is required")
     parent = parents[0]
     info = parent.find(f"{{{_NFE}}}{signed_name}")
-    if info is None or not (info.get("Id") or "").startswith("ID"):
+    identifier = info.get("Id") if info is not None else None
+    if not isinstance(identifier, str) or not identifier.startswith("ID"):
         raise FiscalValidationError("Event reference Id is required")
     if parent.find(f"{{{_DS}}}Signature") is not None:
         raise FiscalValidationError("Event already signed")
@@ -136,7 +137,7 @@ def sign_nfe_event_xml(
     etree.SubElement(signed_info, f"{{{_DS}}}CanonicalizationMethod", Algorithm=_C14N)
     etree.SubElement(signed_info, f"{{{_DS}}}SignatureMethod", Algorithm=_RSA_SHA256)
     reference = etree.SubElement(
-        signed_info, f"{{{_DS}}}Reference", URI="#" + info.get("Id")
+        signed_info, f"{{{_DS}}}Reference", URI="#" + identifier
     )
     transforms = etree.SubElement(reference, f"{{{_DS}}}Transforms")
     etree.SubElement(transforms, f"{{{_DS}}}Transform", Algorithm=_ENVELOPED)
