@@ -100,7 +100,7 @@ def _soap_envelope(invoice_batch: etree._Element) -> bytes:
     return etree.tostring(envelope, encoding="utf-8", xml_declaration=True)
 
 
-def _tls_context(material: EphemeralCertificateMaterial):
+def _tls_context(material: EphemeralCertificateMaterial) -> ssl.SSLContext:
     """Materialize mTLS keypair only inside a private temporary directory."""
     key, cert, chain = pkcs12.load_key_and_certificates(
         material.pkcs12_bytes, material.password
