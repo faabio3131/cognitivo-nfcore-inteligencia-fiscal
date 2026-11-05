@@ -1,5 +1,4 @@
 """Canonical fiscal entrypoint wiring smoke tests."""
-from kordena_fiscal.application.service import FiscalApplicationService
 from kordena_fiscal.runtime.canonical_fiscal_composition import (
     UnprovisionedFiscalGateway,
     build_runtime_fiscal_handler_factory,
