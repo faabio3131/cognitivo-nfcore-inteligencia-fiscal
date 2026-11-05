@@ -1618,7 +1618,7 @@ function appendRtcProfileRegistration(section) {
     const input = document.createElement("input");
     input.name = name;
     input.autocomplete = "off";
-    input.required = name !== "state_registration";
+    input.required = !["state_registration", "municipal_registration"].includes(name);
     if (pattern) input.pattern = pattern;
     label.append(input);
     fields[name] = input;
