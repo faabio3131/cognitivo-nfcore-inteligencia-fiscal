@@ -9,7 +9,7 @@ closed when that execution boundary is not yet present.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -129,11 +129,13 @@ class DurableHumanPortalExecutor:
         capability_readiness: CapabilityReadinessService | None = None,
         user_administration: HumanAdministrationService | None = None,
         commercial_reader: CommercialPortalReader | None = None,
+        danfe_renderer: Callable[[bytes], bytes] | None = None,
     ) -> None:
         self._unit_of_work_factory = unit_of_work_factory
         self._operation_executor = operation_executor
         self._user_administration = user_administration
         self._commercial_reader = commercial_reader
+        self._danfe_renderer = danfe_renderer
         self._capabilities = (
             GovernedCapabilityReadinessService(
                 unit_of_work_factory=unit_of_work_factory,
@@ -852,6 +854,27 @@ class DurableHumanPortalExecutor:
         with self._unit_of_work_factory() as uow:
             entries = uow.archive.list_for_document(scope, document_reference)
         matches = [entry for entry in entries if entry.kind is kind]
+        if not matches and kind is FiscalArchiveKind.DANFE and self._danfe_renderer:
+            # Generate the printable PDF ONLY from an already archived, genuine
+            # authorized XML. No synthetic fiscal authorization or XML is created.
+            authorized = [
+                entry for entry in entries if entry.kind is FiscalArchiveKind.AUTHORIZED_XML
+            ]
+            if len(authorized) == 1:
+                original = authorized[0]
+                if original.media_type not in {"text/xml", "application/xml"}:
+                    raise _portal_error(
+                        409, "FISCAL_ARTIFACT_MEDIA_INVALID", "Invalid archived XML type"
+                    )
+                try:
+                    FiscalArchiveVerifier().verify_entry(original)
+                    pdf = self._danfe_renderer(original.content)
+                except (ArchiveIntegrityError, FiscalValidationError) as exc:
+                    raise _portal_error(
+                        409, "FISCAL_DANFE_RENDER_FAILED",
+                        "Não foi possível gerar DANFE do XML autorizado",
+                    ) from exc
+                return pdf, "application/pdf"
         if len(matches) != 1:
             raise _portal_error(
                 404, "FISCAL_ARTIFACT_NOT_AVAILABLE",
