@@ -8,7 +8,9 @@ import pytest
 from fastapi import HTTPException
 
 from kordena_fiscal.archive import (
-    FiscalArchiveEntry, FiscalArchiveKind, InMemoryFiscalArchiveStore,
+    FiscalArchiveEntry,
+    FiscalArchiveKind,
+    InMemoryFiscalArchiveStore,
     RetentionPolicyMetadata,
 )
 from kordena_fiscal.domain import ExecutionScope, FiscalEnvironment
