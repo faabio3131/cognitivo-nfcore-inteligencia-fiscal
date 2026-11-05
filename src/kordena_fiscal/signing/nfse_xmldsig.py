@@ -38,17 +38,21 @@ def sign_nfse_dps_xml(
         raise FiscalValidationError("XML DPS inválido") from None
     if etree.QName(root).localname != "DPS":
         raise FiscalValidationError("Assinatura NFS-e requer DPS")
-    info_nodes = root.xpath("./*[local-name()='infDPS']")
+    info_nodes = [
+        child for child in root if etree.QName(child).localname == "infDPS"
+    ]
     if len(info_nodes) != 1:
         raise FiscalValidationError("Assinatura requer uma infDPS")
     info = info_nodes[0]
     identifier = info.get("Id", "")
     if not identifier.startswith("DPS") or len(identifier) > 100:
         raise FiscalValidationError("Id de DPS inválido")
-    environments = root.xpath(".//*[local-name()='tpAmb']")
+    environments = [
+        child for child in root.iter() if etree.QName(child).localname == "tpAmb"
+    ]
     if len(environments) != 1 or environments[0].text != "2":
         raise FiscalValidationError("Assinatura DPS permitida somente em tpAmb=2")
-    if root.xpath("./*[local-name()='Signature']"):
+    if any(etree.QName(child).localname == "Signature" for child in root):
         raise FiscalValidationError("DPS já está assinada")
     key, cert, _ = pkcs12.load_key_and_certificates(
         certificate_material.pkcs12_bytes, certificate_material.password
