@@ -109,8 +109,12 @@ para tenant, unidade, ambiente, tipo fiscal, jurisdição IBGE e operação.
 A nova classe `GovernedSpMunicipalProviderResolver` **delega diretamente ao
 resolvedor durável existente**, acrescentando somente o gate R16 para municípios
 SP; não cria outra persistência ou aprovação. Testes exercitam esse contrato.
-**A conexão desse wrapper ao runtime e os adapters municipais reais ainda não
-estão certificados**; a PR não declara provedor homologado.
+A factory `runtime/sp_municipal_provider_composition.py` já compõe esse
+resolvedor canônico com `ProviderGatewayService` e `ProviderRegistry`, com teste
+de contrato em `tests/test_sp_municipal_provider_composition.py`.
+**A ativação no entrypoint fiscal, os adapters municipais reais e a persistência
+de vínculos aprovada para os 22 municípios ainda não estão certificados**;
+a PR não declara provedor homologado.
 
 Cidades do catálogo:
 Barueri, São Paulo, Campinas, Sorocaba, Guarulhos, Santos, São Caetano do Sul,
