@@ -25,7 +25,7 @@ def _authorized_xml(
         f'<protNFe><infProt><chNFe>{key}</chNFe>'
         f'<tpAmb>{environment}</tpAmb><cStat>{status}</cStat>'
         f'<nProt>123456789</nProt></infProt></protNFe></nfeProc>'
-    ).encode("utf-8")
+    ).encode()
 
 
 def test_renderer_uses_offline_pdf_library_on_verified_xml(monkeypatch: pytest.MonkeyPatch) -> None:
