@@ -899,8 +899,10 @@ app = create_runtime_app(
     command_secret_resolver=development_command_resolver(
         _entrypoint_settings, os.environ
     ),
-    fiscal_operation_handlers=development_fiscal_ingress(
-        _entrypoint_settings, os.environ
+    fiscal_operation_handlers=(
+        development_fiscal_ingress(_entrypoint_settings, os.environ)
+        if _entrypoint_settings.environment.value in {"development", "test"}
+        else None
     ),
     commercial_acquisition_security=_development_ingress.get(
         "commercial_acquisition_security"
