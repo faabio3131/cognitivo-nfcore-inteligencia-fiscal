@@ -33,6 +33,14 @@ def render_authorized_nfe_danfe(xml_bytes: bytes) -> bytes:
     protocols = root.xpath("./n:protNFe/n:infProt", namespaces=_NS)
     if len(invoices) != 1 or len(protocols) != 1:
         raise FiscalValidationError("NF-e protocolada exige nota e protocolo únicos")
+    signature = root.xpath(
+        "./n:NFe/*[local-name()='Signature' "
+        "and namespace-uri()='http://www.w3.org/2000/09/xmldsig#']",
+        namespaces=_NS,
+    )
+    model = invoices[0].findtext(f"{{{_NFE}}}ide/{{{_NFE}}}mod")
+    if len(signature) != 1 or model != "55":
+        raise FiscalValidationError("DANFE exige NF-e modelo 55 com XMLDSig")
     access_key = invoices[0].get("Id", "")
     protocol_key = protocols[0].findtext(f"{{{_NFE}}}chNFe")
     status = protocols[0].findtext(f"{{{_NFE}}}cStat")
@@ -52,7 +60,7 @@ def render_authorized_nfe_danfe(xml_bytes: bytes) -> bytes:
         document = Danfe(xml=xml_bytes.decode("utf-8"))
         rendered = document.output(dest="S")
         pdf = bytes(rendered) if isinstance(rendered, (bytes, bytearray)) else b""
-    except (ValueError, UnicodeError, TypeError, AttributeError, RuntimeError) as exc:
+    except Exception as exc:  # Fiscal PDF adapter: never leak renderer errors or XML\n
         raise FiscalValidationError("Falha na geração segura do DANFE") from exc
     if not pdf.startswith(b"%PDF-") or len(pdf) > _MAX_PDF_BYTES:
         raise FiscalValidationError("Gerador DANFE não produziu um PDF válido")
