@@ -1,5 +1,7 @@
 """Issuer IM field flows through the one canonical Portal contract."""
 
+from __future__ import annotations
+
 from pathlib import Path
 
 
