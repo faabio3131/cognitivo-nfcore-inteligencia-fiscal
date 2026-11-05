@@ -116,6 +116,12 @@ de contrato em `tests/test_sp_municipal_provider_composition.py`.
 de vínculos aprovada para os 22 municípios ainda não estão certificados**;
 a PR não declara provedor homologado.
 
+**R16 sem deploy por cidade:** os 22 municípios são somente a lista inicial de
+onboarding. O resolvedor aceita qualquer código IBGE de SP válido quando já
+existe vínculo persistente autorizado no Control Plane, mesmo fora do catálogo.
+Um teste adicional certifica o município de Adamantina (3500105), não listado
+na ordem inicial, sem alteração da lógica.
+
 Cidades do catálogo:
 Barueri, São Paulo, Campinas, Sorocaba, Guarulhos, Santos, São Caetano do Sul,
 Jundiaí, Suzano, Santana de Parnaíba, Osasco, Itapevi, Jandira, Mairiporã,
