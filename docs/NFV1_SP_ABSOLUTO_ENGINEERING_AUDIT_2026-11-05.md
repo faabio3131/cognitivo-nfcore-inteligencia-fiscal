@@ -102,11 +102,15 @@ consultando vínculo governado por host, tenant, unidade, ambiente, versão,
 aprovação e operação. Não escolhe o provedor com base na localização do tomador;
 não usa a tabela consultiva como autoridade; falha fechado sem configuração.
 
-**Integração existente:** `ProviderGatewayService` aceita o contrato
-`ProviderSelectionResolver`. A nova classe `GovernedSpMunicipalProviderResolver`
-implementa esse contrato e testa isolamento. **Injeção em runtime de uma fonte
-persistente canônica de aprovações e os adapters municipais reais permanecem
-pendentes**; a PR não declara provedor certificado.
+**Integração existente:** `control_plane/commercial.py` já implementa
+`DurableProviderBindingResolver`, que consulta `uow.commercial.resolve_provider_binding`
+para tenant, unidade, ambiente, tipo fiscal, jurisdição IBGE e operação.
+`ProviderGatewayService` já aceita o contrato `ProviderSelectionResolver`.
+A nova classe `GovernedSpMunicipalProviderResolver` **delega diretamente ao
+resolvedor durável existente**, acrescentando somente o gate R16 para municípios
+SP; não cria outra persistência ou aprovação. Testes exercitam esse contrato.
+**A conexão desse wrapper ao runtime e os adapters municipais reais ainda não
+estão certificados**; a PR não declara provedor homologado.
 
 Cidades do catálogo:
 Barueri, São Paulo, Campinas, Sorocaba, Guarulhos, Santos, São Caetano do Sul,
