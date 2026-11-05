@@ -21,6 +21,7 @@ from lxml import etree
 from kordena_fiscal.domain import Cnpj, ExecutionScope, FiscalEnvironment, FiscalValidationError
 from kordena_fiscal.vault import EphemeralCertificateMaterial
 from kordena_fiscal.vault.a1_preflight import validate_a1_for_issuer
+from kordena_fiscal.signing.nfe_xmldsig import sign_nfe_envi_xml
 from .authorization import (
     AuthorizationRequest,
     AuthorizationResult,
@@ -59,10 +60,10 @@ def _text(element: etree._Element, name: str) -> str | None:
     return found.text.strip() if found is not None and found.text else None
 
 
-def _signed_homologation_xml(request: AuthorizationRequest) -> etree._Element:
+def _signed_homologation_xml(request: AuthorizationRequest, xml_bytes: bytes) -> etree._Element:
     if request.scope.environment is not FiscalEnvironment.HOMOLOGATION:
         raise OfficialNfeTransportError("Somente homologação (tpAmb=2) permitida")
-    root = _parse_xml(request.signed_xml)
+    root = _parse_xml(xml_bytes)
     if root.tag != "{" + NFE_NAMESPACE + "}enviNFe":
         raise OfficialNfeTransportError("Autorização requer enviNFe 4.00")
     if root.get("versao") != "4.00":
@@ -76,6 +77,8 @@ def _signed_homologation_xml(request: AuthorizationRequest) -> etree._Element:
         ambient = invoice.find(
             ".//{" + NFE_NAMESPACE + "}ide/{" + NFE_NAMESPACE + "}tpAmb"
         )
+        if info is None or info.get("Id") != "NFe" + request.access_key.value:
+            raise OfficialNfeTransportError("Chave de acesso não corresponde ao XML")
         if info is None or signature is None or ambient is None or ambient.text != "2":
             raise OfficialNfeTransportError("NF-e exige assinatura XMLDSig e tpAmb=2")
         signed_info = signature.find("{" + XMLDSIG_NAMESPACE + "}SignedInfo")
@@ -167,7 +170,6 @@ class SefazSpHomologationGateway:
     def authorize(self, request: AuthorizationRequest) -> AuthorizationResult:
         if not isinstance(request, AuthorizationRequest):
             raise OfficialNfeTransportError("Solicitação de autorização fiscal inválida")
-        xml = _signed_homologation_xml(request)
         material = self._resolve_certificate(
             request.scope, request.access_key.issuer_identifier
         )
@@ -179,6 +181,11 @@ class SefazSpHomologationGateway:
             issuer_cnpj=Cnpj(request.access_key.issuer_identifier),
             at=datetime.now(UTC),
         )
+        unsigned = _parse_xml(request.signed_xml)
+        signed_bytes = request.signed_xml
+        if unsigned.find(".//{" + XMLDSIG_NAMESPACE + "}Signature") is None:
+            signed_bytes = sign_nfe_envi_xml(request.signed_xml, material)
+        xml = _signed_homologation_xml(request, signed_bytes)
         context = _tls_context(material)
         response = _parse_xml(
             self._exchange(_soap_envelope(xml), context, self._timeout)
