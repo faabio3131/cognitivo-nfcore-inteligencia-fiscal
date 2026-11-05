@@ -109,7 +109,7 @@ class SefazSpHomologationOperationsGateway:
         resolve_certificate: Callable[[ExecutionScope, str], EphemeralCertificateMaterial],
         resolve_issuer: Callable[[ExecutionScope], str] | None = None,
         exchange: Callable[[str, bytes, ssl.SSLContext, float], bytes] | None = None,
-        timeout_seconds: float = 20,
+        timeout_seconds: float = 15,
     ) -> None:
         if not callable(resolve_certificate) or not 0 < timeout_seconds <= 60:
             raise ValueError("Fiscal operations require approved A1 resolver")
