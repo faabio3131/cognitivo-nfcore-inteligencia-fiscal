@@ -30,7 +30,7 @@ const descriptions = {
   units: "Unidades permitidas para o usuário autenticado.",
   environments: "Homologação e produção com autoridade segregada.",
   capabilities: "Capacidades e prontidão fiscal baseadas em evidência.",
-  certificates: "Configuração de certificados do emitente. O cadastro de referência não substitui o provisionamento seguro do arquivo A1 (.pfx).",
+  certificates: "Configuração de certificados do emitente; material secreto nunca é exibido. O cadastro de referência não substitui o provisionamento seguro do arquivo A1 (.pfx).",
   providers: "Vínculos de provedores por documento, operação e jurisdição.",
   users: "Usuários, papéis e permissões da organização.",
   webhooks: "Destinos e estado de entrega governada.",
