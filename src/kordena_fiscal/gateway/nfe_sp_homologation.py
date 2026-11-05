@@ -168,7 +168,9 @@ class SefazSpHomologationGateway:
         if not isinstance(request, AuthorizationRequest):
             raise OfficialNfeTransportError("Solicitação de autorização fiscal inválida")
         xml = _signed_homologation_xml(request)
-        material = self._resolve_certificate(\n            request.scope, request.access_key.issuer_identifier\n        )
+        material = self._resolve_certificate(
+            request.scope, request.access_key.issuer_identifier
+        )
         if not isinstance(material, EphemeralCertificateMaterial):
             raise OfficialNfeTransportError("Certificado A1 não cadastrado para o CNPJ emitente")
         validate_a1_for_issuer(
