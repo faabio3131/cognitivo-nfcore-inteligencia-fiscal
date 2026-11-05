@@ -1,10 +1,6 @@
 name: NFCore Readiness Benchmark (non-mutating)
 
 on:
-  pull_request:
-    paths:
-      - "scripts/bench/nfcore_readiness_load.py"
-      - ".github/workflows/nfcore-readiness-benchmark.yml"
   workflow_dispatch:
 
 permissions:
