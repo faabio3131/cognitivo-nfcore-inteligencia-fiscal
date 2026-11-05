@@ -57,8 +57,11 @@ def sign_nfe_envi_xml(
     identifier = info.get("Id", "")
     if not identifier.startswith("NFe") or len(identifier) != 47:
         raise FiscalValidationError("Id de infNFe inválido")
-    if invoice.find(f".//{{{_NFE}}}ide/{{{_NFE}}}tpAmb") is None:
-        raise FiscalValidationError("tpAmb obrigatório na NF-e")
+    environment = invoice.find(f".//{{{_NFE}}}ide/{{{_NFE}}}tpAmb")
+    if environment is None or environment.text != "2":
+        raise FiscalValidationError(
+            "Assinatura fiscal de homologação exige tpAmb=2"
+        )
     key, cert, _ = pkcs12.load_key_and_certificates(
         certificate_material.pkcs12_bytes,
         certificate_material.password,
