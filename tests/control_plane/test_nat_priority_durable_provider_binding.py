@@ -105,3 +105,25 @@ def test_pilot_needs_explicit_durable_binding_before_any_route(pilot: Any) -> No
             scope=_scope(), document_kind=FiscalDocumentKind.NFE,
             jurisdiction=jurisdiction, operation="authorize",
         )
+
+
+def test_non_pilot_mg_city_can_join_by_governed_binding_without_code_deploy() -> None:
+    """The same authority serves any MG IBGE; the initial catalog is not an allowlist."""
+    assert all(pilot.municipality_ibge != "3170206" for pilot in NAT_PRIORITY_PILOTS)
+    approved = ProviderBinding(
+        binding_id="pilot-uberlandia-mg",
+        tenant_id="tenant-mg", unit_id="unit-a",
+        environment=FiscalEnvironment.HOMOLOGATION,
+        document_kind=FiscalDocumentKind.NFSE,
+        jurisdiction=BrazilianJurisdiction("MG", "3170206"),
+        operation=ConfiguredFiscalOperation.AUTHORIZE,
+        provider_id="provider-contrato-validado",
+    )
+    resolver = DurableProviderBindingResolver(
+        cast(FiscalUnitOfWorkFactory, lambda: _Uow(approved))
+    )
+    assert resolver.resolve_provider_id(
+        scope=_scope(), document_kind=FiscalDocumentKind.NFSE,
+        jurisdiction=BrazilianJurisdiction("MG", "3170206"),
+        operation="authorize",
+    ) == "provider-contrato-validado"
