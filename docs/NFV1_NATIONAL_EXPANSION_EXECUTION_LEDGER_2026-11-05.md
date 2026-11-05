@@ -1,0 +1,88 @@
+# NFCore National Expansion — Ledger de Estado e Continuidade
+
+**Documento:** NFV1-NAT-LEDGER-001  
+**Data:** 2026-11-05  
+**Status:** planejamento documental, NÃO certificação técnica.  
+**Fonte superior:** GitHub current, código, CI e evidência.  
+**Escopo:** `docs/NFV1_NATIONAL_EXPANSION_MASTER_ARCHITECTURE_2026-11-05.md` + `docs/NFV1_NATIONAL_EXPANSION_MASTER_EXECUTION_SCHEDULE_2026-11-05.md`.
+
+## Checkpoint atual
+
+- Repositório: `faabio3131/nf-core-v001`.
+- Branch deste planejamento: `docs/nfcore-national-fiscal-expansion-architecture-20261105`; baseada na `main` e sem alterações de runtime.
+- PR #355: roteamento municipal SP em branch separada, em Draft na última checagem; **não absorvida neste planejamento**.
+- Production/Contabo: nenhuma modificação por esta entrega.
+- Cuidado: prontidão multi-tenant, modelos/UF na arquitetura **não** são homologação externa.
+- Próximo bloco: **NAT-00**, reconciliação PR #355 + contratos canônicos + bootstrap de fontes oficiais MG.
+- Go/No-Go: aprovação de arquitetura e cronograma pelo Diretor antes de implementação definitiva; aprovação específica para deploy/migrations/credenciais e homologação oficial.
+
+## Ledger plataforma
+
+| ID | CURRENT | TARGET | Status | Dependência | Evidência exigida |
+| --- | --- | --- | --- | --- | --- |
+| NAT-00 | PR #355 não integrada no momento da leitura | conciliar PR, main, production, CI | NOT_STARTED | CI + revisão | SHA e diff atuais, CI, decisões |
+| NAT-01 | ProviderBinding/Resolver canônicos | contrato nacional versionado e governado | NOT_STARTED | NAT-00 | ADR+tests sem dupla autoridade |
+| NAT-02 | tenant/unidade e perfil fiscal | vínculo escritório↔clientes e matriz/filial | NOT_STARTED | NAT-00 | RBAC, revogação, testes isolamento |
+| NAT-03 | routing persistente por jurisdição | catálogo oficial versionado de endpoints | NOT_STARTED | NAT-01 | fontes/proveniência/approval |
+| NAT-04 | gateway NF-e SP / modelos canônicos | adaptadores reutilizáveis UF/modelo/operação | NOT_STARTED | NAT-03 | XSD/SOAP/assinatura/ops |
+| NAT-05 | Vault A1/CSC parcialmente existente | CSC/QR NFC-e governados por UF | NOT_STARTED | NAT-03/04 | QR oficial, sem logs de segredo |
+| NAT-06 | NFS-e nacional + SP em construção | competências e famílias municipais | NOT_STARTED | NAT-01/03 | contratos municipais/nacionais |
+| NAT-07 | Portal fiscal parcial | jornadas Web completas 55/65/serviço | NOT_STARTED | NAT-02/04/06 | Chromium+RBAC+download |
+| NAT-08 | CI e idempotência existentes | stress PostgreSQL/recovery/observabilidade | NOT_STARTED | NAT-04/05/06 | 50/100, locks, métricas |
+| NAT-09 | governança e CI existentes | certificação/gates por UF/doc/ambiente | NOT_STARTED | NAT-00..08 | ledger e gates completos |
+
+## Ledger UF — todas as 27 unidades federativas
+
+`NOT_STARTED` indica que **a nova expansão nacional** ainda não foi executada, não nega componentes anteriores ou trabalho da PR #355.
+
+| Ordem | ID | Status nacional | Bloqueio ou próxima ação |
+| ---: | --- | --- | --- |
+| 0 (reconciliar) | NAT-UF-SP-RECONCILE | NOT_STARTED | revisar PR #355, não duplicar código |
+| 1 | NAT-UF-MG | NOT_STARTED | contratos oficiais MG NF-e/NFC-e e Belo Horizonte NFS-e |
+| 2 | NAT-UF-RJ | NOT_STARTED | SVRS NF-e e NFC-e RJ independente; NFS-e Rio |
+| 3 | NAT-UF-PR | NOT_STARTED | PR NF-e/NFC-e, CSC/credenciamento, Curitiba |
+| 4 | NAT-UF-MT | NOT_STARTED | MT NF-e/NFC-e, CSC/QR, Cuiabá |
+| 5 | NAT-UF-MS | NOT_STARTED | MS NF-e/NFC-e, Campo Grande |
+| 6 | NAT-UF-RS | NOT_STARTED | Porto Alegre, autorizador próprio |
+| 7 | NAT-UF-SC | NOT_STARTED | Florianópolis; SVRS/contratos atuais |
+| 8 | NAT-UF-ES | NOT_STARTED | Vitória; SVRS/contratos atuais |
+| 9 | NAT-UF-GO | NOT_STARTED | Goiânia |
+| 10 | NAT-UF-DF | NOT_STARTED | Brasília |
+| 11 | NAT-UF-BA | NOT_STARTED | Salvador |
+| 12 | NAT-UF-PE | NOT_STARTED | Recife |
+| 13 | NAT-UF-CE | NOT_STARTED | Fortaleza |
+| 14 | NAT-UF-PA | NOT_STARTED | Belém |
+| 15 | NAT-UF-AM | NOT_STARTED | Manaus |
+| 16 | NAT-UF-MA | NOT_STARTED | São Luís; SVAN NF-e |
+| 17 | NAT-UF-PB | NOT_STARTED | João Pessoa |
+| 18 | NAT-UF-RN | NOT_STARTED | Natal |
+| 19 | NAT-UF-PI | NOT_STARTED | Teresina |
+| 20 | NAT-UF-AL | NOT_STARTED | Maceió |
+| 21 | NAT-UF-SE | NOT_STARTED | Aracaju |
+| 22 | NAT-UF-TO | NOT_STARTED | Palmas |
+| 23 | NAT-UF-RO | NOT_STARTED | Porto Velho |
+| 24 | NAT-UF-AC | NOT_STARTED | Rio Branco |
+| 25 | NAT-UF-AP | NOT_STARTED | Macapá |
+| 26 | NAT-UF-RR | NOT_STARTED | Boa Vista |
+
+## Registro obrigatoriamente preenchido a cada bloco
+
+```
+Data:
+ID:
+CURRENT branch + SHA:
+TARGET:
+Fontes oficiais + URL + data + versão/hash:
+Escopo congelado:
+Dependências e áreas protegidas:
+Alterações de domínio/application/infra/DB/API/Web:
+Testes Ruff/Mypy/pytest/postgres/frontend/Chromium/Docker/security:
+CI/Governança (run e conclusion):
+PR:
+Merge (quando autorizado):
+Smoke/homologação externa (se aplicável):
+Riscos/blockers:
+Próximo bloco:
+```
+
+**Nunca marcar CHECKED/CONCLUÍDO apenas por documentação, PR aberta, health 200 ou teste sintético.**
