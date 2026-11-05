@@ -18,6 +18,7 @@ from lxml import etree
 
 from kordena_fiscal.domain import FiscalValidationError
 from kordena_fiscal.gateway.nfe_sp_homologation import _tls_context
+from kordena_fiscal.signing.nfse_xmldsig import sign_nfse_dps_xml
 from kordena_fiscal.vault import EphemeralCertificateMaterial
 
 SEFIN_HOMOLOGATION_NFSE_URL = (
@@ -138,4 +139,10 @@ class NfseNationalHomologationTransport:
         body = build_nfse_dps_request(signed_dps_xml)
         return parse_nfse_homologation_response(
             self._exchange(body, _tls_context(self._certificate), self._timeout)
+        )
+
+    def sign_and_submit_dps(self, unsigned_dps_xml: bytes) -> dict[str, str]:
+        """Use the same scoped A1 identity for XMLDSig and the mTLS handshake."""
+        return self.submit_signed_dps(
+            sign_nfse_dps_xml(unsigned_dps_xml, self._certificate)
         )
