@@ -12,6 +12,8 @@ from kordena_fiscal.application.service import FiscalApplicationService
 from kordena_fiscal.archive import RetentionPolicyMetadata
 from kordena_fiscal.domain import FiscalValidationError
 from kordena_fiscal.gateway import FiscalGatewayClient
+from kordena_fiscal.gateway.nfe_sp_homologation import SefazSpHomologationGateway
+from kordena_fiscal.vault.encrypted_a1 import EncryptedA1Vault
 from kordena_fiscal.operations import FiscalOperationsClient
 
 from .fiscal_runtime import FiscalOperationHandler
@@ -45,6 +47,7 @@ def build_runtime_fiscal_handler_factory(
     *,
     operations_gateway: Any | None = None,
     authorization_gateway: Any | None = None,
+    certificate_vault: EncryptedA1Vault | None = None,
 ) -> Any:
     """Register all four canonical operations without granting fiscal readiness.
 
@@ -52,8 +55,15 @@ def build_runtime_fiscal_handler_factory(
     The default boundary is intentionally non-transmitting.
     """
     operations = FiscalOperationsClient(operations_gateway or UnprovisionedFiscalGateway())
+    selected_authorization = authorization_gateway
+    if selected_authorization is None and certificate_vault is not None:
+        selected_authorization = SefazSpHomologationGateway(
+            resolve_certificate=lambda scope, cnpj: certificate_vault.resolve(
+                scope=scope, issuer_cnpj=cnpj
+            )
+        )
     authorization = FiscalGatewayClient(
-        authorization_gateway or UnprovisionedFiscalGateway()
+        selected_authorization or UnprovisionedFiscalGateway()
     )
     retention = RetentionPolicyMetadata(
         policy_id="nfcore-fiscal-archive", policy_version=1
