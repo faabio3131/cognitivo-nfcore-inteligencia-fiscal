@@ -76,8 +76,11 @@ class GovernedSpMunicipalProviderResolver:
         if jurisdiction.state_code != "SP":
             raise UnsupportedProviderError("Municipal router is limited to SP")
         issuer_ibge = jurisdiction.municipality_ibge_code
-        if issuer_ibge not in SP_MUNICIPAL_CANDIDATES:
-            raise UnsupportedProviderError("Issuer IBGE is not in the SP R16 catalog")
+        # R16: the catalog lists onboarding candidates, but must NEVER be a
+        # hard-coded allowlist. A future SP city with a duly approved durable
+        # provider binding must work without modifying or deploying this code.
+        if issuer_ibge is None or not issuer_ibge.startswith("35"):
+            raise UnsupportedProviderError("Issuer municipality requires an SP IBGE code")
         if scope.host_namespace is None:
             raise UnsupportedProviderError("A trusted host namespace is required")
         try:
