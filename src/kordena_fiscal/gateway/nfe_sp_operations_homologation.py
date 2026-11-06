@@ -22,13 +22,13 @@ from kordena_fiscal.domain import (
     FiscalValidationError,
 )
 from kordena_fiscal.gateway.authorization import GatewayProviderMetadata
+from kordena_fiscal.gateway.fiscal_tls import RejectFiscalRedirects
 from kordena_fiscal.gateway.nfe_sp_homologation import (
     MG_NFE_HOMOLOGATION_PROVIDER_ID,
     NFE_NAMESPACE,
     SOAP12_NAMESPACE,
     HomologationAuthorizationTarget,
     _parse_xml,
-    _RejectFiscalRedirects,
     _tls_context,
 )
 from kordena_fiscal.operations import (
@@ -111,7 +111,7 @@ def _post_xml(
         },
     )
     try:
-        opener = build_opener(HTTPSHandler(context=context), _RejectFiscalRedirects())
+        opener = build_opener(HTTPSHandler(context=context), RejectFiscalRedirects())
         with opener.open(request, timeout=timeout) as answer:
             result = answer.read(_MAX_RESPONSE_BYTES + 1)
         if len(result) > _MAX_RESPONSE_BYTES:

@@ -176,8 +176,8 @@ def test_fiscal_redirect_handler_never_follows_location():
     from email.message import Message
     from urllib.request import Request
 
-    from kordena_fiscal.gateway.nfe_sp_homologation import _RejectFiscalRedirects
-    assert _RejectFiscalRedirects().redirect_request(
+    from kordena_fiscal.gateway.fiscal_tls import RejectFiscalRedirects
+    assert RejectFiscalRedirects().redirect_request(
         Request("https://hnfe.fazenda.mg.gov.br/"), None, 302, "redirect",
         Message(), "https://attacker.example/",
     ) is None

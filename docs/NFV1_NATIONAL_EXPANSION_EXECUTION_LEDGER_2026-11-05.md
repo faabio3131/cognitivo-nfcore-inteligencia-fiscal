@@ -257,3 +257,56 @@ Fontes consultadas em 06/11/2026:
 Próxima entrega: cliente de recibo com correlação persistente e teste mTLS
 de homologação, seguido de adaptação comprovada por modelo/UF e contratos
 municipais. Gates de CI e SHA na PR.
+
+
+### NAT-04 — envelopes municipais em homologação (06/11/2026)
+
+A malha estadual e o roteamento municipal usam contratos distintos. O gateway
+Nacional envia DPS XML assinada dentro de JSON compactado via POST REST SEFIN.
+A preparação ABRASF 2.03 produz SOAP 1.1 com partes string de cabeçalho e
+dados, XML no namespace ABRASF, ação WSDL e assinaturas RPS antes do lote.
+A consulta de lote valida o prestador e o protocolo sem assinar a consulta.
+A assinatura usa o A1 do escopo; a chave privada e a senha ficam fora dos
+envelopes. O cliente mTLS verifica o servidor e recusa redirects.
+
+| Município | IBGE | Contrato identificado |
+|---|---|---|
+| São Paulo | 3550308 | Nota Paulistana tem layout próprio. Emissor Nacional conforme competência e regime, incluindo ME/EPP do Simples desde 01/11/2026. |
+| Belo Horizonte | 3106200 | Emissor Nacional conforme orientações BHISS. |
+| Rio de Janeiro | 3304557 | Emissor Nacional para novas emissões conforme orientação municipal. |
+| Curitiba | 4106902 | Emissor Nacional conforme cronograma oficial por grupo. |
+| Cuiabá | 5103403 | Emissor Nacional a partir de 01/11/2026 conforme Prefeitura. |
+| Campo Grande | 5002704 | ABRASF 2.03 via webservice municipal onde aplicável; regime e competência exigem checagem antes de escolher o canal. |
+
+Os demais polos do catálogo paulista continuam como candidatos por município.
+O mapeamento acima é evidência de contrato, sem autorizar fallback, ativar
+bindings ou tratar ABRASF 1.x, 2.03, 2.04 e Nota Paulistana como equivalentes.
+O WSDL municipal de Campo Grande indicado no comunicado não resolveu por DNS
+nesta execução. O envelope implementado segue o WSDL-base da ABRASF, ainda
+sem registro em runtime para transmissão municipal.
+
+O ZIP ABRASF tem SHA-256
+638f7f9a0dfb76898357e4335270424a5123c2cc2ab040bdb0b2de08da58a941.
+O arquivo .txt de schema não era XML bem formado. Foi corrigida a falta
+de um caractere de abertura na restrição de tsNif e normalizado o whitespace
+de fim de linha para o repositório. O schema derivado e o import estão pinados.
+O ZIP Nacional de 09/02/2026 tem SHA-256
+e7935cbd9470527c6cc32984c1b2263e614183bf0139ce2733eaaed2de9a8072.
+As duas versões DPS compilam offline a partir de arquivos pinados.
+
+A pré-auditoria da preparação ABRASF recebe apenas campos de tributação
+e pode vetar antes de acessar o Vault. As taxas e retenções por município
+precisam de autoridade normativa versionada. Gemini 3.8 Flash/Sentinela
+em runtime, assinatura Nacional aceita pelo autorizador e mTLS municipal
+com A1 elegível continuam pendentes de prova.
+
+Fontes conferidas:
+- https://abrasf.org.br/biblioteca/arquivos-publicos/nfs-e/versao-2-03
+- https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/documentacao-atual
+- https://notadomilhao.sf.prefeitura.sp.gov.br/manuais-reforma-tributaria/
+- https://notadomilhao.sf.prefeitura.sp.gov.br/noticias/migracao-de-contribuintes-do-simples-nacional-para-o-ambiente-nacional/
+- https://prefeitura.pbh.gov.br/fazenda/bhiss/avisos
+- https://www.1746.rio/hc/pt-br/articles/10674193247771-ISS-Emiss%C3%A3o-de-nota-fiscal-eletr%C3%B4nica-Nota-Carioca
+- https://lp.curitiba.pr.gov.br/notanacional/
+- https://cuiaba.mt.gov.br/noticias/cuiaba-prorroga-prazo-para-emissao-de-nfs-e-pelo-emissor-nacional
+- https://cdn.campogrande.ms.gov.br/portal/prod/uploads/sites/29/2026/03/Comunicado-RPS-Integracao-Web-Service-2.pdf
