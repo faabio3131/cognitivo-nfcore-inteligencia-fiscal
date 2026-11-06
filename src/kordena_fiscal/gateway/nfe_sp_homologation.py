@@ -14,6 +14,7 @@ from urllib.request import HTTPSHandler, Request, build_opener
 
 from lxml import etree
 
+from kordena_fiscal.control_plane.sefaz_endpoint_catalog import SefazService, resolve_sefaz_endpoint
 from kordena_fiscal.domain import (
     Cnpj,
     ExecutionScope,
@@ -35,12 +36,12 @@ from .authorization import (
     AuthorizationStatus,
     GatewayProviderMetadata,
 )
-from .fiscal_tls import RejectFiscalRedirects as _RejectFiscalRedirects
-from .fiscal_tls import build_fiscal_tls_context
+from .fiscal_tls import RejectFiscalRedirects, build_fiscal_tls_context
 
-NFE_SP_HOMOLOGATION_AUTHORIZATION_URL = (
-    "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx"
-)
+NFE_SP_HOMOLOGATION_AUTHORIZATION_URL = resolve_sefaz_endpoint(
+    state_ibge_code="35", document_kind=FiscalDocumentKind.NFE,
+    environment=FiscalEnvironment.HOMOLOGATION, service=SefazService.AUTHORIZE,
+).url
 SOAP12_NAMESPACE = "http://www.w3.org/2003/05/soap-envelope"
 NFE_NAMESPACE = "http://www.portalfiscal.inf.br/nfe"
 SERVICE_NAMESPACE = "http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4"
@@ -235,7 +236,7 @@ class SefazHomologationAuthorizationGateway:
                 "Accept": "application/soap+xml",
             },
         )
-        opener = build_opener(HTTPSHandler(context=context), _RejectFiscalRedirects())
+        opener = build_opener(HTTPSHandler(context=context), RejectFiscalRedirects())
         try:
             with opener.open(req, timeout=timeout) as response:
                 raw = response.read(_MAX_RESPONSE_BYTES + 1)
@@ -302,7 +303,7 @@ class SefazHomologationAuthorizationGateway:
             protocol = result.find(".//{" + NFE_NAMESPACE + "}infProt")
             authorization_code = _text(protocol, "cStat") if protocol is not None else None
             protocol_no = _text(protocol, "nProt") if protocol is not None else None
-            if authorization_code == "100" and protocol_no:
+            if code == "104" and authorization_code == "100" and protocol_no:
                 if self._target is HomologationAuthorizationTarget.MG_NFE:
                     digest = xml.findtext(".//{" + XMLDSIG_NAMESPACE + "}DigestValue")
                     if not digest or protocol is None or _text(protocol, "digVal") != digest:

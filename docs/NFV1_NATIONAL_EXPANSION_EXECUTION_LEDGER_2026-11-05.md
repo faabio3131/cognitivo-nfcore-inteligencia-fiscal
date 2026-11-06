@@ -214,6 +214,51 @@ teste autenticado em ambiente publicado e a homologação oficial permanecem
 pendentes. As evidências de CI para o novo SHA estão na PR #364.
 
 
+### NAT-03/04 — envelopes e referências Multi-UF (06/11/2026)
+
+Base auditada main 851efe0ddcf7372f532cbcba33b323f0e0f11ed6 e production
+9e966e7e50fc0a9b33eb2f751cce60ab21686be5. Escopo do incremento limitado ao
+catálogo versionado, resolução exata, consumo pelas rotas existentes e
+proteção de transporte. Vínculos persistentes e gates de ativação continuam
+sendo as autoridades de execução.
+
+- 144 referências de NF-e e NFC-e para SP, MG, RJ, PR, MT e MS nos dois
+  ambientes. Operações de autorização, recibo, consulta, evento, inutilização
+  e status. RJ usa SVRS. A busca compara cUF, família, ambiente e operação,
+  verifica coerência do prefixo IBGE quando informado e recusa lacunas.
+- Adaptadores NF-e já compostos de SP e MG continuam usando os mesmos
+  destinos de homologação, agora a partir do catálogo. O transporte atual
+  trata 103/105 como pendência mesmo se houver protocolo contraditório.
+  A consulta por chave segue como recuperação existente. A rota de recibo
+  descoberta ainda precisa de cliente operacional ligado à persistência.
+- Os dois caminhos de transporte da NFS-e Nacional recusam redirects.
+  Material A1 permanece no contexto mTLS por emitente e escopo do Vault.
+  A NFS-e municipal segue no roteamento existente por vínculo/município.
+- Os XSD oficiais já fixados continuam sendo a referência de validação.
+  NCM, CFOP e regras jurisdicionais ainda requerem dados normativos
+  governados e uma jornada de pré-auditoria. O Core Cognitivo permanece
+  consultivo. Uso do Gemini 3.8 Flash antes da assinatura em runtime
+  requer integração e prova específicas.
+- 48 GETs WSDL sem credencial, em homologação, com TLS verificado e sem
+  redirects, falharam na verificação TLS no cliente Python/Windows.
+  A amostra MG NF-e na Contabo também falhou no handshake sem A1.
+  O resultado é inconclusivo para mTLS autenticado. Ativação e
+  homologar operações exigem emitente elegível, A1 e prova do autorizador.
+
+Fontes consultadas em 06/11/2026:
+- https://dfe-portal.svrs.rs.gov.br/Nfe/Servicos
+- https://dfe-portal.svrs.rs.gov.br/Nfce/Servicos
+- https://portalsped.fazenda.mg.gov.br/spedmg/nfce/web-services/
+- https://www.nfe.fazenda.gov.br/portal/webServices.aspx
+- https://portal.fazenda.rj.gov.br/dfe/wp-content/uploads/sites/17/2023/01/DF-e_NFC-e.pdf
+- https://www.ibge.gov.br/explica/codigos-dos-municipios.php
+- https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash
+
+Próxima entrega: cliente de recibo com correlação persistente e teste mTLS
+de homologação, seguido de adaptação comprovada por modelo/UF e contratos
+municipais. Gates de CI e SHA na PR.
+
+
 ### NAT-04 — envelopes municipais em homologação (06/11/2026)
 
 A malha estadual e o roteamento municipal usam contratos distintos. O gateway
