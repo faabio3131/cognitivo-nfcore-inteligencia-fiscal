@@ -21,7 +21,7 @@ from kordena_fiscal.gateway.authorization import (
     AuthorizationStatus,
     GatewayProviderMetadata,
 )
-from kordena_fiscal.gateway.nfe_sp_homologation import _tls_context
+from kordena_fiscal.gateway.nfe_sp_homologation import _RejectFiscalRedirects, _tls_context
 from kordena_fiscal.issuance.nfe_nfse import (
     NfseAuthorizationRequest,
     NfseAuthorizationResult,
@@ -74,7 +74,8 @@ def _exchange_http(payload: bytes, context: ssl.SSLContext, timeout: float) -> b
         headers={"Content-Type": "application/json", "Accept": "application/json"},
     )
     try:
-        with build_opener(HTTPSHandler(context=context)).open(req, timeout=timeout) as response:
+        opener = build_opener(HTTPSHandler(context=context), _RejectFiscalRedirects())
+        with opener.open(req, timeout=timeout) as response:
             data = response.read(_MAX_RESPONSE + 1)
         if len(data) > _MAX_RESPONSE:
             raise OfficialNfseTransportError("Resposta nacional excede limite")

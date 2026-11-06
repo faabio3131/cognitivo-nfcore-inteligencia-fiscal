@@ -299,3 +299,20 @@ def test_unknown_signature_profile_is_rejected(material):
     from kordena_fiscal.signing.nfe_xmldsig import sign_nfe_envi_xml
     with pytest.raises(FiscalValidationError, match="protocol profile"):
         sign_nfe_envi_xml(_request().signed_xml, material, profile="arbitrary")
+
+@pytest.mark.parametrize("batch_code", ["103", "105"])
+def test_in_progress_batch_never_authorizes_even_with_embedded_protocol(material, batch_code):
+    request = _request()
+    response = (
+        '<Envelope xmlns="http://www.w3.org/2003/05/soap-envelope"><Body>'
+        f'<retEnviNFe xmlns="{NS}"><tpAmb>2</tpAmb><cUF>31</cUF>'
+        f'<cStat>{batch_code}</cStat><infRec><nRec>310000000000001</nRec></infRec>'
+        '<protNFe><infProt><cStat>100</cStat><nProt>131000000000001</nProt></infProt>'
+        '</protNFe></retEnviNFe></Body></Envelope>'
+    ).encode()
+    exchange = Mock(return_value=response)
+    result = _gateway(Mock(return_value=material), exchange).authorize(request)
+    assert result.status is AuthorizationStatus.PENDING
+    assert result.provider_request_id == "310000000000001"
+    assert result.protocol_reference is None
+    exchange.assert_called_once()

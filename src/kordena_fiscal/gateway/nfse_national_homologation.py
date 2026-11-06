@@ -17,7 +17,7 @@ from urllib.request import HTTPSHandler, Request, build_opener
 from lxml import etree
 
 from kordena_fiscal.domain import FiscalValidationError
-from kordena_fiscal.gateway.nfe_sp_homologation import _tls_context
+from kordena_fiscal.gateway.nfe_sp_homologation import _RejectFiscalRedirects, _tls_context
 from kordena_fiscal.signing.nfse_xmldsig import sign_nfse_dps_xml
 from kordena_fiscal.vault import EphemeralCertificateMaterial
 
@@ -131,7 +131,7 @@ class NfseNationalHomologationTransport:
             headers={"Content-Type": "application/json", "Accept": "application/json"},
         )
         try:
-            opener = build_opener(HTTPSHandler(context=context))
+            opener = build_opener(HTTPSHandler(context=context), _RejectFiscalRedirects())
             with opener.open(request, timeout=timeout) as response:
                 raw = response.read(_MAX_RESPONSE_BYTES + 1)
         except (HTTPError, URLError, TimeoutError, OSError, ssl.SSLError):
