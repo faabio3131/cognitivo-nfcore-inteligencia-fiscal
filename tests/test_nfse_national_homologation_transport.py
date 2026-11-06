@@ -105,3 +105,26 @@ def test_nfse_parses_offline_authorization_receipt() -> None:
 def test_nfse_rejects_invalid_response_without_secret_echo() -> None:
     with pytest.raises(OfficialNfseTransportError):
         parse_nfse_homologation_response(b'{"secret":"never echo"}')
+
+@pytest.mark.parametrize("version", ["1.00", "1.01"])
+def test_national_schema_rejects_minimal_dps_at_scoped_dispatch(version):
+    from kordena_fiscal.gateway.nfse_nacional_homologation import encode_signed_dps
+    from kordena_fiscal.xml.schema import XmlSchemaValidationError
+
+    material, _ = _ephemeral_certificate()
+    root = etree.fromstring(_unsigned_dps())
+    root.set("versao", version)
+    provider = etree.SubElement(root[0], f"{{{_NS}}}prest")
+    etree.SubElement(provider, f"{{{_NS}}}CNPJ").text = "11222333000181"
+    signed = sign_nfse_dps_xml(etree.tostring(root), material)
+    with pytest.raises(FiscalValidationError, match="scoped A1"):
+        encode_signed_dps(signed, issuer_cnpj="00944029000100")
+    with pytest.raises(XmlSchemaValidationError):
+        encode_signed_dps(signed, issuer_cnpj="11222333000181")
+
+
+def test_national_envelope_refuses_an_abrasf_root():
+    with pytest.raises(FiscalValidationError, match="official DPS root"):
+        build_nfse_dps_request(
+            b'<GerarNfseEnvio xmlns="http://www.abrasf.org.br/nfse.xsd"/>',
+        )
