@@ -105,3 +105,34 @@ def test_nfse_parses_offline_authorization_receipt() -> None:
 def test_nfse_rejects_invalid_response_without_secret_echo() -> None:
     with pytest.raises(OfficialNfseTransportError):
         parse_nfse_homologation_response(b'{"secret":"never echo"}')
+
+@pytest.mark.parametrize("canonical", [False, True])
+def test_nfse_mtls_exchange_refuses_redirect(monkeypatch, canonical):
+    import ssl
+    from email.message import Message
+    from unittest.mock import Mock
+    from urllib.error import HTTPError
+    from urllib.request import Request
+
+    from kordena_fiscal.gateway import nfse_nacional_homologation, nfse_national_homologation
+    from kordena_fiscal.gateway.nfe_sp_homologation import _RejectFiscalRedirects
+
+    module = nfse_nacional_homologation if canonical else nfse_national_homologation
+    exchange = (
+        nfse_nacional_homologation._exchange_http
+        if canonical else
+        nfse_national_homologation.NfseNationalHomologationTransport._https_exchange
+    )
+    opener = Mock()
+    opener.open.side_effect = HTTPError("https://sefin.example", 302, "redirect", Message(), None)
+    build = Mock(return_value=opener)
+    monkeypatch.setattr(module, "build_opener", build)
+    with pytest.raises(FiscalValidationError):
+        exchange(b"{}", ssl.create_default_context(), 1)
+    opener.open.assert_called_once()
+    guard = next(arg for arg in build.call_args.args if isinstance(arg, _RejectFiscalRedirects))
+    request = opener.open.call_args.args[0]
+    assert request.full_url.startswith("https://sefin.producaorestrita.nfse.gov.br/")
+    assert guard.redirect_request(
+        Request(request.full_url), None, 302, "redirect", Message(), "https://external.example/",
+    ) is None
