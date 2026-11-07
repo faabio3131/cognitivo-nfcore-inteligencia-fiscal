@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "configuration_id": "nfcore-consumption-four-plans-director-20261103",
+  "version": 1,
+  "status": "APPROVED_PRODUCT_PROPOSAL_NOT_PUBLISHED",
+  "policy": "consumption_based_total_feature_parity",
+  "trial": {
+    "duration_days": 14,
+    "requires_credit_card": false,
+    "homologation_docs_limit": null,
+    "production_docs_limit": 50,
+    "all_features_enabled": true,
+    "production_fiscal_activation_required": true,
+    "external_homologation_required": true
+  },
+  "plans": {
+    "starter": {
+      "name": "Starter",
+      "monthly_price_brl": "99.00",
+      "annual_monthly_price_brl": "79.00",
+      "included_documents": 300,
+      "overage_unit_price_brl": "0.25",
+      "max_cnpjs": 2,
+      "api_rate_limit_rpm": 120,
+      "features": {
+        "all_features_enabled": true
+      }
+    },
+    "pro": {
+      "name": "Pro (Growth)",
+      "monthly_price_brl": "249.00",
+      "annual_monthly_price_brl": "199.00",
+      "included_documents": 1500,
+      "overage_unit_price_brl": "0.15",
+      "max_cnpjs": 5,
+      "api_rate_limit_rpm": 600,
+      "features": {
+        "all_features_enabled": true
+      }
+    },
+    "business": {
+      "name": "Business (Scale)",
+      "monthly_price_brl": "590.00",
+      "annual_monthly_price_brl": "490.00",
+      "included_documents": 6000,
+      "overage_unit_price_brl": "0.08",
+      "max_cnpjs": 20,
+      "api_rate_limit_rpm": 2400,
+      "features": {
+        "all_features_enabled": true
+      }
+    },
+    "enterprise": {
+      "name": "Enterprise (Hub)",
+      "monthly_price_brl": "1490.00",
+      "annual_monthly_price_brl": "1190.00",
+      "included_documents": 25000,
+      "overage_unit_price_brl": "0.04",
+      "max_cnpjs": null,
+      "api_rate_limit_rpm": null,
+      "features": {
+        "all_features_enabled": true
+      }
+    }
+  }
+}

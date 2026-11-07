@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from io import BytesIO
 from typing import cast
 
-from lxml import etree  # type: ignore[import-untyped]
+from lxml import etree
 
 from kordena_fiscal.domain import FiscalDomainError, FiscalValidationError
 
@@ -128,12 +128,12 @@ class NfceXmlPayload:
             raise XmlSchemaValidationError("infNFe Id does not match the access key")
 
 
-class _MemorySchemaResolver(etree.Resolver):  # type: ignore[misc]
+class _MemorySchemaResolver(etree.Resolver):
     def __init__(self, resources: dict[str, bytes]) -> None:
         super().__init__()
         self._resources = resources
 
-    def resolve(self, url: str, pubid: str, context: object) -> object | None:
+    def resolve(self, url: str, pubid: str, context: object) -> object | None:  # type: ignore[override]
         del pubid
         raw = url.replace("\\", "/")
         if "://" in raw or raw.startswith("/"):
@@ -144,7 +144,7 @@ class _MemorySchemaResolver(etree.Resolver):  # type: ignore[misc]
         content = self._resources.get(normalized)
         if content is None:
             return None
-        resolved = self.resolve_string(content.decode("utf-8"), context)
+        resolved = self.resolve_string(content.decode("utf-8"), context, base_url=normalized)
         return cast(object, resolved)
 
 
@@ -176,15 +176,21 @@ class XmlSchemaValidator:
     def validate(self, payload: NfceXmlPayload) -> XmlValidationResult:
         if not isinstance(payload, NfceXmlPayload):
             raise FiscalValidationError("payload must be NfceXmlPayload")
-        document = _parse_xml_document(payload.xml)
+        return self.validate_document(payload.xml)
+
+    def validate_document(self, xml: bytes) -> XmlValidationResult:
+        """Validate protocol roots using the same pinned, no-network XSD compilation."""
+        if not isinstance(xml, bytes) or not xml or len(xml) > 2_097_152:
+            raise XmlSchemaValidationError("XML is empty or exceeds validation limit")
+        document = _parse_xml_document(xml)
         if not self._schema.validate(document):
-            message = self._schema.error_log.last_error
+            message = getattr(self._schema.error_log, "last_error", None)
             detail = message.message if message is not None else "unknown XSD validation error"
             raise XmlSchemaValidationError(f"XML does not satisfy pinned XSD: {detail}")
         return XmlValidationResult(
             schema_version=self._schema_set.version,
             schema_package_sha256=self._schema_set.package_sha256,
-            xml_sha256=hashlib.sha256(payload.xml).hexdigest(),
+            xml_sha256=hashlib.sha256(xml).hexdigest(),
         )
 
 

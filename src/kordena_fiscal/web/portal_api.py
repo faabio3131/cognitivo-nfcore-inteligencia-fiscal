@@ -8,13 +8,19 @@ fails closed with 503.
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Annotated, Any, Protocol, runtime_checkable
+from uuid import uuid4
 
 from fastapi import APIRouter, Body, HTTPException, Request, status
+from fastapi.responses import Response
 
-from kordena_fiscal.domain import FiscalEnvironment
+from kordena_fiscal.archive import FiscalArchiveKind
+from kordena_fiscal.domain import ExecutionScope, FiscalEnvironment, FiscalValidationError
 from kordena_fiscal.security.human_identity import (
     AuthenticatedHuman,
     CsrfValidationError,
@@ -23,6 +29,7 @@ from kordena_fiscal.security.human_identity import (
     HumanIdentityService,
     PortalPermission,
 )
+from kordena_fiscal.vault.encrypted_a1 import A1VaultUnavailable, EncryptedA1Vault
 from kordena_fiscal.web.human_auth import CSRF_COOKIE, CSRF_HEADER, SESSION_COOKIE
 
 
@@ -240,6 +247,7 @@ def create_portal_router(
     executor: HumanPortalExecutor | None,
     *,
     platform_surfaces: tuple[str, ...] = (),
+    certificate_vault: EncryptedA1Vault | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/v1/portal", tags=["human-portal"])
 
@@ -256,6 +264,103 @@ def create_portal_router(
                 },
             )
         return executor
+
+    @router.post("/certificates/a1")
+    async def upload_a1(request: Request) -> dict[str, str]:
+        auth = authority(request)
+        _csrf(request, identity, auth)
+        if certificate_vault is None:
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "A1_VAULT_UNAVAILABLE",
+                        "message": "Cofre A1 não configurado neste ambiente"},
+            )
+        if request.headers.get("content-type", "").split(";")[0].lower() != "application/json":
+            raise HTTPException(415, detail={"code": "INVALID_CERTIFICATE_CONTENT_TYPE"})
+        raw = await request.body()
+        if len(raw) > 3_200_000:
+            raise HTTPException(413, detail={"code": "CERTIFICATE_TOO_LARGE"})
+        try:
+            fields = json.loads(raw)
+            if not isinstance(fields, dict) or set(fields) != {
+                "unit_id", "environment", "issuer_cnpj", "pfx_base64", "password"
+            }:
+                raise ValueError
+            unit_id = fields["unit_id"]
+            issuer_cnpj = fields["issuer_cnpj"]
+            environment = FiscalEnvironment(fields["environment"])
+            if (
+                not isinstance(unit_id, str) or not unit_id or
+                not isinstance(issuer_cnpj, str) or
+                not isinstance(fields["pfx_base64"], str) or
+                not isinstance(fields["password"], str)
+            ):
+                raise ValueError
+            certificate = base64.b64decode(fields["pfx_base64"], validate=True)
+            password = fields["password"].encode("utf-8")
+            if environment is not FiscalEnvironment.HOMOLOGATION:
+                raise ValueError
+        except (ValueError, TypeError, KeyError, UnicodeError, binascii.Error):
+            raise HTTPException(
+                400, detail={"code": "INVALID_A1_UPLOAD",
+                             "message": "Dados do certificado A1 inválidos"},
+            ) from None
+        _authorized(auth, PortalPermission.CERTIFICATE_MANAGE, unit_id=unit_id)
+        scope = ExecutionScope(
+            tenant_id=auth.tenant_id, unit_id=unit_id,
+            environment=environment, correlation_id=uuid4().hex,
+            host_namespace="fm-nfcore",
+        )
+        try:
+            evidence = certificate_vault.provision(
+                scope=scope, issuer_cnpj=issuer_cnpj,
+                pkcs12_bytes=certificate, password=password,
+            )
+        except (A1VaultUnavailable, FiscalValidationError):
+            raise HTTPException(
+                422, detail={"code": "A1_VALIDATION_FAILED",
+                             "message": "Certificado A1 inválido, vencido ou não pertence ao CNPJ"},
+            ) from None
+        return {
+            "status": "stored",
+            "issuer_cnpj": evidence.issuer_cnpj,
+            "expires_at": evidence.expires_at.isoformat(),
+            "fingerprint_sha256": evidence.certificate_fingerprint_sha256,
+        }
+
+    @router.get("/documents/{document_reference}/artifacts/{kind}")
+    async def download_fiscal_artifact(
+        document_reference: str,
+        kind: str,
+        request: Request,
+        unit_id: str,
+        environment: FiscalEnvironment = FiscalEnvironment.HOMOLOGATION,
+    ) -> Response:
+        """Serve immutable fiscal files to the same authorized human session."""
+        auth = authority(request)
+        _authorized(auth, PortalPermission.DOCUMENT_QUERY, unit_id=unit_id)
+        if kind not in {"authorized_xml", "danfe"}:
+            raise HTTPException(400, detail={"code": "FISCAL_ARTIFACT_KIND_INVALID"})
+        if not 1 <= len(document_reference) <= 256:
+            raise HTTPException(400, detail={"code": "FISCAL_ARTIFACT_REFERENCE_INVALID"})
+        reader = getattr(require_executor(), "fiscal_artifact", None)
+        if not callable(reader):
+            raise HTTPException(503, detail={"code": "FISCAL_ARTIFACT_READER_NOT_CONFIGURED"})
+        content, media_type = reader(
+            authority=auth, unit_id=unit_id, environment=environment,
+            document_reference=document_reference, kind=FiscalArchiveKind(kind),
+        )
+        extension = "xml" if kind == "authorized_xml" else "pdf"
+        disposition = "attachment" if extension == "xml" else "inline"
+        return Response(
+            content=content,
+            media_type=media_type,
+            headers={
+                "Cache-Control": "no-store",
+                "Content-Disposition": f'{disposition}; filename="nfcore-documento.{extension}"',
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
 
     @router.get("/bootstrap")
     async def bootstrap(request: Request) -> dict[str, Any]:

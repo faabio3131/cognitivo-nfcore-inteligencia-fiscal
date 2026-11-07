@@ -7,9 +7,12 @@ import argparse
 import http.client
 import json
 import os
+import queue
+import threading
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from time import monotonic
 from urllib.parse import unquote, urlsplit
 
 _PORTAL_CSP = "; ".join(
@@ -51,6 +54,57 @@ _PROXY_RESPONSE_HEADERS = (
     "Retry-After",
     "WWW-Authenticate",
 )
+
+# Bounded idle HTTP/1.1 connection reuse toward the *internal* canonical API.
+# Connections never retain Authorization/Cookie headers; each request supplies
+# its own session. No fiscal mutation is retried if a pooled socket is stale.
+_POOL_LOCK = threading.Lock()
+_IDLE_UPSTREAM: dict[
+    tuple[str, str, int], queue.LifoQueue[tuple[float, http.client.HTTPConnection]]
+] = {}
+_IDLE_CAPACITY = 16
+# Keep this below the canonical API's 30s keep-alive timeout. Never replay a
+# request to hide a stale socket: retire idle connections before sending it.
+_MAX_UPSTREAM_IDLE_SECONDS = 10.0
+
+
+def _borrow_upstream(
+    origin: tuple[str, str, int],
+) -> http.client.HTTPConnection:
+    with _POOL_LOCK:
+        idle = _IDLE_UPSTREAM.setdefault(
+            origin, queue.LifoQueue(maxsize=_IDLE_CAPACITY)
+        )
+    while True:
+        try:
+            returned_at, connection = idle.get_nowait()
+        except queue.Empty:
+            scheme, host, port = origin
+            cls = http.client.HTTPSConnection if scheme == "https" else http.client.HTTPConnection
+            return cls(host, port, timeout=_PROXY_TIMEOUT_SECONDS)
+        if connection.sock is not None and monotonic() - returned_at < _MAX_UPSTREAM_IDLE_SECONDS:
+            return connection
+        connection.close()
+
+
+def _release_upstream(
+    origin: tuple[str, str, int],
+    connection: http.client.HTTPConnection,
+    *,
+    reusable: bool,
+) -> None:
+    if not reusable or connection.sock is None:
+        connection.close()
+        return
+    with _POOL_LOCK:
+        idle = _IDLE_UPSTREAM.setdefault(
+            origin, queue.LifoQueue(maxsize=_IDLE_CAPACITY)
+        )
+    try:
+        idle.put_nowait((monotonic(), connection))
+    except queue.Full:
+        connection.close()
+
 
 
 def _api_upstream() -> tuple[str, str, int] | None:
@@ -168,11 +222,8 @@ class SecurePortalHandler(SimpleHTTPRequestHandler):
             if value:
                 headers[name] = value
 
-        scheme, host, port = upstream
-        connection_class = (
-            http.client.HTTPSConnection if scheme == "https" else http.client.HTTPConnection
-        )
-        connection = connection_class(host, port, timeout=_PROXY_TIMEOUT_SECONDS)
+        connection = _borrow_upstream(upstream)
+        reusable = False
 
         try:
             connection.request(
@@ -186,6 +237,7 @@ class SecurePortalHandler(SimpleHTTPRequestHandler):
             if len(response_body) > _MAX_PROXY_RESPONSE_BYTES:
                 self._json_error(502, "portal API upstream response too large")
                 return
+            reusable = not response.will_close
 
             self.send_response(response.status)
             for name in _PROXY_RESPONSE_HEADERS:
@@ -201,7 +253,7 @@ class SecurePortalHandler(SimpleHTTPRequestHandler):
         except (OSError, http.client.HTTPException):
             self._json_error(502, "portal API upstream is unavailable")
         finally:
-            connection.close()
+            _release_upstream(upstream, connection, reusable=reusable)
 
     def do_GET(self) -> None:  # noqa: N802
         if self._is_api_request():

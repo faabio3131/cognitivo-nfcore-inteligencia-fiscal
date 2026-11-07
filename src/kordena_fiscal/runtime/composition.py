@@ -7,7 +7,7 @@ this composition root and fiscal production authority is injected independently.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -19,6 +19,7 @@ from kordena_fiscal.application.commercial_fulfillment import CommercialFulfillm
 from kordena_fiscal.application.commercial_portal import CommercialPortalReadService
 from kordena_fiscal.application.commercial_trial import GovernedTrialService
 from kordena_fiscal.application.service import FiscalApplicationService
+from kordena_fiscal.archive.danfe_pdf import render_authorized_nfe_danfe
 from kordena_fiscal.compliance import CapabilityReadinessService
 from kordena_fiscal.control_plane.cakto_checkout import (
     CaktoCheckoutAdministrationService,
@@ -59,6 +60,10 @@ from .fiscal_runtime import (
 from .internal_archive_handler import build_archive_reference_handler
 from .observability import MetricsRegistry
 
+FiscalOperationHandlerFactory = Callable[
+    [FiscalApplicationService], Mapping[str, FiscalOperationHandler]
+]
+
 
 @dataclass(frozen=True, slots=True)
 class RuntimeComposition:
@@ -91,6 +96,7 @@ def build_postgres_runtime_composition(
     workload_credentials: tuple[WorkloadCredentialRecord, ...] = (),
     security_audit_sink: SecurityAuditSink | None = None,
     fiscal_operation_handlers: Mapping[str, FiscalOperationHandler] | None = None,
+    fiscal_operation_handler_factory: FiscalOperationHandlerFactory | None = None,
     capability_readiness: CapabilityReadinessService | None = None,
     enable_cakto_checkout: bool = False,
     metrics: MetricsRegistry | None = None,
@@ -169,8 +175,16 @@ def build_postgres_runtime_composition(
         cakto_checkout_administration = CaktoCheckoutAdministrationService(
             cakto_commercial_database
         )
+    if fiscal_operation_handlers is not None and fiscal_operation_handler_factory is not None:
+        raise ValueError("two independent fiscal handler authorities are prohibited")
     fiscal_application = FiscalApplicationService(database, metrics=metrics)
-    canonical_handlers = dict(fiscal_operation_handlers or {})
+    if fiscal_operation_handler_factory is None:
+        canonical_handlers = dict(fiscal_operation_handlers or {})
+    else:
+        provided = fiscal_operation_handler_factory(fiscal_application)
+        if not isinstance(provided, Mapping):
+            raise TypeError("fiscal handler factory must return an operation mapping")
+        canonical_handlers = dict(provided)
     canonical_handlers.setdefault(
         "queryArchiveReference", build_archive_reference_handler(database)
     )
@@ -201,6 +215,7 @@ def build_postgres_runtime_composition(
         capability_readiness=capability_readiness,
         user_administration=human_administration,
         commercial_reader=commercial_portal_read,
+        danfe_renderer=render_authorized_nfe_danfe,
     )
     return RuntimeComposition(
         human_identity=identity,
