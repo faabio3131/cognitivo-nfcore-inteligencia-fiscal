@@ -30,6 +30,7 @@ from kordena_fiscal.runtime.observability import (
 )
 from kordena_fiscal.security.human_identity import HumanIdentityService
 from kordena_fiscal.security.human_recovery import PasswordRecoveryService
+from kordena_fiscal.vault.encrypted_a1 import EncryptedA1Vault
 from kordena_fiscal.web.cakto_checkout import create_cakto_checkout_router
 from kordena_fiscal.web.commercial_release import create_commercial_release_router
 from kordena_fiscal.web.human_auth import create_human_auth_router
@@ -263,17 +264,22 @@ def create_app(
     password_reset_delivery: PasswordResetDelivery | None = None,
     password_reset_completed: Callable[[str, datetime], None] | None = None,
     portal_executor: HumanPortalExecutor | None = None,
+    certificate_vault: EncryptedA1Vault | None = None,
     pricing_administration: CommercialPricingAdministrationService | None = None,
     commercial_release_administration: CommercialReleaseAdministrationService | None = None,
     commercial_checkout: CommercialCheckoutProjector | None = None,
     commercial_checkout_processing_configured: bool = False,
     commercial_trial_ingress_configured: bool = False,
     commercial_trial_site_channel_configured: bool = False,
+    commercial_public_trial_configured: bool = False,
     commercial_delivery_readiness: CommercialDeliveryPathReadiness | None = None,
     commercial_operational_readiness: Callable[[], bool] | None = None,
+    commercial_trial_operational_readiness: Callable[[], bool] | None = None,
     cakto_checkout_administration: CaktoCheckoutAdministrationService | None = None,
     runtime_metrics: MetricsRegistry | None = None,
     cognitive_router: APIRouter | None = None,
+    command_commercial_router: APIRouter | None = None,
+    command_operational_usage_router: APIRouter | None = None,
 ) -> FastAPI:
     """Create the web adapter without granting fiscal authority by default."""
 
@@ -341,6 +347,30 @@ def create_app(
         )
         return response
 
+    if cognitive_router is not None:
+        # Mounted unconditionally: the Command read-only metrics sub-route inside
+        # cognitive_router does not depend on human_identity (see
+        # kordena_fiscal.cognitive.composition.build_cognitive_router, which already
+        # returns a metrics-only router when human_identity/portal_executor are
+        # absent or the AI advisory flag is off). Gating the whole router behind
+        # human_identity here would re-introduce the same 404 the PR fixed: in any
+        # composition where human_identity ends up None (e.g. no PostgreSQL
+        # composition), GET /v1/command/cognitive/metrics would vanish from the real
+        # app even though build_cognitive_router built it. The advisory sub-route
+        # keeps its own internal gating untouched.
+        app.include_router(cognitive_router)
+
+    if command_commercial_router is not None:
+        # Same rationale as cognitive_router above: this router fails closed
+        # per-request (503) when its reader isn't wired, and must stay routable
+        # regardless of human_identity so Command never sees a 404.
+        app.include_router(command_commercial_router)
+
+    if command_operational_usage_router is not None:
+        # Same rationale as command_commercial_router above: read-only,
+        # fails closed per-request, mounted regardless of human_identity.
+        app.include_router(command_operational_usage_router)
+
     if human_identity is not None:
         app.include_router(
             create_human_auth_router(
@@ -368,10 +398,9 @@ def create_app(
                 human_identity,
                 portal_executor,
                 platform_surfaces=platform_surfaces,
+                certificate_vault=certificate_vault,
             )
         )
-        if cognitive_router is not None:
-            app.include_router(cognitive_router)
         if pricing_administration is not None:
             app.include_router(
                 create_pricing_router(human_identity, pricing_administration)
@@ -401,7 +430,9 @@ def create_app(
                     trial_site_channel_configured=(
                         commercial_trial_site_channel_configured
                     ),
+                    public_trial_configured=commercial_public_trial_configured,
                     operational_readiness=commercial_operational_readiness,
+                    trial_operational_readiness=commercial_trial_operational_readiness,
                     runtime_metrics=http_metrics,
                 )
             )

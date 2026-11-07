@@ -20,7 +20,7 @@ const safetyStates = {
 const descriptions = {
   overview: "Visão governada da operação fiscal e da prontidão comprovada da organização.",
   documents: "Ciclo de vida documental, consulta, arquivo e correlação.",
-  issuances: "Emissões idempotentes e rastreáveis.",
+  issuances: "Emissões idempotentes e rastreáveis. Para transmitir, configure o certificado A1 do CNPJ emitente e o provedor fiscal autorizado.",
   inutilizations: "Solicitação governada de inutilização de faixa e acompanhamento do processamento interno.",
   errors: "Falhas operacionais sem exposição de segredo.",
   reconciliation: "Convergência segura entre estado interno e provedor.",
@@ -30,7 +30,7 @@ const descriptions = {
   units: "Unidades permitidas para o usuário autenticado.",
   environments: "Homologação e produção com autoridade segregada.",
   capabilities: "Capacidades e prontidão fiscal baseadas em evidência.",
-  certificates: "Referências de certificado; material secreto nunca é exibido.",
+  certificates: "Configuração de certificados do emitente; material secreto nunca é exibido. O cadastro de referência não substitui o provisionamento seguro do arquivo A1 (.pfx).",
   providers: "Vínculos de provedores por documento, operação e jurisdição.",
   users: "Usuários, papéis e permissões da organização.",
   webhooks: "Destinos e estado de entrega governada.",
@@ -372,6 +372,9 @@ async function api(path, options = {}) {
       UNIT_SELECTION_REQUIRED: "Selecione uma unidade autorizada.",
       ENVIRONMENT_NOT_ENABLED: "O ambiente selecionado não está habilitado para esta unidade.",
       FISCAL_RUNTIME_NOT_READY: "O executor fiscal está indisponível. Nenhuma autorização fiscal foi confirmada.",
+      A1_VAULT_UNAVAILABLE: "O cofre de certificados A1 ainda não está configurado neste ambiente.",
+      A1_VALIDATION_FAILED: "Certificado A1 inválido, vencido ou incompatível com o CNPJ informado.",
+      CERTIFICATE_UNAVAILABLE: "Certificado A1 não localizado para o CNPJ. Acesse Configuração > Certificados.",
       PORTAL_RUNTIME_NOT_READY: "Esta capacidade ainda não está disponível no runtime. Tente novamente após a configuração governada.",
       BROWSER_AUTHORITY_REJECTED: "Organização e permissões são definidas pela sessão. Remova campos de autoridade do pedido.",
       INVALID_PREPARED_DOCUMENT: "Referência inválida ou documento ainda não preparado neste escopo. Confira e corrija o campo.",
@@ -555,7 +558,43 @@ function fiscalRowElement(row) {
   const primary = row.document_id || row.document_reference || row.source_id || row.entry_id || row.reference_id || row.binding_id || row.destination_id || row.module_id || row.policy_id || row.document_kind || "Registro";
   const state = row.readiness || row.state || row.status || row.kind || "registrado";
   const display = {registro: primary, escopo: `${text(row.unit_id)} · ${text(row.environment)} · ${text(row.record_type || row.code || "capability")}`, state};
-  return appendRecordDetails(rowElement(display), row);
+  const wrapper = appendRecordDetails(rowElement(display), row);
+  // Render artifact actions only when this authorized scope actually contains
+  // an immutable PDF or XML entry. An issuance attempt is not an authorized note.
+  const kind = String(row.kind || "");
+  const reference = String(row.document_reference || "");
+  const unit = String(row.unit_id || "");
+  const environment = String(row.environment || "");
+  if (row.record_type === "archive" && reference && unit
+      && ["homologation", "production"].includes(environment)
+      && ["authorized_xml", "danfe"].includes(kind)) {
+    const artifact = document.createElement("a");
+    artifact.className = "ghost";
+    artifact.href = `/v1/portal/documents/${encodeURIComponent(reference)}/artifacts/${kind}?${new URLSearchParams({
+      unit_id: unit, environment,
+    })}`;
+    if (kind === "authorized_xml") {
+      artifact.textContent = "Baixar XML autorizado";
+      artifact.download = "nfcore-documento.xml";
+    } else {
+      artifact.textContent = "Visualizar DANFE/PDF";
+      artifact.target = "_blank";
+      artifact.rel = "noopener noreferrer";
+    }
+    wrapper.append(artifact);
+    if (kind === "authorized_xml") {
+      const danfe = document.createElement("a");
+      danfe.className = "ghost";
+      danfe.textContent = "Visualizar DANFE/PDF";
+      danfe.href = `/v1/portal/documents/${encodeURIComponent(reference)}/artifacts/danfe?${new URLSearchParams({
+        unit_id: unit, environment,
+      })}`;
+      danfe.target = "_blank";
+      danfe.rel = "noopener noreferrer";
+      wrapper.append(danfe);
+    }
+  }
+  return wrapper;
 }
 
 /** Show the complete authorized projection instead of dropping commercial fields. */
@@ -1090,6 +1129,77 @@ function configurationInput(form, key, label, kind) {
   return input;
 }
 
+/** Upload encrypted A1 through the canonical session/CSRF portal API.
+ * @param {HTMLElement} article
+ */
+function appendA1UploadForm(article) {
+  if (!bootstrapState?.permissions.includes("certificate.manage")) return;
+  const form = document.createElement("form");
+  form.id = "a1-upload-form";
+  form.className = "panel-form";
+  const heading = document.createElement("h3");
+  heading.textContent = "Cadastrar certificado A1 (.pfx) — homologação";
+  const hint = document.createElement("p");
+  hint.textContent = "O arquivo e a senha são enviados somente via HTTPS para o cofre criptografado. O certificado deve pertencer ao CNPJ informado. Nenhuma emissão é realizada durante o cadastro.";
+  form.append(heading, hint);
+  const cnpj = configurationInput(form, "issuer_cnpj", "CNPJ do emitente (14 dígitos)", "text");
+  cnpj.pattern = "[0-9]{14}";
+  cnpj.maxLength = 14;
+  const file = configurationInput(form, "pfx", "Arquivo A1 (.pfx ou .p12)", "file");
+  file.accept = ".pfx,.p12,application/x-pkcs12";
+  const password = configurationInput(form, "pfx_password", "Senha do certificado A1", "password");
+  password.autocomplete = "new-password";
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "primary";
+  submit.textContent = "Armazenar A1 com segurança";
+  const status = document.createElement("p");
+  status.setAttribute("role", "status");
+  form.append(submit, status);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    if (!selectedFiscalUnit || selectedFiscalEnvironment !== "homologation") {
+      status.textContent = "Selecione uma unidade e o ambiente de homologação.";
+      return;
+    }
+    const chosen = file.files?.[0];
+    if (!chosen || chosen.size === 0 || chosen.size > 2 * 1024 * 1024 ||
+        !/\\.(pfx|p12)$/i.test(chosen.name)) {
+      status.textContent = "Selecione um arquivo A1 .pfx ou .p12 de até 2 MB.";
+      return;
+    }
+    submit.disabled = true;
+    status.textContent = "Validando e gravando o certificado A1...";
+    try {
+      const bytes = new Uint8Array(await chosen.arrayBuffer());
+      let binary = "";
+      for (let index = 0; index < bytes.length; index += 8192) {
+        binary += String.fromCharCode(...bytes.subarray(index, index + 8192));
+      }
+      const result = await api("/v1/portal/certificates/a1", {
+        method: "POST",
+        headers: {"X-CSRF-Token": csrfToken()},
+        body: JSON.stringify({
+          unit_id: selectedFiscalUnit,
+          environment: "homologation",
+          issuer_cnpj: cnpj.value,
+          pfx_base64: btoa(binary),
+          password: password.value,
+        }),
+      });
+      status.textContent = `Certificado A1 armazenado com segurança. Validade: ${result.expires_at}. Identificador de verificação: ${result.fingerprint_sha256}.`;
+      file.value = "";
+      password.value = "";
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : "Falha ao cadastrar A1";
+    } finally {
+      submit.disabled = false;
+    }
+  });
+  article.append(form);
+}
+
 /** @param {HTMLElement} article @param {string} viewId @param {Record<string, unknown>[]} rows */
 function appendCustomerConfiguration(article, viewId, rows) {
   const spec = customerForms[viewId];
@@ -1530,6 +1640,7 @@ function appendRtcProfileRegistration(section) {
     ["legal_name", "Razão social", ""],
     ["primary_cnae", "CNAE principal (7 dígitos)", "[0-9]{7}"],
     ["state_registration", "Inscrição estadual (se aplicável)", ""],
+    ["municipal_registration", "Inscrição municipal (IM, se aplicável)", ""],
     ["street", "Logradouro", ""],
     ["number", "Número", ""],
     ["district", "Bairro", ""],
@@ -1543,7 +1654,7 @@ function appendRtcProfileRegistration(section) {
     const input = document.createElement("input");
     input.name = name;
     input.autocomplete = "off";
-    input.required = name !== "state_registration";
+    input.required = !["state_registration", "municipal_registration"].includes(name);
     if (pattern) input.pattern = pattern;
     label.append(input);
     fields[name] = input;
@@ -1588,6 +1699,7 @@ function appendRtcProfileRegistration(section) {
       crt: Number(crt.value),
       primary_cnae: fields.primary_cnae.value.trim(),
       state_registration: fields.state_registration.value.trim(),
+      municipal_registration: fields.municipal_registration.value.trim(),
       state_registration_exempt: exempt.checked,
       street: fields.street.value.trim(),
       number: fields.number.value.trim(),
@@ -1770,6 +1882,7 @@ async function renderSurface(viewId) {
       notice.className = "form-error";
       notice.textContent = "Referência cadastrada não comprova segredo resolvido, entrega, homologação ou produção. Webhooks exigem aprovação vigente da plataforma.";
       appendCustomerConfiguration(article, viewId, rows);
+      if (viewId === "certificates") appendA1UploadForm(article);
       article.append(notice);
     }
     if (viewId === "onboarding" || viewId === "units") appendOnboardingControls(article);
