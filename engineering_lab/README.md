@@ -34,3 +34,31 @@ The JSON mission state is a single-writer lab prototype, not an atomic multi-ten
 - Handoff Claude/Code to Codex/Gemini must be demonstrated without duplicated operations.
 
 Do not confuse successful unit tests with real remote or fiscal homologation.
+
+
+## EGM — instalação REAL no executor (não no motor fiscal)
+
+O arquivo ZIP original contém as sete skills em `skills/egm-*/SKILL.md`, personas em `agents/`, recursos em `resources/` e manifests de plugins. Estes arquivos NÃO estão instalados pelo motor `fm_agent_governance.py`; ele apenas controla missões. Não declare qualquer skill EGM executada apenas por ter gerado um relatório manual.
+
+**Claude Code (ambiente de desenvolvimento autenticado):**
+
+```sh
+claude plugin marketplace add google/elephant-goldfish-model
+claude plugin install egm@egm
+claude plugin enable egm@egm
+```
+
+Iniciar uma nova sessão e invocar os comandos de skill publicados pelo plugin, por exemplo `/egm:egm-brainstorm`, `/egm:egm-draft` e `/egm:egm-review`. Confirmar que o runtime suporta subagentes independentes e suas permissões de leitura. Seguir `docs/claude.md` do próprio EGM, inclusive seu requisito de versão e isolamento de contexto.
+
+**Codex CLI (ambiente autenticado):**
+
+```sh
+codex plugin marketplace add google/elephant-goldfish-model
+codex plugin add egm@egm
+```
+
+Iniciar nova sessão e descobrir as sete skills do plugin. Seguir `docs/codex.md` do EGM. Os revisores Goldfish precisam de contexto fresco e leitura de seus arquivos de persona e standards. Se o host não suportar isolamento, a revisão deve ser marcada INCOMPLETE, não PASSED.
+
+**Critério de teste obrigatório:** registrar versão do EGM, runtime, skill invocada, persona lida, artefato produzido, identidades/resultados de revisores e evidência do isolamento de contexto. O usuário deve distinguir EGM nativo executado de inspeção manual. Nenhum desses comandos foi executado na branch pelo simples ato de documentá-los. Não instalar scripts arbitrários nem copiar uma distribuição para o repositório fiscal.
+
+**Separação de responsabilidades:** o EGM é o revisor; FM Governance guarda tarefas, políticas, evidências e estados. Não desenvolver clones improvisados das sete skills.
