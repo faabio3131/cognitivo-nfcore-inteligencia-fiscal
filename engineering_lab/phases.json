@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "authority": "FM Tecnologia - separação obrigatória construção/homologação",
+  "stages": {
+    "INTERNAL_BUILD": {
+      "completion": "All internal product code, adapters, configuration surfaces and simulated integration paths implemented",
+      "requires_external_credentials": false
+    },
+    "INTERNAL_CERTIFICATION": {
+      "completion": "Internal automated and functional checks, security, regression, integration and acceptance evidence approved",
+      "requires_external_credentials": false
+    },
+    "EXTERNAL_CONFIGURATION": {
+      "completion": "Real credentials, certificates, providers and official environments configured by authorized humans",
+      "requires_internal_certification": true
+    },
+    "EXTERNAL_HOMOLOGATION": {
+      "completion": "Official provider/jurisdiction tests and real authorized operations backed by external evidence",
+      "requires_external_configuration": true
+    },
+    "COMMERCIAL_RELEASE": {
+      "completion": "Separate owner approval, operational checks, published and commercially approved",
+      "requires_external_homologation": true,
+      "human_approval": true
+    }
+  },
+  "rules": [
+    "Never treat missing client, A1, CSC, SEFAZ, prefeitura, bank account, gateway keys or official provider access as an internal development blocker",
+    "Continue every independent internal construction task until 100% built and internally certified",
+    "Never state external homologation complete based on mocks, unit tests or simulated calls",
+    "Never promote commercial release without external certifications applicable to the product and owner approval",
+    "Every external blocker must reference a named external configuration or official credential, evidence and responsible party",
+    "Every internal blocker must be actionable on code, tests, specification or project architecture",
+    "Runtime deployment and external production access remain independently protected by existing AGENTS.md authority"
+  ]
+}
