@@ -6,11 +6,13 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from fm_phase_gates import STAGES, validate_phase_plan
 import re
 import subprocess
 import sys
 import tempfile
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from fm_phase_gates import STAGES, validate_phase_plan
 
 ROOT = Path(__file__).resolve().parents[1]
 LAB = ROOT / "engineering_lab"
@@ -40,7 +42,7 @@ def check():
     phases = read(LAB / "phases.json")["stages"]
     if tuple(phases) != STAGES:
         raise Denied("Invalid or reordered canonical phase policy")
-    validate_phase_plan(phases, [{"id": t["id"], "phase": "INTERNAL_BUILD"} for t in plan["tasks"]])
+    validate_phase_plan(phases, [{"id": t["id"], "phase": t.get("phase", "INTERNAL_BUILD")} for t in plan["tasks"]])
     if len(tasks) != len(plan["tasks"]) or set(tasks) != set(state["tasks"]):
         raise Denied("Task ID mismatch or duplicate")
     visiting, seen = set(), set()
