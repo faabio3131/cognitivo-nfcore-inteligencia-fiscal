@@ -1,0 +1,227 @@
+{
+  "schema_version": 1,
+  "project": "NFCore-CognitiveCore-EGM-Lab",
+  "policy": "BUILD_INTERNAL_FIRST",
+  "source": {
+    "repository": "faabio3131/cognitivo-nfcore-inteligencia-fiscal",
+    "branch": "lab/fm-governed-agent-continuity-v1",
+    "reviewed_sha": "c7e9e19857cba94bbbdcf72163c21319ecaf499c",
+    "document": "docs/NFCORE_COGNITIVE_CORE_ARCHITECTURE.md",
+    "egm_bundle": "egm@egm 0.1.1",
+    "egm_review_sha256": "75f5bbdcc3b93269f3866811a43e6b5e00107ae45d4c2e26bb41aab6342c38b6",
+    "review_status": "FAIL_DOCUMENT_REVIEW",
+    "native_review_stage": "5-8",
+    "native_stage9": "NOT_RUN",
+    "agents_reported": 7,
+    "raw_findings_reported": 36,
+    "findings_major": 31,
+    "findings_nit": 5,
+    "native_log_attested_only": true
+  },
+  "tasks": [
+    {
+      "id": "A01",
+      "title": "Choose and document one inference architecture, with alternatives",
+      "description": "Compare deterministic-only advice, the existing direct-provider adapter and central FM inference. Select the current flow, credential owner, fallback and usage owner. Separate Command metrics from inference. Label other designs deferred/superseded rather than building extra integration layers.",
+      "severity": "MAJOR",
+      "origin_findings": [
+        "S5-ZO-01",
+        "S6-C-02",
+        "S7-D-01",
+        "S7-D-02",
+        "S7-S-01",
+        "S7-ST-03",
+        "S8-ZO-01"
+      ],
+      "acceptance": [
+        "One coherent diagram/status/activation description and concrete trade-offs for rejected alternatives."
+      ],
+      "depends_on": [],
+      "external_dependency": false,
+      "status": "OPEN",
+      "evidence": {}
+    },
+    {
+      "id": "A02",
+      "title": "Reconcile delivery status and explain the existing evidence path",
+      "description": "Separate service logic, Portal input availability, model activation, durable audit, usage persistence and external certification. Document PortalSurfaceEvidenceProvider and its trust obligations; missing projections do not justify another ingestion service. Move capability-specific limitations beside the affected journey.",
+      "severity": "MAJOR",
+      "origin_findings": [
+        "S5-ZO-03",
+        "S6-C-01",
+        "S6-C-03",
+        "S6-C-04",
+        "S7-S-04",
+        "S7-ST-02",
+        "S7-ST-08",
+        "S8-ZO-02",
+        "S8-ZO-03"
+      ],
+      "acceptance": [
+        "A consistent current status table and a request-to-authorized-evidence explanation identifying rejection/classification limitations and user-visible behavior."
+      ],
+      "depends_on": [
+        "A01"
+      ],
+      "external_dependency": false,
+      "status": "OPEN",
+      "evidence": {}
+    },
+    {
+      "id": "A03",
+      "title": "Define the mandatory governance boundary for model activation",
+      "description": "The inspected service accepts absent audit, ledger and entitlements; composition can use logging instead of durable audit. Specify the authoritative composition guarantee and permitted development exception. Reuse ControlPlaneAuditSink; distinguish missing dependencies from post-call write failure.",
+      "severity": "MAJOR",
+      "origin_findings": [
+        "S5-ZO-02",
+        "S7-D-03",
+        "S7-ST-04",
+        "S8-ZO-04"
+      ],
+      "acceptance": [
+        "An explicit activation/failure contract and evidence for enforcement before any claim of no audit, no AI. No production bypass is claimed by this review."
+      ],
+      "depends_on": [
+        "A01"
+      ],
+      "external_dependency": false,
+      "status": "OPEN",
+      "evidence": {}
+    },
+    {
+      "id": "A04",
+      "title": "Separate request replay, provider attempts and usage accounting",
+      "description": "Repeated logical requests can invoke a model again while request-only deduplication suppresses usage; the key omits scope. Failed or timed-out attempts may have unknown consumption. Define scoped identity, payload equivalence, attempt accounting and uncertainty before adding persistence or settlement machinery.",
+      "severity": "MAJOR",
+      "origin_findings": [
+        "S5-IC-01",
+        "S7-D-04",
+        "S8-ZO-05"
+      ],
+      "acceptance": [
+        "Documented replay/attempt semantics and bounded recovery policy; provider reconciliation only where evidence supports it. Do not reuse fiscal issuance storage for advisory calls."
+      ],
+      "depends_on": [
+        "A01"
+      ],
+      "external_dependency": false,
+      "status": "OPEN",
+      "evidence": {}
+    },
+    {
+      "id": "A05",
+      "title": "Close and describe the prompt metadata boundary",
+      "description": "Evidence IDs and keys bypass the cleanup applied to values/origins/questions. Define validated opaque IDs and allowed keys or sanitize the full rendered surface, preserving unique citation identities. Use existing contracts, Redactor and ContextPackBuilder.",
+      "severity": "MAJOR",
+      "origin_findings": [
+        "S7-D-05",
+        "S7-ST-05",
+        "S8-ZO-06"
+      ],
+      "acceptance": [
+        "A field-level boundary identifying what may reach each provider and where validation/redaction occurs. Static observations are not evidence of an actual external leak."
+      ],
+      "depends_on": [
+        "A01"
+      ],
+      "external_dependency": false,
+      "status": "OPEN",
+      "evidence": {}
+    },
+    {
+      "id": "A06",
+      "title": "Specify bounded input, model work and quota assumptions",
+      "description": "Evidence item count does not bound mapping cardinality or aggregate context. State fields/bytes/tokens, output, fallback attempts and concurrency limits. Describe soft per-process quota, restart behavior, non-atomic admission and distinct provider-side spend controls.",
+      "severity": "MAJOR",
+      "origin_findings": [
+        "S7-D-06",
+        "S7-S-03",
+        "S7-ST-06",
+        "S8-ZO-06"
+      ],
+      "acceptance": [
+        "A bounded operating envelope and clear oversized/invalid-input behavior. Durable storage must not be described as atomic cross-process admission by itself."
+      ],
+      "depends_on": [
+        "A01"
+      ],
+      "external_dependency": false,
+      "status": "OPEN",
+      "evidence": {}
+    },
+    {
+      "id": "A07",
+      "title": "Make context identity retain source, time and catalog applicability",
+      "description": "The current hash omits origin and as_of; response provenance does not require a catalog/effective-date snapshot. Define canonical evidence identity and unknown temporal applicability using existing fields and stable_hash.",
+      "severity": "MAJOR",
+      "origin_findings": [
+        "S7-D-07",
+        "S8-ZO-07"
+      ],
+      "acceptance": [
+        "The documented hash/provenance contract distinguishes relevant source/time/version changes and points to immutable evidence. No new provenance platform is justified."
+      ],
+      "depends_on": [
+        "A01"
+      ],
+      "external_dependency": false,
+      "status": "OPEN",
+      "evidence": {}
+    },
+    {
+      "id": "A08",
+      "title": "State the concrete operator problem and first useful outcome",
+      "description": "Replace maximal cognition and anthropomorphic claims with the accountant/operator task, existing workflow problem, expected advice and benefit of optional model enrichment over the baseline.",
+      "severity": "MAJOR",
+      "origin_findings": [
+        "S7-S-02",
+        "S7-ST-01",
+        "S8-ZO-02"
+      ],
+      "acceptance": [
+        "A concise measurable problem/goal statement and smallest usable journey. Capability expansion is not a substitute for missing evidence inputs."
+      ],
+      "depends_on": [],
+      "external_dependency": false,
+      "status": "OPEN",
+      "evidence": {}
+    },
+    {
+      "id": "A09",
+      "title": "Link project-specific delivery and integration terms",
+      "description": "Provide navigable definitions for task IDs and Integration Fabric without turning this architecture into a second master plan.",
+      "severity": "NIT",
+      "origin_findings": [
+        "S6-C-05",
+        "S8-ZO-08"
+      ],
+      "acceptance": [
+        "References resolve to the governing task index and integration contract."
+      ],
+      "depends_on": [
+        "A01"
+      ],
+      "external_dependency": false,
+      "status": "OPEN",
+      "evidence": {}
+    },
+    {
+      "id": "A10",
+      "title": "Label response-contract representation",
+      "description": "Separate Python field names and enum members from HTTP serialization names and values.",
+      "severity": "NIT",
+      "origin_findings": [
+        "S7-ST-07"
+      ],
+      "acceptance": [
+        "Exact contract names or an explicitly illustrative representation linked to its serializer."
+      ],
+      "depends_on": [
+        "A01"
+      ],
+      "external_dependency": false,
+      "status": "OPEN",
+      "evidence": {}
+    }
+  ]
+}
