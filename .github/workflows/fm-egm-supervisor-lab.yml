@@ -1,0 +1,31 @@
+name: FM EGM Supervisor Lab
+on:
+  pull_request:
+    paths:
+      - 'fm_supervisor/**'
+      - '.github/workflows/fm-egm-supervisor-lab.yml'
+  push:
+    branches:
+      - 'lab/**'
+    paths:
+      - 'fm_supervisor/**'
+      - '.github/workflows/fm-egm-supervisor-lab.yml'
+permissions:
+  contents: read
+jobs:
+  validate-supervisor:
+    name: FM EGM structural gate (not a functional certification)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unit and adversarial tests
+        run: python -m unittest discover -s fm_supervisor/tests -v
+      - name: Validate EGM findings coverage and task state
+        run: python -m fm_supervisor.cli validate --mode workflow
+      - name: Prepare review routing without using an LLM
+        run: python -m fm_supervisor.cli route implementation-changed
