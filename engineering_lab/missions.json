@@ -1,0 +1,37 @@
+{
+  "plan_id": "FM-LAB-001",
+  "tasks": [
+    {
+      "id": "LAB-01",
+      "title": "Build and validate governance baseline",
+      "depends_on": [],
+      "acceptance": [
+        "CI gate passes",
+        "Policy and graph validated",
+        "No fiscal runtime changes"
+      ]
+    },
+    {
+      "id": "LAB-02",
+      "title": "Independent EGM architecture review",
+      "depends_on": [
+        "LAB-01"
+      ],
+      "acceptance": [
+        "Review artifacts verified against code",
+        "Architectural gaps documented"
+      ]
+    },
+    {
+      "id": "LAB-03",
+      "title": "Interrupted Claude to Codex to Gemini recovery",
+      "depends_on": [
+        "LAB-02"
+      ],
+      "acceptance": [
+        "Cross-model checkpoint recovered",
+        "No duplicate work or false completion"
+      ]
+    }
+  ]
+}

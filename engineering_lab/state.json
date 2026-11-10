@@ -1,0 +1,17 @@
+{
+  "plan_id": "FM-LAB-001",
+  "tasks": {
+    "LAB-01": {
+      "status": "PENDING",
+      "evidence": {}
+    },
+    "LAB-02": {
+      "status": "PENDING",
+      "evidence": {}
+    },
+    "LAB-03": {
+      "status": "PENDING",
+      "evidence": {}
+    }
+  }
+}
