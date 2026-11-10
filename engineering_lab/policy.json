@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "engineering_tenant": "fm-tecnologia/nfcore-v2-lab",
+  "allowed_branches": [
+    "lab/fm-governed-agent-continuity-v1"
+  ],
+  "required_documents": [
+    "AGENTS.md",
+    "docs/standards/FM_AI_MASTER_PLAN_EXECUTION_STANDARD.md",
+    "docs/EXECUTION_TRACKER_V2.md",
+    "docs/NFCORE_COGNITIVE_CORE_ARCHITECTURE.md"
+  ],
+  "prohibited_actions": [
+    "merge",
+    "deploy",
+    "production",
+    "real credentials",
+    "fiscal issuance",
+    "cross-tenant actions",
+    "edit V1"
+  ]
+}

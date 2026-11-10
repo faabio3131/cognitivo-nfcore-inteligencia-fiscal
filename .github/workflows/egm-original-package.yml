@@ -1,0 +1,23 @@
+name: EGM Original - Package Integrity
+on:
+  pull_request:
+    paths:
+      - '.gitmodules'
+      - 'third_party/elephant-goldfish-model'
+      - 'egm_original_lab/**'
+      - 'scripts/check_egm_original.py'
+      - '.github/workflows/egm-original-package.yml'
+  push:
+    branches: [lab/fm-governed-agent-continuity-v1]
+permissions:
+  contents: read
+jobs:
+  original-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Validate upstream pinned revision, seven skills and ten personas
+        run: python3 scripts/check_egm_original.py

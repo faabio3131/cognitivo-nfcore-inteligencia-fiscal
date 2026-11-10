@@ -1,0 +1,19 @@
+name: FM Engineering Lab Governance
+on:
+  pull_request:
+    paths:
+      - 'engineering_lab/**'
+      - 'scripts/fm_agent_governance.py'
+      - 'tests/engineering_lab/**'
+      - '.github/workflows/fm-engineering-lab.yml'
+  push:
+    branches: [lab/fm-governed-agent-continuity-v1]
+permissions:
+  contents: read
+jobs:
+  governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/fm_agent_governance.py audit
+      - run: python3 -m unittest discover -s tests/engineering_lab -p 'test_*.py' -v
